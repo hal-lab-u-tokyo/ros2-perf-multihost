@@ -6,6 +6,7 @@
 
 ## Build
 ```bash
+sudo apt install python3-json5
 colcon build
 ```
 
@@ -37,6 +38,15 @@ python3 parse_json.py ../examples/topology_example/topology_example.json
 ```
 生成したdocker-compose.ymlからコンテナイメージを生成し、実行する。別のdocker-compose.ymlを実行していた場合は、`docker-compose down`を叩いておく
 ```bash
-docker-compose build --no-cache
-docker-compose up
+docker compose build --no-cache
+docker compose up
+```
+
+```bash
+docker compose down
+docker image prune -a
+
+# option (want to delete logs/*)
+cd performance_test
+chmod +x clear_log.sh
 ```
