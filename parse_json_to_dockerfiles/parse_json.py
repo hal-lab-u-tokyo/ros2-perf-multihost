@@ -214,10 +214,10 @@ def generate_docker_compose(json_content, rmw_zenoh_flag):
 
         additional_content = textwrap.dedent(f"""
             router_bridge:
-            build:
+              build:
                 context: Dockerfiles/router_bridge
                 dockerfile: Dockerfile
-            container_name: router_bridge
+              container_name: router_bridge
         """
         )
         additional_content = "  " + additional_content.replace("\n", "\n  ")
