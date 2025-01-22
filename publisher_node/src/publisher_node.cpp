@@ -131,7 +131,7 @@ class Publisher : public rclcpp::Node
         };
 
         // Qos設定
-        rclcpp::QoS qos(rclcpp::KeepLast(10));
+        rclcpp::QoS qos(rclcpp::KeepLast(1));
 
         // Publisher作成
         auto publisher = create_publisher<publisher_node::msg::IntMessage>(topic_name, qos);

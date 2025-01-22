@@ -102,7 +102,7 @@ public:
         record_log(topic_name, pub_node_name, current_pub_idx, sub_time);
       };
         
-      rclcpp::QoS qos(rclcpp::KeepLast(10));
+      rclcpp::QoS qos(rclcpp::KeepLast(1));
 
       // Subscriber作成
       auto subscriber = create_subscription<publisher_node::msg::IntMessage>(topic_name, qos, callback);

@@ -93,7 +93,7 @@ class Intermediate : public rclcpp::Node
         end_time_pub_[topic_name] = start_time_pub_[topic_name] + rclcpp::Duration::from_seconds(options.eval_time) ;
 
         // Qos設定
-        rclcpp::QoS qos(rclcpp::KeepLast(10));
+        rclcpp::QoS qos(rclcpp::KeepLast(1));
 
         // 各トピックに対し、単独のpubか、pub/sub兼任のpubかで分ける。
 
@@ -184,7 +184,7 @@ class Intermediate : public rclcpp::Node
         start_time_sub_[topic_name] = this->get_clock()->now();
         end_time_sub_[topic_name] = start_time_sub_[topic_name] + rclcpp::Duration::from_seconds(options.eval_time) ;
 
-        rclcpp::QoS qos(rclcpp::KeepLast(10));
+        rclcpp::QoS qos(rclcpp::KeepLast(1));
 
         // 各トピックに対し、単独のsubか、pub/sub兼任のsubかで分ける。
         // `callback`を事前に宣言
