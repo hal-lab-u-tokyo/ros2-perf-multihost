@@ -275,7 +275,7 @@ def measure_latency(pub_logdata, sub_logdata, topic_list):
         latency_statics = calcurate_statics(latency_results_for_all_topics, topic)
         latency_statics_for_all_topics[f"{topic}"] = latency_statics
 
-    with open("results/latency_results.txt", "w") as f:
+    with open("results/two_nodes_latency.txt", "w") as f:
         for topic in topic_list:
             loss_index_rate = loss_results_for_all_topics[f"{topic}"]
             latency_results = latency_results_for_all_topics[f"{topic}"]
@@ -295,32 +295,32 @@ def measure_latency(pub_logdata, sub_logdata, topic_list):
 
     return latency_statics_for_all_topics
 
-def measure_throughput(pub_info, latency_statics_for_all_topics, topic_list):
-    throughput_results_for_all_topics = {}
+# def measure_throughput(pub_info, latency_statics_for_all_topics, topic_list):
+#     throughput_results_for_all_topics = {}
 
-    for topic in topic_list:
-        payload_size = pub_info[f"{topic}"]["payload_size"]
-        payload_size_bit = int(payload_size) * 8 # bitに直す
-        latency_statics = latency_statics_for_all_topics[f"{topic}"]
-        sum_latency = latency_statics["sum"] * 0.001 # msをsに変換
-        print(sum_latency)
-        count_messages = latency_statics["count"]
-        print(count_messages)
+#     for topic in topic_list:
+#         payload_size = pub_info[f"{topic}"]["payload_size"]
+#         payload_size_bit = int(payload_size) * 8 # bitに直す
+#         latency_statics = latency_statics_for_all_topics[f"{topic}"]
+#         sum_latency = latency_statics["sum"] * 0.001 # msをsに変換
+#         print(sum_latency)
+#         count_messages = latency_statics["count"]
+#         print(count_messages)
 
-        throughput_results_for_all_topics[f"{topic}"] = round((payload_size_bit * count_messages) / sum_latency, 3)
+#         throughput_results_for_all_topics[f"{topic}"] = round((payload_size_bit * count_messages) / sum_latency, 3)
 
-    with open("results/throuput_results.txt", "w") as f:
-        for topic in topic_list:
-            f.write(f"topic: {topic}\n")
-            f.write(f"Throughput: {throughput_results_for_all_topics[f"{topic}"]}bps\n")
+#     with open("results/throuput_results.txt", "w") as f:
+#         for topic in topic_list:
+#             f.write(f"topic: {topic}\n")
+#             f.write(f"Throughput: {throughput_results_for_all_topics[f"{topic}"]}bps\n")
 
-    print("complete caluculating throughput!")
+#     print("complete caluculating throughput!")
 
-    return throughput_results_for_all_topics
+#     return throughput_results_for_all_topics
 
 if __name__ == "__main__":
     args = sys.argv
     pub_info, sub_info, common_topics = check_connect(args)
     pub_logdata, sub_logdata = get_logdata(pub_info, sub_info, common_topics)
     latency_statics_for_all_topics = measure_latency(pub_logdata, sub_logdata, common_topics)
-    throughput_results_for_all_topics = measure_throughput(pub_info, latency_statics_for_all_topics, common_topics)
+    # throughput_results_for_all_topics = measure_throughput(pub_info, latency_statics_for_all_topics, common_topics)
