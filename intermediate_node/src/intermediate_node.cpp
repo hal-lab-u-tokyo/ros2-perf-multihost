@@ -82,6 +82,21 @@ class Intermediate : public rclcpp::Node
     node_name = options.node_name;
     create_metadata_file(options);
 
+    // Qos設定
+    rclcpp::QoS qos = rclcpp::QoS(rclcpp::KeepLast(1));
+
+    if(options.qos_history == "KEEP_LAST") {
+      int qos_keep_depth = options.qos_depth;
+      qos.keep_last(qos_keep_depth);
+    } 
+    else if (options.qos_history == "KEEP_ALL") {
+      qos.keep_all();
+    }
+
+    if (options.qos_reliability == "BEST_EFFORT") {
+      qos.best_effort();
+    }
+
       // まずはPub
     for (size_t i = 0; i < options.topic_names_pub.size(); ++i) {
         const std::string & topic_name = options.topic_names_pub[i];
@@ -91,9 +106,6 @@ class Intermediate : public rclcpp::Node
         pub_idx_[topic_name] = 0;
         start_time_pub_[topic_name] = this->get_clock()->now();
         end_time_pub_[topic_name] = start_time_pub_[topic_name] + rclcpp::Duration::from_seconds(options.eval_time) ;
-
-        // Qos設定
-        rclcpp::QoS qos(rclcpp::KeepLast(1));
 
         // 各トピックに対し、単独のpubか、pub/sub兼任のpubかで分ける。
 
@@ -183,8 +195,6 @@ class Intermediate : public rclcpp::Node
         const std::string & topic_name = options.topic_names_sub[i];
         start_time_sub_[topic_name] = this->get_clock()->now();
         end_time_sub_[topic_name] = start_time_sub_[topic_name] + rclcpp::Duration::from_seconds(options.eval_time) ;
-
-        rclcpp::QoS qos(rclcpp::KeepLast(1));
 
         // 各トピックに対し、単独のsubか、pub/sub兼任のsubかで分ける。
         // `callback`を事前に宣言

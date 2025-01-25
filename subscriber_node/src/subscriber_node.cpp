@@ -101,8 +101,22 @@ public:
         // ログに記録
         record_log(topic_name, pub_node_name, current_pub_idx, sub_time);
       };
-        
-      rclcpp::QoS qos(rclcpp::KeepLast(1));
+
+      // Qos設定
+      rclcpp::QoS qos = rclcpp::QoS(rclcpp::KeepLast(1));
+
+      if(options.qos_history == "KEEP_LAST") {
+        int qos_keep_depth = options.qos_depth;
+        qos.keep_last(qos_keep_depth);
+      } 
+      else if (options.qos_history == "KEEP_ALL") {
+        qos.keep_all();
+      }
+
+      if (options.qos_reliability == "BEST_EFFORT") {
+        qos.best_effort();
+      }
+      
 
       // Subscriber作成
       auto subscriber = create_subscription<publisher_node::msg::IntMessage>(topic_name, qos, callback);

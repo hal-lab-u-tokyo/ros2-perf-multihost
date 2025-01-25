@@ -131,7 +131,21 @@ class Publisher : public rclcpp::Node
         };
 
         // Qos設定
-        rclcpp::QoS qos(rclcpp::KeepLast(1));
+        rclcpp::QoS qos = rclcpp::QoS(rclcpp::KeepLast(1));
+
+        if(options.qos_history == "KEEP_LAST") {
+          int qos_keep_depth = options.qos_depth;
+          qos.keep_last(qos_keep_depth);
+        } 
+        else if (options.qos_history == "KEEP_ALL") {
+          qos.keep_all();
+        }
+
+        if (options.qos_reliability == "BEST_EFFORT") {
+          qos.best_effort();
+        }
+
+        print_qos_settings(qos);
 
         // Publisher作成
         auto publisher = create_publisher<publisher_node::msg::IntMessage>(topic_name, qos);
@@ -280,7 +294,24 @@ class Publisher : public rclcpp::Node
         }
       }
     }
+
+    void print_qos_settings(const rclcpp::QoS &qos) {
+      auto qos_profile = qos.get_rmw_qos_profile();
+
+      // QoSの列挙型を文字列に変換する関数
+      std::string reliability = (qos_profile.reliability == rmw_qos_reliability_policy_t::RMW_QOS_POLICY_RELIABILITY_BEST_EFFORT) ? "Best Effort" : "Reliable";
+      std::string durability = (qos_profile.durability == rmw_qos_durability_policy_t::RMW_QOS_POLICY_DURABILITY_TRANSIENT_LOCAL) ? "Transient Local" : "Volatile";
+      std::string history = (qos_profile.history == rmw_qos_history_policy_t::RMW_QOS_POLICY_HISTORY_KEEP_LAST) ? "Keep Last" : "Keep All";
+      std::string depth = std::to_string(qos_profile.depth);
+      
+      std::cout << "QoS Settings" << std::endl;
+      std::cout << "Reliability: " << reliability << std::endl;
+      std::cout << "Durability: " << durability << std::endl;
+      std::cout << "History: " << history << std::endl;
+      std::cout << "Depth: " << depth << std::endl;
+    }
 };
+
 
 void sigint_handler (int signum)
 {

@@ -23,6 +23,9 @@ public:
  std::vector<int> payload_size;
  std::vector<int> period_ms;
  int eval_time;
+ std::string qos_history;
+ int qos_depth;
+ std::string qos_reliability;
 };
 
 std::ostream & operator<<(std::ostream & os, const Options & options);

@@ -13,6 +13,9 @@ namespace node_options
 Options::Options()
 {
     eval_time = 60;
+    qos_history = "KEEP_LAST";
+    qos_depth = 1;
+    qos_reliability = "RELIABLE";
 }
 
 // コンストラクタ
@@ -33,7 +36,10 @@ void Options::parse(int argc, char ** argv)
         ("topic_names_sub", "topic_name for this node", cxxopts::value<std::vector<std::string>>(topic_names_sub))
         ("s, size", "payload size", cxxopts::value<std::vector<int>>(payload_size), "bytes")
         ("p, period", "publish frequency", cxxopts::value<std::vector<int>>(period_ms), "ms_sec")
-        ("eval_time", "period of publishing", cxxopts::value<int>(eval_time), "sec");
+        ("eval_time", "period of publishing", cxxopts::value<int>(eval_time), "sec")
+        ("qos_history", "KEEP_LAST or KEEP_ALL", cxxopts::value<std::string>(qos_history))
+        ("qos_depth", "KEEP_LAST(n)", cxxopts::value<int>(qos_depth))
+        ("qos_reliability", "RELIABLE or BEST_EFFORT", cxxopts::value<std::string>(qos_reliability));
 
     try {
         auto result = options.parse(argc, argv);
