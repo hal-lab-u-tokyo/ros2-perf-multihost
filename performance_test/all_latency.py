@@ -175,7 +175,7 @@ def cal_all_latency(all_node_info):
 
                 sub_node_statics["topics"].append(sub_topic_statics) # {"node": lyon, "topics": [{"topic": amazon, "loss": 0, "mean": 0.220, ...}, {"topic": inazuma, }...] }
 
-        all_latency_results.append(latency_results)
+                all_latency_results.append(latency_results)
         sub_all_node_statics.append(sub_node_statics)
 
     return sub_all_node_statics, all_latency_results
@@ -233,6 +233,7 @@ def write_total_latency(sub_all_node_statics, all_latency_results):
         f.write(f"{header}\n")
         f.write("-" * len(header))
         f.write("\n")
+        f.write(final_latency_results)
 
         for row in data[1:]:
             row = "".join(f"{row[i]:<{col_widths[i]}}" for i in range(len(row)) )
