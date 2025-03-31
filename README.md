@@ -72,7 +72,7 @@ docker compose up
 docker compose down
 docker image prune -a
 ```
-## Performance_test
+## Performance test
 `docker-compose`の結果生成されたログファイルに対し、レイテンシの統計データを算出するテストスクリプトを実行する。
 ```bash
 cd performance_test
