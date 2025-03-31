@@ -1,8 +1,16 @@
 # graduate_research
 
-以下のパッケージを組み合わせます:
-1. ノード名やトピック名、ペイロードサイズ等のoptionを制御できるPublisher, Subscriberを作成するパッケージ
-2. jsonファイルをparseして、立ち上げるコンテナ、ノードの種類、ノードの設定を書き込んだdocker-compose.ymlを作成するパッケージ
+各ディレクトリの役割
+`publisher_node`, `subscriber_node`, `intermediate_node`:
+ノード名やトピック名、メッセージのペイロードサイズを受け取り、複数のトピックを持ち得る Publisher, Subscriber, およびそれらの兼任(Intermediate)ノードを作成する。同時にそれらのノードの起動時間も設定し、起動し終わった後ノードを自動的にシャットダウンする。測定ログ(メッセージを送受信した履歴)と、ノードのメタデータを記録したtxtファイルを格納するディレクトリを作成する機能もここに実装している。
+`node_options`, `node_options_intermediate`:
+上記のノードに関する設定を、コマンドライン引数としてユーザが指定できるようにする。`options.add_options()`の項目を増やすことで、新たな設定を追加することもできる。IntermediateではPublisherとSubscriberの両方にそれぞれトピック名を指定する仕様のため、通常のPublisherおよびSubscriberの設定と分けている。
+`parse_json_to_dockerfiles`:
+`example`フォルダにあるようなJSONファイルを受け取り、それらの設定を反映したノードが立ち上がるようなDockerfileをホストの数だけ作成する。同時にそれらのDockerfilesを一斉起動するための`docker-compose.yml`ファイルも作成する。
+`docker_base`:
+`parse_json_to_dockerfiles`でDockerfileを作成するにあたり、どんなノードでも使用する共通の命令を記述したDockerfileが入っている。`parse_json_to_dockerfiles`では、このベースDockerfileにJSONファイルに記述された内容を付け足していく形でDockerfileを作成する。
+`performance_test`:
+ROS 2システムを起動した結果生成された`logs`フォルダに対し、それらのノードのレイテンシに関する統計データを算出する`all_latency.py`と、前回の`logs`フォルダを削除するための`clear_log.sh`ファイルが格納されている。`two_nodes_latency.py`に関しては、任意の2ノードを指定することでそれらのレイテンシデータを算出するために作成したが、途中でROS 2システム全体のレイテンシデータを算出する`all_latency.py`の方が良いことに気づき、中途半端な状態で放置している。
 
 ## Build
 ```bash
@@ -45,8 +53,12 @@ docker compose up
 ```bash
 docker compose down
 docker image prune -a
-
-# option (want to delete logs/*)
+```
+## Performance_test
+`docker-compose`の結果生成されたログファイルに対し、レイテンシの統計データを算出するテストスクリプトを実行する。
+```bash
 cd performance_test
+python3 all_latency.py
+# option (want to delete logs/*)
 chmod +x clear_log.sh
 ```
