@@ -12,7 +12,7 @@
 
 `parse_json_to_dockerfiles`:
 
-`example`フォルダにあるようなJSONファイルを受け取り、それらの設定を反映したノードが立ち上がるようなDockerfileをホストの数だけ作成する。同時にそれらのDockerfilesを一斉起動するための`docker-compose.yml`ファイルも作成する。
+`examples`フォルダにあるようなJSONファイルを受け取り、それらの設定を反映したノードが立ち上がるようなDockerfileをホストの数だけ作成する。同時にそれらのDockerfilesを一斉起動するための`docker-compose.yml`ファイルも作成する。
 
 `docker_base`:
 
@@ -21,6 +21,14 @@
 `performance_test`:
 
 ROS 2システムを起動した結果生成された`logs`フォルダに対し、それらのノードのレイテンシに関する統計データを算出する`all_latency.py`と、前回の`logs`フォルダを削除するための`clear_log.sh`ファイルが格納されている。`two_nodes_latency.py`に関しては、任意の2ノードを指定することでそれらのレイテンシデータを算出するために作成したが、途中でROS 2システム全体のレイテンシデータを算出する`all_latency.py`の方が良いことに気づき、中途半端な状態で放置している。
+
+`examples`:
+
+入力JSONファイルや、そのJSONファイルから生成される`docker-compose.yml`ファイルの例を置いている。
+
+`config`:
+
+Dockerコンテナ内にZenohルーターを立ち上げるにあたり必要な設定ファイルを置いている。詳しくはZenoh公式のドキュメントを参照。
 
 ## Build
 ```bash
