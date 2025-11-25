@@ -1,0 +1,6 @@
+Name: inter1
+NodeType: Intermediate
+Topics(Pub): amazon,inazuma,
+PayloadSize: 32,32,
+Period: 1000,1000,
+Topics(Sub): inazuma,

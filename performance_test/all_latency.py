@@ -233,7 +233,7 @@ def write_total_latency(sub_all_node_statics, all_latency_results):
         f.write(f"{header}\n")
         f.write("-" * len(header))
         f.write("\n")
-        f.write(final_latency_results)
+        # f.write(final_latency_results)
 
         for row in data[1:]:
             row = "".join(f"{row[i]:<{col_widths[i]}}" for i in range(len(row)) )
@@ -241,6 +241,7 @@ def write_total_latency(sub_all_node_statics, all_latency_results):
 
 
 if __name__ == "__main__":
+    os.makedirs("results", exist_ok=True)
     all_node_info = get_node_and_topics()
     print(all_node_info)
     sub_all_node_statics, all_latency_results = cal_all_latency(all_node_info)

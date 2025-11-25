@@ -1,0 +1,5 @@
+Name: pub2
+NodeType: Publisher
+Topics: inazuma,
+PayloadSize: 32,
+Period: 1000,

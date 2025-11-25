@@ -35,6 +35,16 @@ def generate_dockerfiles(json_content, file_path):
         eval_time = json_content["eval_time"]
     else:
         eval_time = 60
+        
+    if "payload_size" in json_content:
+        payload_size = json_content["payload_size"]
+    else:
+        payload_size = 32
+        
+    if "period_ms" in json_content:
+        period_ms = json_content["period_ms"]
+    else:
+        period_ms = 100
     
     if ("rmw" in json_content and json_content["rmw"] == "zenoh"):
         rmw_zenoh_flag = True
@@ -72,7 +82,7 @@ def generate_dockerfiles(json_content, file_path):
             json5.dump(config_json, f, indent=4)
 
         make_config_file_command = textwrap.dedent(
-        f"""
+        """
         COPY multihost_config.json5 /root/performance_ws/src/graduate_research/config/multihost_config.json5
         """
         )
@@ -122,10 +132,10 @@ def generate_dockerfiles(json_content, file_path):
                 if node.get("publisher"):
                     publisher_list = node["publisher"]
                     topic_names = ",".join(publisher["topic_name"] for publisher in publisher_list)
-                    payload_sizes = ",".join(str(publisher["payload_size"]) for publisher in publisher_list)
-                    period_ms = ",".join(str(publisher["period_ms"]) for publisher in publisher_list)
+                    # payload_sizes = ",".join(str(publisher["payload_size"]) for publisher in publisher_list)
+                    # period_ms = ",".join(str(publisher["period_ms"]) for publisher in publisher_list)
 
-                    additional_command = f"{zenoh_router_command}. /root/performance_ws/install/setup.sh {zenoh_config_command} && cd /root/performance_ws/install/publisher_node/lib/publisher_node && ./publisher_node_exe --node_name {node_name} --topic_names {topic_names} -s {payload_sizes} -p {period_ms} --eval_time {eval_time}"
+                    additional_command = f"{zenoh_router_command}. /root/performance_ws/install/setup.sh {zenoh_config_command} && cd /root/performance_ws/install/publisher_node/lib/publisher_node && ./publisher_node_exe --node_name {node_name} --topic_names {topic_names} -s {payload_size} -p {period_ms} --eval_time {eval_time}"
                     base_command += additional_command
 
                 if node.get("subscriber"):
@@ -140,11 +150,11 @@ def generate_dockerfiles(json_content, file_path):
                     subscriber_list = node["intermediate"][0]["subscriber"]
 
                     topic_names_pub = ",".join(publisher["topic_name"] for publisher in publisher_list)
-                    payload_sizes = ",".join(str(publisher["payload_size"]) for publisher in publisher_list)
-                    period_ms = ",".join(str(publisher["period_ms"]) for publisher in publisher_list)
+                    # payload_sizes = ",".join(str(publisher["payload_size"]) for publisher in publisher_list)
+                    # period_ms = ",".join(str(publisher["period_ms"]) for publisher in publisher_list)
                     topic_names_sub = ",".join(subscriber["topic_name"] for subscriber in subscriber_list)
 
-                    additional_command =f"{zenoh_router_command}. /root/performance_ws/install/setup.sh {zenoh_config_command} && cd /root/performance_ws/install/intermediate_node/lib/intermediate_node && ./intermediate_node --node_name {node_name} --topic_names_pub {topic_names_pub} --topic_names_sub {topic_names_sub} -s {payload_sizes} -p {period_ms} --eval_time {eval_time}"
+                    additional_command =f"{zenoh_router_command}. /root/performance_ws/install/setup.sh {zenoh_config_command} && cd /root/performance_ws/install/intermediate_node/lib/intermediate_node && ./intermediate_node --node_name {node_name} --topic_names_pub {topic_names_pub} --topic_names_sub {topic_names_sub} -s {payload_size} -p {period_ms} --eval_time {eval_time}"
                     base_command += additional_command
 
                 continue
@@ -153,10 +163,10 @@ def generate_dockerfiles(json_content, file_path):
             if node.get("publisher"):
                 publisher_list = node["publisher"]
                 topic_names = ",".join(publisher["topic_name"] for publisher in publisher_list)
-                payload_sizes = ",".join(str(publisher["payload_size"]) for publisher in publisher_list)
-                period_ms = ",".join(str(publisher["period_ms"]) for publisher in publisher_list)
+                # payload_sizes = ",".join(str(publisher["payload_size"]) for publisher in publisher_list)
+                # period_ms = ",".join(str(publisher["period_ms"]) for publisher in publisher_list)
 
-                additional_command = f" & . /root/performance_ws/install/setup.sh {zenoh_config_command} && cd /root/performance_ws/install/publisher_node/lib/publisher_node && ./publisher_node_exe --node_name {node_name} --topic_names {topic_names} -s {payload_sizes} -p {period_ms} --eval_time {eval_time}"
+                additional_command = f" & . /root/performance_ws/install/setup.sh {zenoh_config_command} && cd /root/performance_ws/install/publisher_node/lib/publisher_node && ./publisher_node_exe --node_name {node_name} --topic_names {topic_names} -s {payload_size} -p {period_ms} --eval_time {eval_time}"
                 base_command += additional_command
 
             if node.get("subscriber"):
@@ -171,11 +181,11 @@ def generate_dockerfiles(json_content, file_path):
                 subscriber_list = node["intermediate"][0]["subscriber"]
 
                 topic_names_pub = ",".join(publisher["topic_name"] for publisher in publisher_list)
-                payload_sizes = ",".join(str(publisher["payload_size"]) for publisher in publisher_list)
-                period_ms = ",".join(str(publisher["period_ms"]) for publisher in publisher_list)
+                # payload_sizes = ",".join(str(publisher["payload_size"]) for publisher in publisher_list)
+                # period_ms = ",".join(str(publisher["period_ms"]) for publisher in publisher_list)
                 topic_names_sub = ",".join(subscriber["topic_name"] for subscriber in subscriber_list)
 
-                additional_command =f" & . /root/performance_ws/install/setup.sh {zenoh_config_command} && cd /root/performance_ws/install/intermediate_node/lib/intermediate_node && ./intermediate_node --node_name {node_name} --topic_names_pub {topic_names_pub} --topic_names_sub {topic_names_sub} -s {payload_sizes} -p {period_ms} --eval_time {eval_time}"
+                additional_command =f" & . /root/performance_ws/install/setup.sh {zenoh_config_command} && cd /root/performance_ws/install/intermediate_node/lib/intermediate_node && ./intermediate_node --node_name {node_name} --topic_names_pub {topic_names_pub} --topic_names_sub {topic_names_sub} -s {payload_size} -p {period_ms} --eval_time {eval_time}"
                 base_command += additional_command
 
             # コマンドの最後には wait 命令をつける
@@ -212,7 +222,7 @@ def generate_docker_compose(json_content, rmw_zenoh_flag):
 
     if rmw_zenoh_flag:
 
-        additional_content = textwrap.dedent(f"""
+        additional_content = textwrap.dedent("""
             router_bridge:
               build:
                 context: Dockerfiles/router_bridge
