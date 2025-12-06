@@ -277,7 +277,7 @@ def generate_host_scripts(json_content):
         lines = []
         lines.append("#!/usr/bin/env bash")
         lines.append("set -e")
-        lines.append("source /root/ros_ws/install/setup.bash")
+        lines.append("source /root/ros2-perf-multihost-v2/install/setup.bash")
 
         for node in nodes:
             node_name = node["node_name"]
@@ -285,7 +285,7 @@ def generate_host_scripts(json_content):
             if node.get("publisher"):
                 pub_list = node["publisher"]
                 topic_names = ",".join(p["topic_name"] for p in pub_list)
-                lines.append("cd /root/ros_ws/install/publisher_node/lib/publisher_node")
+                lines.append("cd /root/ros2-perf-multihost-v2/install/publisher_node/lib/publisher_node")
                 lines.append(
                     f"./publisher_node_exe "
                     f"--node_name {node_name} "
@@ -297,7 +297,7 @@ def generate_host_scripts(json_content):
             if node.get("subscriber"):
                 sub_list = node["subscriber"]
                 topic_names = ",".join(s["topic_name"] for s in sub_list)
-                lines.append("cd /root/ros_ws/install/subscriber_node/lib/subscriber_node")
+                lines.append("cd /root/ros2-perf-multihost-v2/install/subscriber_node/lib/subscriber_node")
                 lines.append(
                     f"./subscriber_node --node_name {node_name} --topic_names {topic_names} --eval_time {eval_time} &"
                 )
@@ -307,7 +307,7 @@ def generate_host_scripts(json_content):
                 sub_list = node["intermediate"][0]["subscriber"]
                 topic_names_pub = ",".join(p["topic_name"] for p in pub_list)
                 topic_names_sub = ",".join(s["topic_name"] for s in sub_list)
-                lines.append("cd /root/ros_ws/install/intermediate_node/lib/intermediate_node")
+                lines.append("cd /root/ros2-perf-multihost-v2/install/intermediate_node/lib/intermediate_node")
                 lines.append(
                     f"./intermediate_node "
                     f"--node_name {node_name} "
