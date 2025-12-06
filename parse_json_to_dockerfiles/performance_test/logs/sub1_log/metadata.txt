@@ -1,3 +1,0 @@
-Name: sub1
-NodeType: Subscriber
-Topics: amazon,

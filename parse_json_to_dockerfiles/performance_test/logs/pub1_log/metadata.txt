@@ -1,5 +1,0 @@
-Name: pub1
-NodeType: Publisher
-Topics: amazon,
-PayloadSize: 32,
-Period: 1000,
