@@ -84,14 +84,14 @@ def generate_dockerfiles(json_content, file_path):
 
         make_config_file_command = textwrap.dedent(
             """
-        COPY multihost_config.json5 /root/performance_ws/src/graduate_research/config/multihost_config.json5
+        COPY multihost_config.json5 ~/performance_ws/src/graduate_research/config/multihost_config.json5
         """
         )
         docker_base_content += make_config_file_command
 
         dockerfile_content = docker_base_content
-        new_config_path = "/root/performance_ws/src/graduate_research/config/multihost_config.json5"
-        zenoh_router_bridge_command = f". /root/performance_ws/install/setup.sh &&  export ZENOH_ROUTER_CONFIG_URI={new_config_path} && ros2 run rmw_zenoh_cpp rmw_zenohd"
+        new_config_path = "~/performance_ws/src/graduate_research/config/multihost_config.json5"
+        zenoh_router_bridge_command = f". ~/performance_ws/install/setup.sh &&  export ZENOH_ROUTER_CONFIG_URI={new_config_path} && ros2 run rmw_zenoh_cpp rmw_zenohd"
 
         additional_content = textwrap.dedent(f"""
         # コンテナを起動するときのコマンド ENVを扱うために、exec形式でありながらシェル形式を用いる(/bin/bash -c)
@@ -256,121 +256,9 @@ def generate_docker_compose(json_content, rmw_zenoh_flag):
     return
 
 
-def generate_host_scripts(json_content):
-    # ホストごとの起動スクリプトを出力するディレクトリ
-    output_dir = "../host_scripts"
-    if os.path.exists(output_dir):
-        shutil.rmtree(output_dir)
-    os.makedirs(output_dir, exist_ok=True)
-
-    eval_time = json_content.get("eval_time", 60)
-    payload_size = json_content.get("payload_size", 32)
-    period_ms = json_content.get("period_ms", 100)
-
-    hosts = json_content["hosts"]
-
-    for host_dict in hosts:
-        host_name = host_dict["host_name"]
-        nodes = host_dict["nodes"]
-
-        script_path = os.path.join(output_dir, f"{host_name}_start.sh")
-        lines = []
-        lines.append("#!/usr/bin/env bash")
-        lines.append("set -e")
-        lines.append("source /root/ros2-perf-multihost-v2/install/setup.bash")
-
-        for node in nodes:
-            node_name = node["node_name"]
-
-            if node.get("publisher"):
-                pub_list = node["publisher"]
-                topic_names = ",".join(p["topic_name"] for p in pub_list)
-                lines.append("cd /root/ros2-perf-multihost-v2/install/publisher_node/lib/publisher_node")
-                lines.append(
-                    f"./publisher_node_exe "
-                    f"--node_name {node_name} "
-                    f"--topic_names {topic_names} "
-                    f"-s {payload_size} -p {period_ms} "
-                    f"--eval_time {eval_time} &"
-                )
-
-            if node.get("subscriber"):
-                sub_list = node["subscriber"]
-                topic_names = ",".join(s["topic_name"] for s in sub_list)
-                lines.append("cd /root/ros2-perf-multihost-v2/install/subscriber_node/lib/subscriber_node")
-                lines.append(
-                    f"./subscriber_node --node_name {node_name} --topic_names {topic_names} --eval_time {eval_time} &"
-                )
-
-            if node.get("intermediate"):
-                pub_list = node["intermediate"][0]["publisher"]
-                sub_list = node["intermediate"][0]["subscriber"]
-                topic_names_pub = ",".join(p["topic_name"] for p in pub_list)
-                topic_names_sub = ",".join(s["topic_name"] for s in sub_list)
-                lines.append("cd /root/ros2-perf-multihost-v2/install/intermediate_node/lib/intermediate_node")
-                lines.append(
-                    f"./intermediate_node "
-                    f"--node_name {node_name} "
-                    f"--topic_names_pub {topic_names_pub} "
-                    f"--topic_names_sub {topic_names_sub} "
-                    f"-s {payload_size} -p {period_ms} "
-                    f"--eval_time {eval_time} &"
-                )
-
-        lines.append("wait")
-        lines.append(f'echo "All nodes on host {host_name} finished."')
-
-        with open(script_path, "w") as f:
-            f.write("\n".join(lines))
-
-        os.chmod(script_path, 0o755)
-
-
-def generate_master_launcher(json_content):
-    """
-    ホストPC用ランチャースクリプトを生成する
-    - host_scripts/run_all_hosts.sh を作成
-    - 各 host_name に対して ssh で {host_name}_start.sh を実行
-    """
-    output_dir = "../host_scripts"
-    os.makedirs(output_dir, exist_ok=True)
-
-    hosts = json_content["hosts"]
-    launcher_path = os.path.join(output_dir, "run_all_hosts.sh")
-
-    lines = []
-    lines.append("#!/usr/bin/env bash")
-    lines.append("set -e")
-    lines.append("")
-    lines.append("# このスクリプトはホストPC上で実行することを想定しています。")
-    lines.append("# 事前に各ラズパイに {host_name}_start.sh をコピーしておいてください。")
-    lines.append("")
-
-    for host_dict in hosts:
-        host_name = host_dict["host_name"]
-        # 必要に応じてユーザ名を固定したければ pi@{host_name} などにする
-        remote = host_name
-        remote_script_path = f"~/ros2-perf-multihost-v2/host_scripts/{host_name}_start.sh"
-
-        # 並列実行したいので & を付ける
-        lines.append(f'echo "=== start {host_name} ==="')
-        lines.append(f"ssh {remote} 'chmod +x {remote_script_path} && ~/\"{remote_script_path}\"' &")
-        lines.append("")
-
-    lines.append("wait")
-    lines.append('echo "=== all hosts finished ==="')
-
-    with open(launcher_path, "w") as f:
-        f.write("\n".join(lines))
-
-    os.chmod(launcher_path, 0o755)
-
-
 if __name__ == "__main__":
     args = sys.argv
     json_content, file_path = load_json_file(args)
 
-    # rmw_zenoh_flag = generate_dockerfiles(json_content, file_path)
-    # generate_docker_compose(json_content, rmw_zenoh_flag)
-    generate_host_scripts(json_content)
-    generate_master_launcher(json_content)
+    rmw_zenoh_flag = generate_dockerfiles(json_content, file_path)
+    generate_docker_compose(json_content, rmw_zenoh_flag)
