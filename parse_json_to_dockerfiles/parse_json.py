@@ -350,11 +350,11 @@ def generate_master_launcher(json_content):
         host_name = host_dict["host_name"]
         # 必要に応じてユーザ名を固定したければ pi@{host_name} などにする
         remote = host_name
-        remote_script = f"{host_name}_start.sh"
+        remote_script_path = f"~/ros2-perf-multihost-v2/host_scripts/{host_name}_start.sh"
 
         # 並列実行したいので & を付ける
         lines.append(f'echo "=== start {host_name} ==="')
-        lines.append(f"ssh {remote} 'chmod +x ~/{remote_script} && ~/\"{remote_script}\"' &")
+        lines.append(f"ssh {remote} 'chmod +x {remote_script_path} && ~/\"{remote_script_path}\"' &")
         lines.append("")
 
     lines.append("wait")

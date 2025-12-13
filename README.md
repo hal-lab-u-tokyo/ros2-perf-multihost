@@ -32,7 +32,7 @@ Dockerコンテナ内にZenohルーターを立ち上げるにあたり必要な
 
 ## Build
 ```bash
-sudo apt install python3-json5
+sudo apt install python3-json5 libcxxopts-dev
 colcon build
 ```
 
