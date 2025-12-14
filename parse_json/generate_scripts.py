@@ -109,19 +109,31 @@ def generate_master_launcher(json_content):
     lines.append("# 事前に各ラズパイに {host_name}_start.sh をコピーしておいてください。")
     lines.append("")
 
+    # 1) 各ラズパイで *_start.sh を起動
     for host_dict in hosts:
         host_name = host_dict["host_name"]
-        # 必要に応じてユーザ名を固定したければ pi@{host_name} などにする
         remote = host_name
-        remote_script_path = f"~/ros2-perf-multihost-v2/host_scripts/{host_name}_start.sh"
+        remote_script_path = f"ros2-perf-multihost-v2/host_scripts/{host_name}_start.sh"
 
-        # 並列実行したいので & を付ける
         lines.append(f'echo "=== start {host_name} ==="')
-        lines.append(f"ssh {remote} 'chmod +x {remote_script_path} && ~/\"{remote_script_path}\"' &")
+        lines.append(f"ssh {remote} 'chmod +x ~/{remote_script_path} && ~/\"{remote_script_path}\"' &")
         lines.append("")
 
     lines.append("wait")
     lines.append('echo "=== all hosts finished ==="')
+    lines.append("")
+
+    # 2) 各ラズパイからログを回収
+    lines.append('echo "=== collecting logs to ../performance_test/logs ==="')
+    lines.append("mkdir -p ../performance_test/logs")
+    for host_dict in hosts:
+        host_name = host_dict["host_name"]
+        remote = host_name
+        # 各ラズパイ上の logs_local を回収
+        remote_logs = "ros2-perf-multihost-v2/src/graduate_research/performance_test/logs_local"
+        lines.append(f"scp -r {remote}:~/{remote_logs} ../performance_test/logs/{host_name}")
+
+    lines.append('echo "=== log collection finished ==="')
 
     with open(launcher_path, "w") as f:
         f.write("\n".join(lines))
