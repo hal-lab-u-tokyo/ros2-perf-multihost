@@ -256,9 +256,82 @@ def generate_docker_compose(json_content, rmw_zenoh_flag):
     return
 
 
+def generate_run_all_hosts_docker(json_content, rmw_zenoh_flag):
+    host_scripts_dir = "../host_scripts"
+    os.makedirs(host_scripts_dir, exist_ok=True)
+    script_path = os.path.join(host_scripts_dir, "run_all_hosts_docker.sh")
+
+    hosts = json_content["hosts"]
+
+    lines = [
+        "#!/bin/bash",
+        "set -e",
+        "",
+        'SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"',
+        'REPO_DIR="$(cd "${SCRIPT_DIR}/.." && pwd)"',
+        'DOCKERFILES_DIR="${REPO_DIR}/Dockerfiles"',
+        'LOCAL_LOGS_DIR="${REPO_DIR}/performance_test/logs"',
+        "",
+        'mkdir -p "${LOCAL_LOGS_DIR}"',
+        "",
+    ]
+
+    # ラズパイ側のリポジトリ配置を想定
+    remote_repo_dir = "~/ros2-perf-multihost-v2"
+    remote_dockerfiles_dir = f"{remote_repo_dir}/Dockerfiles"
+    remote_logs_dir = f"{remote_repo_dir}/performance_test/logs"
+
+    # 各ホストに Dockerfile を配布してコンテナ起動
+    for host_dict in hosts:
+        host_name = host_dict["host_name"]
+
+        lines.extend(
+            [
+                f'echo "=== Deploying Dockerfiles for {host_name} ==="',
+                f'ssh {host_name} "mkdir -p {remote_dockerfiles_dir} {remote_logs_dir}"',
+                f'scp -r "${{DOCKERFILES_DIR}}/{host_name}" {host_name}:{remote_dockerfiles_dir}/',
+                "",
+                f'echo "=== Building Docker image on {host_name} ==="',
+                f'ssh {host_name} "cd {remote_dockerfiles_dir}/{host_name} && docker build -t ros2_perf_{host_name} ."',
+                "",
+                f'echo "=== Running Docker container on {host_name} ==="',
+                f'ssh {host_name} "docker run --rm --network host '
+                f"-v {remote_logs_dir}:/root/performance_ws/src/graduate_research/performance_test/logs_local "
+                f'ros2_perf_{host_name}" &',
+                "",
+            ]
+        )
+
+    lines.append('echo "=== Waiting for all remote containers to finish ==="')
+    lines.append("wait")
+    lines.append("")
+
+    # 実行終了後に各ラズパイからログを回収
+    for host_dict in hosts:
+        host_name = host_dict["host_name"]
+
+        lines.extend(
+            [
+                f'echo "=== Collecting logs from {host_name} ==="',
+                f'mkdir -p "${{LOCAL_LOGS_DIR}}/{host_name}"',
+                f'scp -r {host_name}:{remote_logs_dir}/* "${{LOCAL_LOGS_DIR}}/{host_name}/" '
+                f'|| echo "No logs to copy from {host_name}"',
+                "",
+            ]
+        )
+
+    script_content = "\n".join(lines) + "\n"
+
+    with open(script_path, "w") as f:
+        f.write(script_content)
+
+    os.chmod(script_path, 0o755)
+
+
 if __name__ == "__main__":
     args = sys.argv
     json_content, file_path = load_json_file(args)
 
     rmw_zenoh_flag = generate_dockerfiles(json_content, file_path)
     generate_docker_compose(json_content, rmw_zenoh_flag)
+    generate_run_all_hosts_docker(json_content, rmw_zenoh_flag)

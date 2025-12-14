@@ -3,19 +3,21 @@ irobot_benchmark -> latency_all.txt
 
 input: logs folder
 output: latency_all.txt, latency_total.txt
-""" 
+"""
+
 import os
 import numpy as np
 
+
 # all_node_info = [{"name": lyon, "type": Publisher, "pub_topics": ["amazon", "inazuma", ...], "sub_topics": [] }, {}]
-def get_node_and_topics ():
+def get_node_and_topics():
     logs_folder_path = "./logs"
     all_node_info = []
 
     # metadata Subscriber or Intermediate
     for node_folder in os.listdir(logs_folder_path):
-        node_folder_path = os.path.join(logs_folder_path, node_folder) # ./logs/node1
-        metadata_path = os.path.join(node_folder_path, "metadata.txt") # ./logs/node1/metadata.txt
+        node_folder_path = os.path.join(logs_folder_path, node_folder)  # ./logs/node1
+        metadata_path = os.path.join(node_folder_path, "metadata.txt")  # ./logs/node1/metadata.txt
         node_info = {}
 
         with open(metadata_path, "r") as metadata:
@@ -27,23 +29,23 @@ def get_node_and_topics ():
 
             for line in lines:
                 if line.startswith("Name:"):
-                    node_name = line.split(":", 1)[1].strip() # node1
+                    node_name = line.split(":", 1)[1].strip()  # node1
                 if line.startswith("NodeType:"):
-                    node_type = line.split(":", 1)[1].strip() # ”Publisher", "Intermediate" 
+                    node_type = line.split(":", 1)[1].strip()  # ”Publisher", "Intermediate"
 
-            if(node_type == "Publisher"):
+            if node_type == "Publisher":
                 for line in lines:
                     if line.startswith("Topics:"):
                         topics = line.split(":", 1)[1].strip().split(",")
-                        pub_topic_list = [topic for topic in topics if topic] 
+                        pub_topic_list = [topic for topic in topics if topic]
 
-            elif(node_type == "Subscriber"):
+            elif node_type == "Subscriber":
                 for line in lines:
                     if line.startswith("Topics:"):
                         topics = line.split(":", 1)[1].strip().split(",")
                         sub_topic_list = [topic for topic in topics if topic]
 
-            elif(node_type == "Intermediate"):
+            elif node_type == "Intermediate":
                 for line in lines:
                     if line.startswith("Topics(Pub):"):
                         pub_topics = line.split(":", 1)[1].strip().split(",")
@@ -61,8 +63,8 @@ def get_node_and_topics ():
 
     return all_node_info
 
-def cal_all_latency(all_node_info):
 
+def cal_all_latency(all_node_info):
     # make log.txt -> [("StartTime, 1111"), ("EndTime, 2222"), (0, 1120), (1, 1125)...]
     def get_log(logdata_path, type):
         logdata_list = []
@@ -80,27 +82,26 @@ def cal_all_latency(all_node_info):
                 if "Index:" in line and "Timestamp:" in line:
                     # "Index:" と "Timestamp:" を分割して値を取得
                     parts = line.split(", ")
-                    if type == "Publisher": # Publisher log / Index: Timestamp: 
+                    if type == "Publisher":  # Publisher log / Index: Timestamp:
                         index = int(parts[0].split(":")[1].strip())
                         timestamp = int(parts[1].split(":")[1].strip())
                         logdata_list.append((index, timestamp))
-                    else:                   # Other log / Pub_Node_name: Index: Timestamp: 
+                    else:  # Other log / Pub_Node_name: Index: Timestamp:
                         index = int(parts[1].split(":")[1].strip())
                         timestamp = int(parts[2].split(":")[1].strip())
                         logdata_list.append((index, timestamp))
-                    
+
         return logdata_list
-    
 
     warmup_ns = 1_000_000_000
     all_latency_results = []
     sub_all_node_statics = []
     for sub_node_info in all_node_info:
-        if (sub_node_info["type"] == "Publisher"):
+        if sub_node_info["type"] == "Publisher":
             continue
-        
+
         else:
-            sub_node_statics = {}   # {"node": lyon, "topics": [{"topic": amazon, "loss": 0, "latency": [0.110, 0.223, ...]}, {"topic": inazuma, }...] }
+            sub_node_statics = {}  # {"node": lyon, "topics": [{"topic": amazon, "loss": 0, "latency": [0.110, 0.223, ...]}, {"topic": inazuma, }...] }
             sub_node_name = sub_node_info["name"]
             sub_node_type = sub_node_info["type"]
             sub_topic_list = sub_node_info["sub_topics"]
@@ -134,38 +135,68 @@ def cal_all_latency(all_node_info):
                         # print(pub_logdata_path)
                         # print(sub_logdata_path)
 
-                        pub_logdata_list = get_log(pub_logdata_path, pub_node_type) # [("StartTime, 1111"), ("EndTime, 2222"), (0, 1120), (1, 1125)...]
-                        sub_logdata_list = get_log(sub_logdata_path, sub_node_type) # [("StartTime, 1112"), ("EndTime, 2232"), (0, 1121), (1, 1128)...]
+                        pub_logdata_list = get_log(
+                            pub_logdata_path, pub_node_type
+                        )  # [("StartTime, 1111"), ("EndTime, 2222"), (0, 1120), (1, 1125)...]
+                        sub_logdata_list = get_log(
+                            sub_logdata_path, sub_node_type
+                        )  # [("StartTime, 1112"), ("EndTime, 2232"), (0, 1121), (1, 1128)...]
 
                         pub_start_time = next(item[1] for item in pub_logdata_list if item[0] == "StartTime")
                         pub_end_time = next(item[1] for item in pub_logdata_list if item[0] == "EndTime")
                         sub_start_time = next(item[1] for item in sub_logdata_list if item[0] == "StartTime")
                         sub_end_time = next(item[1] for item in sub_logdata_list if item[0] == "EndTime")
                         # StartTimeとEndTimeは用済なので消す
-                        pub_logdata_list = [item for item in pub_logdata_list if item[0] != "StartTime" and item[0]!= "EndTime"]
-                        sub_logdata_list = [item for item in sub_logdata_list if item[0] != "StartTime" and item[0]!= "EndTime"]
+                        pub_logdata_list = [
+                            item for item in pub_logdata_list if item[0] != "StartTime" and item[0] != "EndTime"
+                        ]
+                        sub_logdata_list = [
+                            item for item in sub_logdata_list if item[0] != "StartTime" and item[0] != "EndTime"
+                        ]
 
                         # この共通集合に入る時間帯が計測対象
                         common_start_time = int(max(pub_start_time, sub_start_time)) + warmup_ns
                         common_end_time = int(min(pub_end_time, sub_end_time))
 
-                        # Start~Endの共通集合に入らないindexを除く
-                        pub_indices = {item[0] for item in pub_logdata_list if int(item[1]) >= common_start_time and int(item[1]) <= common_end_time}
-                        sub_indices = {item[0] for item in sub_logdata_list if int(item[1]) >= common_start_time and int(item[1]) <= common_end_time}
+                        # 共通時間帯が成立しない場合は警告してスキップ
+                        if common_start_time >= common_end_time:
+                            print(
+                                f"[WARN] No common time window: node={sub_node_name}, topic={sub_topic} "
+                                f"pub_node={pub_node_name}, pub_path={pub_logdata_path}, sub_path={sub_logdata_path} "
+                                f"(pub:[{pub_start_time},{pub_end_time}] sub:[{sub_start_time},{sub_end_time}] warmup={warmup_ns})"
+                            )
+                            continue
 
-                        # その上で片方にしか入っていないindexをlossとしてlossをcount
-                        loss_index_count = len(set(pub_indices) - set(sub_indices)) + len(set(pub_indices) - set(sub_indices))
+                        # Start~Endの共通集合に入らないindexを除く
+                        pub_indices = {
+                            item[0]
+                            for item in pub_logdata_list
+                            if int(item[1]) >= common_start_time and int(item[1]) <= common_end_time
+                        }
+                        sub_indices = {
+                            item[0]
+                            for item in sub_logdata_list
+                            if int(item[1]) >= common_start_time and int(item[1]) <= common_end_time
+                        }
+
+                        # pubまたはsubの片方にしか入っていないindexをlossとしてlossをcount
+                        loss_index_count = len(set(pub_indices) - set(sub_indices)) + len(set(sub_indices) - set(pub_indices))
                         loss += loss_index_count
-                        common_indices = pub_indices.intersection(sub_indices) # [0, 1, 3, ...]
+                        common_indices = pub_indices.intersection(sub_indices)  # [0, 1, 3, ...]
+
+                        pub_dict = dict(pub_logdata_list)  # {index: timestamp}
+                        sub_dict = dict(sub_logdata_list)
 
                         for index in common_indices:
-                            timestamp_pub = next(timestamp for idx, timestamp in pub_logdata_list if idx == index)
-                            timestamp_sub = next(timestamp for idx, timestamp in sub_logdata_list if idx == index)
+                            latency_results.append((sub_dict[index] - pub_dict[index]) / 1_000_000)
+                        # for index in common_indices:
+                        #     timestamp_pub = next(timestamp for idx, timestamp in pub_logdata_list if idx == index)
+                        #     timestamp_sub = next(timestamp for idx, timestamp in sub_logdata_list if idx == index)
 
-                            latency_results.append((timestamp_sub - timestamp_pub)/ 1_000_000) # [0.120, 0.321, ...]
+                        #     latency_results.append((timestamp_sub - timestamp_pub) / 1_000_000)  # [0.120, 0.321, ...]
 
                 sub_topic_statics["loss"] = loss
-                sub_topic_statics["mean"] =round(np.mean(latency_results), 6)
+                sub_topic_statics["mean"] = round(np.mean(latency_results), 6)
                 sub_topic_statics["sd"] = round(np.std(latency_results), 6)
                 sub_topic_statics["min"] = round(np.min(latency_results), 6)
                 sub_topic_statics["max"] = round(np.max(latency_results), 6)
@@ -173,12 +204,15 @@ def cal_all_latency(all_node_info):
                 sub_topic_statics["mid"] = round(np.percentile(latency_results, 50), 6)
                 sub_topic_statics["q3"] = round(np.percentile(latency_results, 75), 6)
 
-                sub_node_statics["topics"].append(sub_topic_statics) # {"node": lyon, "topics": [{"topic": amazon, "loss": 0, "mean": 0.220, ...}, {"topic": inazuma, }...] }
+                sub_node_statics["topics"].append(
+                    sub_topic_statics
+                )  # {"node": lyon, "topics": [{"topic": amazon, "loss": 0, "mean": 0.220, ...}, {"topic": inazuma, }...] }
 
                 all_latency_results.append(latency_results)
         sub_all_node_statics.append(sub_node_statics)
 
     return sub_all_node_statics, all_latency_results
+
 
 def write_all_latency(sub_all_node_statics):
     data = []
@@ -196,17 +230,31 @@ def write_all_latency(sub_all_node_statics):
                 topic_mid = topic_statics["mid"]
                 topic_q3 = topic_statics["q3"]
                 topic_max = topic_statics["max"]
-                data.append([node_name, topic_name, topic_loss, topic_mean, topic_sd, topic_min, topic_q1, topic_mid, topic_q3, topic_max])
+                data.append(
+                    [
+                        node_name,
+                        topic_name,
+                        topic_loss,
+                        topic_mean,
+                        topic_sd,
+                        topic_min,
+                        topic_q1,
+                        topic_mid,
+                        topic_q3,
+                        topic_max,
+                    ]
+                )
 
-        col_widths =[12, 12, 12, 12, 12, 12, 12, 12, 12, 12]
-        header = "".join(f"{data[0][i]:<{col_widths[i]}}" for i in range(len(data[0])) )
+        col_widths = [12, 12, 12, 12, 12, 12, 12, 12, 12, 12]
+        header = "".join(f"{data[0][i]:<{col_widths[i]}}" for i in range(len(data[0])))
         f.write(f"{header}\n")
         f.write("-" * len(header))
         f.write("\n")
 
         for row in data[1:]:
-            row = "".join(f"{row[i]:<{col_widths[i]}}" for i in range(len(row)) )
+            row = "".join(f"{row[i]:<{col_widths[i]}}" for i in range(len(row)))
             f.write(f"{row}\n")
+
 
 def write_total_latency(sub_all_node_statics, all_latency_results):
     total_loss = 0
@@ -214,8 +262,8 @@ def write_total_latency(sub_all_node_statics, all_latency_results):
         for topic_statics in node_statics["topics"]:
             total_loss += topic_statics["loss"]
 
-    final_latency_results = [item for node_latency in all_latency_results for item in node_latency ] #[[], [],,,,] -> []
-    total_mean =round(np.mean(final_latency_results), 6)
+    final_latency_results = [item for node_latency in all_latency_results for item in node_latency]  # [[], [],,,,] -> []
+    total_mean = round(np.mean(final_latency_results), 6)
     total_sd = round(np.std(final_latency_results), 6)
     total_min = round(np.min(final_latency_results), 6)
     total_q1 = round(np.percentile(final_latency_results, 25), 6)
@@ -228,15 +276,15 @@ def write_total_latency(sub_all_node_statics, all_latency_results):
     with open("results/total_latency.txt", "w") as f:
         data.append([total_loss, total_mean, total_sd, total_min, total_q1, total_mid, total_q3, total_max])
 
-        col_widths =[12, 12, 12, 12, 12, 12, 12, 12]
-        header = "".join(f"{data[0][i]:<{col_widths[i]}}" for i in range(len(data[0])) )
+        col_widths = [12, 12, 12, 12, 12, 12, 12, 12]
+        header = "".join(f"{data[0][i]:<{col_widths[i]}}" for i in range(len(data[0])))
         f.write(f"{header}\n")
         f.write("-" * len(header))
         f.write("\n")
         # f.write(final_latency_results)
 
         for row in data[1:]:
-            row = "".join(f"{row[i]:<{col_widths[i]}}" for i in range(len(row)) )
+            row = "".join(f"{row[i]:<{col_widths[i]}}" for i in range(len(row)))
             f.write(f"{row}\n")
 
 
