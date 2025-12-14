@@ -131,7 +131,7 @@ def generate_master_launcher(json_content):
         remote = host_name
         # 各ラズパイ上の logs_local を回収
         remote_logs = "ros2-perf-multihost-v2/src/graduate_research/performance_test/logs_local"
-        lines.append(f"scp -r {remote}:~/{remote_logs} ../performance_test/logs/{host_name}")
+        lines.append(f"scp -r {remote}:~/{remote_logs} ../performance_test/logs")
 
     lines.append('echo "=== log collection finished ==="')
 
@@ -145,7 +145,5 @@ if __name__ == "__main__":
     args = sys.argv
     json_content, file_path = load_json_file(args)
 
-    # rmw_zenoh_flag = generate_dockerfiles(json_content, file_path)
-    # generate_docker_compose(json_content, rmw_zenoh_flag)
     generate_host_scripts(json_content)
     generate_master_launcher(json_content)
