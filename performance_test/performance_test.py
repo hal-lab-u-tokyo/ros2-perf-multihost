@@ -13,17 +13,12 @@ num_trials = 10  # 1ペイロードサイズあたりの試行回数
 
 def run_test(payload_size, run_idx, base_log_dir, base_result_dir, run_all_hosts_sh, latest_dir=None):
     print(f"=== Run payload={payload_size}B, trial={run_idx+1} ===")
-    result = subprocess.run([run_all_hosts_sh, str(payload_size)], capture_output=True, text=True)
+    result = subprocess.run([run_all_hosts_sh, str(payload_size), str(run_idx + 1)], capture_output=True, text=True)
     print(result.stdout)
     log_parent = os.path.abspath(base_log_dir)
-    # 1回目はディレクトリ作成、2回目以降は引数で受け取る
-    if latest_dir is None:
-        dirs = sorted([d for d in os.listdir(log_parent) if d.startswith(f"raw_{payload_size}B_")])
-        if not dirs:
-            raise RuntimeError(f"No log directories found for payload_size={payload_size} in {log_parent}")
-        latest_dir = max(dirs, key=lambda d: os.path.getmtime(os.path.join(log_parent, d)))
-    src_log_dir = os.path.join(log_parent, latest_dir)
-    run_log_dir = os.path.join(src_log_dir, f"run_{run_idx+1}")
+    latest_dir = f"raw_{payload_size}B"
+    src_log_dir = os.path.join(log_parent, latest_dir, f"run_{run_idx+1}")
+    run_log_dir = src_log_dir
     os.makedirs(run_log_dir, exist_ok=True)
     for item in os.listdir(src_log_dir):
         item_path = os.path.join(src_log_dir, item)
