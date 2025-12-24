@@ -181,7 +181,7 @@ def generate_master_launcher(json_content):
         remote_script_path = f"ros2-perf-multihost-v2/host_scripts/{host_name}_start.sh"
 
         lines.append(f'echo "=== start {host_name} ==="')
-        lines.append(f"ssh {remote} 'chmod +x ~/{remote_script_path} && ~/\"{remote_script_path}\" $PAYLOAD_SIZE' &")
+        lines.append(f"ssh {remote} 'chmod +x ~/{remote_script_path} && ~/{remote_script_path} \"$PAYLOAD_SIZE\"' &")
         lines.append("")
 
     lines.append("wait")
