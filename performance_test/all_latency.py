@@ -7,6 +7,7 @@ output: latency_all.txt, latency_total.txt
 
 import os
 import numpy as np
+from datetime import datetime
 
 
 # all_node_info = [{"name": lyon, "type": Publisher, "pub_topics": ["amazon", "inazuma", ...], "sub_topics": [] }, {}]
@@ -214,10 +215,10 @@ def cal_all_latency(all_node_info):
     return sub_all_node_statics, all_latency_results
 
 
-def write_all_latency(sub_all_node_statics):
+def write_all_latency(sub_all_node_statics, results_dir):
     data = []
     data.append(["node", "topic", "lost[#]", "mean[ms]", "sd[ms]", "min[ms]", "q1[ms]", "mid[ms]", "q3[ms]", "max[ms]"])
-    with open("results/all_latency.txt", "w") as f:
+    with open(f"{results_dir}/all_latency.txt", "w") as f:
         for node_statics in sub_all_node_statics:
             node_name = node_statics["node"]
             for topic_statics in node_statics["topics"]:
@@ -256,7 +257,7 @@ def write_all_latency(sub_all_node_statics):
             f.write(f"{row}\n")
 
 
-def write_total_latency(sub_all_node_statics, all_latency_results):
+def write_total_latency(sub_all_node_statics, all_latency_results, result_dir):
     total_loss = 0
     for node_statics in sub_all_node_statics:
         for topic_statics in node_statics["topics"]:
@@ -273,7 +274,7 @@ def write_total_latency(sub_all_node_statics, all_latency_results):
 
     data = []
     data.append(["lost[#]", "mean[ms]", "sd[ms]", "min[ms]", "q1[ms]", "mid[ms]", "q3[ms]", "max[ms]"])
-    with open("results/total_latency.txt", "w") as f:
+    with open(f"{result_dir}/total_latency.txt", "w") as f:
         data.append([total_loss, total_mean, total_sd, total_min, total_q1, total_mid, total_q3, total_max])
 
         col_widths = [12, 12, 12, 12, 12, 12, 12, 12]
@@ -281,7 +282,6 @@ def write_total_latency(sub_all_node_statics, all_latency_results):
         f.write(f"{header}\n")
         f.write("-" * len(header))
         f.write("\n")
-        # f.write(final_latency_results)
 
         for row in data[1:]:
             row = "".join(f"{row[i]:<{col_widths[i]}}" for i in range(len(row)))
@@ -289,10 +289,15 @@ def write_total_latency(sub_all_node_statics, all_latency_results):
 
 
 if __name__ == "__main__":
-    os.makedirs("results", exist_ok=True)
+    # 日時でサブディレクトリを作成 (例: results/2025-12-24_153045)
+    timestamp = datetime.now().strftime("%Y-%m-%d_%H%M%S")
+    result_dir = os.path.join("results", timestamp)
+    os.makedirs(result_dir, exist_ok=True)
+    print(f"Results will be saved to: {result_dir}")
+
     all_node_info = get_node_and_topics()
     print(all_node_info)
     sub_all_node_statics, all_latency_results = cal_all_latency(all_node_info)
     print(sub_all_node_statics)
-    write_all_latency(sub_all_node_statics)
-    write_total_latency(sub_all_node_statics, all_latency_results)
+    write_all_latency(sub_all_node_statics, result_dir)
+    write_total_latency(sub_all_node_statics, all_latency_results, result_dir)

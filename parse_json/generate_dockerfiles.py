@@ -287,12 +287,12 @@ def generate_run_all_hosts_docker(json_content, rmw_zenoh_flag):
 
         lines.extend(
             [
-                f'echo "=== Deploying Dockerfiles for {host_name} ==="',
-                f'ssh {host_name} "mkdir -p {remote_dockerfiles_dir} {remote_logs_dir}"',
-                f'scp -r "${{DOCKERFILES_DIR}}/{host_name}" {host_name}:{remote_dockerfiles_dir}/',
-                "",
+                # f'echo "=== Deploying Dockerfiles for {host_name} ==="',
+                # f'ssh {host_name} "mkdir -p {remote_dockerfiles_dir} {remote_logs_dir}"',
+                # f'scp -r "${{DOCKERFILES_DIR}}/{host_name}" {host_name}:{remote_dockerfiles_dir}/',
+                # "",
                 f'echo "=== Building Docker image on {host_name} ==="',
-                f'ssh {host_name} "cd {remote_dockerfiles_dir}/{host_name} && docker build -t ros2_perf_{host_name} ."',
+                f'ssh {host_name} "cd {remote_dockerfiles_dir}/{host_name} && docker build --platform=linux/arm64 -t ros2_perf_{host_name} ."',
                 "",
                 f'echo "=== Running Docker container on {host_name} ==="',
                 f'ssh {host_name} "docker run --rm --network host '

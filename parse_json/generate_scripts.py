@@ -6,7 +6,6 @@ JSONファイルを受け取ったら、ホストの数のDockerfileと、それ
 import sys
 import json
 import os
-import shutil
 
 
 # コマンドラインからJSONファイルのパスを受け取り、そのJSONファイルを取得する
@@ -22,15 +21,21 @@ def load_json_file(args):
 def generate_host_scripts(json_content):
     # ホストごとの起動スクリプトを出力するディレクトリ
     output_dir = "../host_scripts"
-    if os.path.exists(output_dir):
-        shutil.rmtree(output_dir)
     os.makedirs(output_dir, exist_ok=True)
 
     eval_time = json_content.get("eval_time", 60)
     payload_size = json_content.get("payload_size", 32)
     period_ms = json_content.get("period_ms", 100)
 
+    # RMW Zenoh判定
+    rmw_zenoh_flag = json_content.get("rmw") == "zenoh"
+
     hosts = json_content["hosts"]
+
+    # 既存の *_start.sh ファイルを削除（run_all_hosts_docker.sh 等は残す）
+    for filename in os.listdir(output_dir):
+        if filename.endswith("_start.sh"):
+            os.remove(os.path.join(output_dir, filename))
 
     for host_dict in hosts:
         host_name = host_dict["host_name"]
@@ -41,6 +46,22 @@ def generate_host_scripts(json_content):
         lines.append("#!/usr/bin/env bash")
         lines.append("set -e")
         lines.append("source ~/ros2-perf-multihost-v2/install/setup.bash")
+
+        if rmw_zenoh_flag:
+            # Zenoh用の環境変数設定
+            lines.append("")
+            lines.append("# RMW Zenoh設定")
+            lines.append("export RMW_IMPLEMENTATION=rmw_zenoh_cpp")
+            lines.append("export RUST_LOG=zenoh=info,zenoh_transport=debug")
+            zenoh_config_path = "~/ros2-perf-multihost-v2/config/multihost_config.json5"
+            lines.append(f"export ZENOH_ROUTER_CONFIG_URI={zenoh_config_path}")
+            lines.append("")
+            # Zenohルーターをバックグラウンドで起動
+            lines.append("# Zenohルーターを起動")
+            lines.append("ros2 run rmw_zenoh_cpp rmw_zenohd &")
+            lines.append("ZENOH_PID=$!")
+            lines.append("sleep 2  # ルーター起動待ち")
+            lines.append("")
 
         for node in nodes:
             node_name = node["node_name"]
@@ -81,6 +102,13 @@ def generate_host_scripts(json_content):
                 )
 
         lines.append("wait")
+
+        if rmw_zenoh_flag:
+            # Zenohルーターを終了
+            lines.append("")
+            lines.append("# Zenohルーターを終了")
+            lines.append("kill $ZENOH_PID 2>/dev/null || true")
+
         lines.append(f'echo "All nodes on host {host_name} finished."')
 
         with open(script_path, "w") as f:
@@ -109,6 +137,20 @@ def generate_master_launcher(json_content):
     lines.append("# 事前に各ラズパイに {host_name}_start.sh をコピーしておいてください。")
     lines.append("")
 
+    # 0) ホストPC側のログをクリーンアップ
+    lines.append('echo "=== cleanup local logs ==="')
+    lines.append("rm -rf ../performance_test/logs")
+    lines.append("mkdir -p ../performance_test/logs")
+    lines.append("")
+
+    # 各ラズパイ側のログをクリーンアップ
+    lines.append('echo "=== cleanup remote logs ==="')
+    for host_dict in hosts:
+        host_name = host_dict["host_name"]
+        remote_logs = "ros2-perf-multihost-v2/src/graduate_research/performance_test/logs_local"
+        lines.append(f"ssh {host_name} 'rm -rf ~/{remote_logs} && mkdir -p ~/{remote_logs}' || true")
+    lines.append("")
+
     # 1) 各ラズパイで *_start.sh を起動
     for host_dict in hosts:
         host_name = host_dict["host_name"]
@@ -130,8 +172,8 @@ def generate_master_launcher(json_content):
         host_name = host_dict["host_name"]
         remote = host_name
         # 各ラズパイ上の logs_local を回収
-        remote_logs = "ros2-perf-multihost-v2/src/graduate_research/performance_test/logs_local"
-        lines.append(f"scp -r {remote}:~/{remote_logs} ../performance_test/logs")
+        remote_logs = "ros2-perf-multihost-v2/src/graduate_research/performance_test/logs_local/*"
+        lines.append(f"scp -r {remote}:~/{remote_logs} ../performance_test/logs/")
 
     lines.append('echo "=== log collection finished ==="')
 

@@ -7,7 +7,7 @@ set -euo pipefail
 #   bash copy_artifacts_to_rpis.sh
 #
 # 前提:
-# - 各Raspberry Piにsshでパスワードなし接続可能 (pi0, pi1, pi2, pi3)
+# - 各Raspberry Piにsshでパスワードなし接続可能 (pi0, pi1, pi2, pi3, pi4)
 # - 各Raspberry Piに ~/ros2-perf-multihost-v2 ディレクトリが存在
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -16,7 +16,7 @@ DOCKERFILES_DIR="${REPO_DIR}/Dockerfiles"
 HOST_SCRIPTS_DIR="${REPO_DIR}/host_scripts"
 
 # 配布対象ホスト（必要に応じて編集）
-HOSTS=("pi0" "pi1" "pi2" "pi3")
+HOSTS=("pi0" "pi1" "pi2" "pi3" "pi4")
 
 # リモート側の受け取り先
 REMOTE_BASE="~/ros2-perf-multihost-v2"
@@ -37,22 +37,24 @@ for host in "${HOSTS[@]}"; do
   echo "=== Copying artifacts to ${host} ==="
   ssh "${host}" "mkdir -p ${REMOTE_DOCKERFILES_DIR} ${REMOTE_HOST_SCRIPTS_DIR}"
 
-  # Dockerfiles はホスト毎のディレクトリ単位でコピー
-  # 存在するホストのみコピー（無い場合はスキップ）
-  for dfdir in "${DOCKERFILES_DIR}"/*; do
-    dfname="$(basename "${dfdir}")"
-    if [[ -d "${dfdir}" ]]; then
-      echo " -> Dockerfiles/${dfname} -> ${host}:${REMOTE_DOCKERFILES_DIR}/${dfname}"
-      scp -r "${dfdir}" "${host}:${REMOTE_DOCKERFILES_DIR}/"
-    fi
-  done
+  # Dockerfiles はホスト名と一致するディレクトリのみコピー
+  host_dockerfile_dir="${DOCKERFILES_DIR}/${host}"
+  if [[ -d "${host_dockerfile_dir}" ]]; then
+    echo " -> Dockerfiles/${host} -> ${host}:${REMOTE_DOCKERFILES_DIR}/${host}"
+    scp -r "${host_dockerfile_dir}" "${host}:${REMOTE_DOCKERFILES_DIR}/"
+  else
+    echo " -> Dockerfiles/${host} not found, skipping."
+  fi
 
-  # host_scripts はディレクトリごとコピー
-  echo " -> host_scripts/* -> ${host}:${REMOTE_HOST_SCRIPTS_DIR}/"
-  scp -r "${HOST_SCRIPTS_DIR}/"* "${host}:${REMOTE_HOST_SCRIPTS_DIR}/" || true
-
-  # 実行権限の付与
-  ssh "${host}" "chmod +x ${REMOTE_HOST_SCRIPTS_DIR}/*.sh || true"
+  # host_scripts はホスト名と一致する *_start.sh のみコピー
+  host_start_script="${HOST_SCRIPTS_DIR}/${host}_start.sh"
+  if [[ -f "${host_start_script}" ]]; then
+    echo " -> host_scripts/${host}_start.sh -> ${host}:${REMOTE_HOST_SCRIPTS_DIR}/"
+    scp "${host_start_script}" "${host}:${REMOTE_HOST_SCRIPTS_DIR}/"
+    ssh "${host}" "chmod +x ${REMOTE_HOST_SCRIPTS_DIR}/${host}_start.sh"
+  else
+    echo " -> host_scripts/${host}_start.sh not found, skipping."
+  fi
 
   echo "=== Done for ${host} ==="
 done
