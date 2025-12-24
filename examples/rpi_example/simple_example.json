@@ -1,6 +1,5 @@
 {
     "eval_time": 60,
-    "payload_size": 64,
     "period_ms": 100,
     "rmw": "fastdds",
     "qos": {

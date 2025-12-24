@@ -7,7 +7,7 @@ output: latency_all.txt, latency_total.txt
 
 import os
 import numpy as np
-from datetime import datetime
+import argparse
 
 
 # all_node_info = [{"name": lyon, "type": Publisher, "pub_topics": ["amazon", "inazuma", ...], "sub_topics": [] }, {}]
@@ -132,9 +132,6 @@ def cal_all_latency(all_node_info):
                             sub_logdata_path = os.path.join("./logs", f"{sub_node_name}_log", f"{sub_topic}_log.txt")
                         elif sub_node_type == "Intermediate":
                             sub_logdata_path = os.path.join("./logs", f"{sub_node_name}_log", f"{sub_topic}_sub_log.txt")
-
-                        # print(pub_logdata_path)
-                        # print(sub_logdata_path)
 
                         pub_logdata_list = get_log(
                             pub_logdata_path, pub_node_type
@@ -288,16 +285,77 @@ def write_total_latency(sub_all_node_statics, all_latency_results, result_dir):
             f.write(f"{row}\n")
 
 
-if __name__ == "__main__":
-    # 日時でサブディレクトリを作成 (例: results/2025-12-24_153045)
-    timestamp = datetime.now().strftime("%Y-%m-%d_%H%M%S")
-    result_dir = os.path.join("results", timestamp)
-    os.makedirs(result_dir, exist_ok=True)
-    print(f"Results will be saved to: {result_dir}")
+def process_log_directory(log_dir_name, logs_base_path, results_base_path):
+    """指定されたログディレクトリを解析し、結果を保存する"""
+    logs_folder_path = os.path.join(logs_base_path, log_dir_name)
+    result_dir = os.path.join(results_base_path, log_dir_name)
 
-    all_node_info = get_node_and_topics()
-    print(all_node_info)
-    sub_all_node_statics, all_latency_results = cal_all_latency(all_node_info)
-    print(sub_all_node_statics)
+    print(f"Processing: {log_dir_name}")
+    print(f"  Logs path: {logs_folder_path}")
+    print(f"  Results path: {result_dir}")
+
+    # 結果ディレクトリを作成
+    os.makedirs(result_dir, exist_ok=True)
+
+    # 解析実行
+    all_node_info = get_node_and_topics(logs_folder_path)
+    print(f"  Nodes found: {[n['name'] for n in all_node_info]}")
+
+    sub_all_node_statics, all_latency_results = cal_all_latency(all_node_info, logs_folder_path)
     write_all_latency(sub_all_node_statics, result_dir)
     write_total_latency(sub_all_node_statics, all_latency_results, result_dir)
+
+    print(f"  Done: Results saved to {result_dir}")
+
+
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description="Process log directories and save latency results.")
+    parser.add_argument("--logs", type=str, default="./logs", help="Base path for logs")
+    parser.add_argument("--results", type=str, default="./results", help="Base path for results")
+    args = parser.parse_args()
+
+    logs_base_path = args.logs
+    results_base_path = args.results
+
+    # resultsディレクトリがなければ作成
+    os.makedirs(results_base_path, exist_ok=True)
+
+    # logsディレクトリが存在しない場合は終了
+    if not os.path.exists(logs_base_path):
+        print(f"Error: Logs directory '{logs_base_path}' does not exist.")
+        exit(1)
+
+    # logsディレクトリ内のraw_*ディレクトリを取得
+    log_dirs = [d for d in os.listdir(logs_base_path) if os.path.isdir(os.path.join(logs_base_path, d))]
+
+    if not log_dirs:
+        print(f"No directories found in '{logs_base_path}'.")
+        exit(0)
+
+    # 既に解析済みの結果ディレクトリを取得
+    existing_results = set()
+    if os.path.exists(results_base_path):
+        existing_results = set(os.listdir(results_base_path))
+
+    # 未解析のログディレクトリを処理
+    pending_dirs = [d for d in log_dirs if d not in existing_results]
+
+    if not pending_dirs:
+        print("All log directories have already been processed.")
+        print(f"  Existing results: {sorted(existing_results)}")
+        exit(0)
+
+    print(f"Found {len(pending_dirs)} new log directory(ies) to process:")
+    for d in sorted(pending_dirs):
+        print(f"  - {d}")
+    print()
+
+    # 各ログディレクトリを処理
+    for log_dir_name in sorted(pending_dirs):
+        try:
+            process_log_directory(log_dir_name, logs_base_path, results_base_path)
+        except Exception as e:
+            print(f"  Error processing {log_dir_name}: {e}")
+        print()
+
+    print("All processing complete.")

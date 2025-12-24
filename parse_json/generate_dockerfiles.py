@@ -23,7 +23,7 @@ def load_json_file(args):
 
 # JSONファイルを受けとり、各ホストに対応するDockerfileを生成する.生成したDockerfileの数だけディレクトリを作り、Dockerfileはその下に置く
 #  json -> list[Dockerfile]の生成
-def generate_dockerfiles(json_content, file_path):
+def generate_dockerfiles(json_content):
     output_dir = "../Dockerfiles"
     if os.path.exists(output_dir):
         shutil.rmtree(output_dir)
@@ -32,20 +32,8 @@ def generate_dockerfiles(json_content, file_path):
     with open("../docker_base/Dockerfile", "r") as f:
         docker_base_content = f.read()
 
-    if "eval_time" in json_content:
-        eval_time = json_content["eval_time"]
-    else:
-        eval_time = 60
-
-    if "payload_size" in json_content:
-        payload_size = json_content["payload_size"]
-    else:
-        payload_size = 32
-
-    if "period_ms" in json_content:
-        period_ms = json_content["period_ms"]
-    else:
-        period_ms = 100
+    eval_time = json_content.get("eval_time", 60)
+    period_ms = json_content.get("period_ms", 100)
 
     if "rmw" in json_content and json_content["rmw"] == "zenoh":
         rmw_zenoh_flag = True
@@ -133,10 +121,7 @@ def generate_dockerfiles(json_content, file_path):
                 if node.get("publisher"):
                     publisher_list = node["publisher"]
                     topic_names = ",".join(publisher["topic_name"] for publisher in publisher_list)
-                    # payload_sizes = ",".join(str(publisher["payload_size"]) for publisher in publisher_list)
-                    # period_ms = ",".join(str(publisher["period_ms"]) for publisher in publisher_list)
-
-                    additional_command = f"{zenoh_router_command}. /root/performance_ws/install/setup.sh {zenoh_config_command} && cd /root/performance_ws/install/publisher_node/lib/publisher_node && ./publisher_node_exe --node_name {node_name} --topic_names {topic_names} -s {payload_size} -p {period_ms} --eval_time {eval_time}"
+                    additional_command = f"{zenoh_router_command}. /root/performance_ws/install/setup.sh {zenoh_config_command} && cd /root/performance_ws/install/publisher_node/lib/publisher_node && ./publisher_node_exe --node_name {node_name} --topic_names {topic_names} -s $PAYLOAD_SIZE -p {period_ms} --eval_time {eval_time}"
                     base_command += additional_command
 
                 if node.get("subscriber"):
@@ -151,11 +136,9 @@ def generate_dockerfiles(json_content, file_path):
                     subscriber_list = node["intermediate"][0]["subscriber"]
 
                     topic_names_pub = ",".join(publisher["topic_name"] for publisher in publisher_list)
-                    # payload_sizes = ",".join(str(publisher["payload_size"]) for publisher in publisher_list)
-                    # period_ms = ",".join(str(publisher["period_ms"]) for publisher in publisher_list)
                     topic_names_sub = ",".join(subscriber["topic_name"] for subscriber in subscriber_list)
 
-                    additional_command = f"{zenoh_router_command}. /root/performance_ws/install/setup.sh {zenoh_config_command} && cd /root/performance_ws/install/intermediate_node/lib/intermediate_node && ./intermediate_node --node_name {node_name} --topic_names_pub {topic_names_pub} --topic_names_sub {topic_names_sub} -s {payload_size} -p {period_ms} --eval_time {eval_time}"
+                    additional_command = f"{zenoh_router_command}. /root/performance_ws/install/setup.sh {zenoh_config_command} && cd /root/performance_ws/install/intermediate_node/lib/intermediate_node && ./intermediate_node --node_name {node_name} --topic_names_pub {topic_names_pub} --topic_names_sub {topic_names_sub} -s $PAYLOAD_SIZE -p {period_ms} --eval_time {eval_time}"
                     base_command += additional_command
 
                 continue
@@ -164,10 +147,8 @@ def generate_dockerfiles(json_content, file_path):
             if node.get("publisher"):
                 publisher_list = node["publisher"]
                 topic_names = ",".join(publisher["topic_name"] for publisher in publisher_list)
-                # payload_sizes = ",".join(str(publisher["payload_size"]) for publisher in publisher_list)
-                # period_ms = ",".join(str(publisher["period_ms"]) for publisher in publisher_list)
 
-                additional_command = f" & . /root/performance_ws/install/setup.sh {zenoh_config_command} && cd /root/performance_ws/install/publisher_node/lib/publisher_node && ./publisher_node_exe --node_name {node_name} --topic_names {topic_names} -s {payload_size} -p {period_ms} --eval_time {eval_time}"
+                additional_command = f" & . /root/performance_ws/install/setup.sh {zenoh_config_command} && cd /root/performance_ws/install/publisher_node/lib/publisher_node && ./publisher_node_exe --node_name {node_name} --topic_names {topic_names} -s $PAYLOAD_SIZE -p {period_ms} --eval_time {eval_time}"
                 base_command += additional_command
 
             if node.get("subscriber"):
@@ -182,11 +163,9 @@ def generate_dockerfiles(json_content, file_path):
                 subscriber_list = node["intermediate"][0]["subscriber"]
 
                 topic_names_pub = ",".join(publisher["topic_name"] for publisher in publisher_list)
-                # payload_sizes = ",".join(str(publisher["payload_size"]) for publisher in publisher_list)
-                # period_ms = ",".join(str(publisher["period_ms"]) for publisher in publisher_list)
                 topic_names_sub = ",".join(subscriber["topic_name"] for subscriber in subscriber_list)
 
-                additional_command = f" & . /root/performance_ws/install/setup.sh {zenoh_config_command} && cd /root/performance_ws/install/intermediate_node/lib/intermediate_node && ./intermediate_node --node_name {node_name} --topic_names_pub {topic_names_pub} --topic_names_sub {topic_names_sub} -s {payload_size} -p {period_ms} --eval_time {eval_time}"
+                additional_command = f" & . /root/performance_ws/install/setup.sh {zenoh_config_command} && cd /root/performance_ws/install/intermediate_node/lib/intermediate_node && ./intermediate_node --node_name {node_name} --topic_names_pub {topic_names_pub} --topic_names_sub {topic_names_sub} -s $PAYLOAD_SIZE -p {period_ms} --eval_time {eval_time}"
                 base_command += additional_command
 
             # コマンドの最後には wait 命令をつける
@@ -267,12 +246,26 @@ def generate_run_all_hosts_docker(json_content, rmw_zenoh_flag):
         "#!/bin/bash",
         "set -e",
         "",
+        "# 使い方: ./run_all_hosts_docker.sh <payload_size>",
+        "",
+        "# 引数チェック",
+        'if [ -z "$1" ]; then',
+        '  echo "Error: payload_size is required."',
+        '  echo "Usage: $0 <payload_size>"',
+        "  exit 1",
+        "fi",
+        'PAYLOAD_SIZE="$1"',
+        "",
+        "# ログ保存先ディレクトリを生成（docker_${payload_size}B_日時）",
+        'TIMESTAMP=$(date +"%Y-%m-%d_%H%M%S")',
+        "",
         'SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"',
         'REPO_DIR="$(cd "${SCRIPT_DIR}/.." && pwd)"',
         'DOCKERFILES_DIR="${REPO_DIR}/Dockerfiles"',
-        'LOCAL_LOGS_DIR="${REPO_DIR}/performance_test/logs"',
+        'LOG_DIR="${REPO_DIR}/performance_test/logs/docker_${PAYLOAD_SIZE}B_${TIMESTAMP}"',
         "",
-        'mkdir -p "${LOCAL_LOGS_DIR}"',
+        'mkdir -p "$LOG_DIR"',
+        'echo "=== Settings: payload_size=$PAYLOAD_SIZE, log_dir=$LOG_DIR ==="',
         "",
     ]
 
@@ -281,21 +274,25 @@ def generate_run_all_hosts_docker(json_content, rmw_zenoh_flag):
     remote_dockerfiles_dir = f"{remote_repo_dir}/Dockerfiles"
     remote_logs_dir = f"{remote_repo_dir}/performance_test/logs"
 
-    # 各ホストに Dockerfile を配布してコンテナ起動
+    # 各ホストのリモートログをクリーンアップ
+    lines.append('echo "=== cleanup remote logs ==="')
+    for host_dict in hosts:
+        host_name = host_dict["host_name"]
+        lines.append(f"ssh {host_name} 'rm -rf {remote_logs_dir} && mkdir -p {remote_logs_dir}' || true")
+    lines.append("")
+
+    # 各ホストに ssh接続してコンテナ起動
     for host_dict in hosts:
         host_name = host_dict["host_name"]
 
         lines.extend(
             [
-                # f'echo "=== Deploying Dockerfiles for {host_name} ==="',
-                # f'ssh {host_name} "mkdir -p {remote_dockerfiles_dir} {remote_logs_dir}"',
-                # f'scp -r "${{DOCKERFILES_DIR}}/{host_name}" {host_name}:{remote_dockerfiles_dir}/',
-                # "",
                 f'echo "=== Building Docker image on {host_name} ==="',
                 f'ssh {host_name} "cd {remote_dockerfiles_dir}/{host_name} && docker build --platform=linux/arm64 -t ros2_perf_{host_name} ."',
                 "",
                 f'echo "=== Running Docker container on {host_name} ==="',
                 f'ssh {host_name} "docker run --rm --network host '
+                f"-e PAYLOAD_SIZE=$PAYLOAD_SIZE "
                 f"-v {remote_logs_dir}:/root/performance_ws/src/graduate_research/performance_test/logs_local "
                 f'ros2_perf_{host_name}" &',
                 "",
@@ -307,18 +304,20 @@ def generate_run_all_hosts_docker(json_content, rmw_zenoh_flag):
     lines.append("")
 
     # 実行終了後に各ラズパイからログを回収
+    lines.append('echo "=== Collecting logs to ${LOG_DIR} ==="')
     for host_dict in hosts:
         host_name = host_dict["host_name"]
 
         lines.extend(
             [
                 f'echo "=== Collecting logs from {host_name} ==="',
-                f'mkdir -p "${{LOCAL_LOGS_DIR}}/{host_name}"',
-                f'scp -r {host_name}:{remote_logs_dir}/* "${{LOCAL_LOGS_DIR}}/{host_name}/" '
-                f'|| echo "No logs to copy from {host_name}"',
+                f'scp -r {host_name}:{remote_logs_dir}/* "$LOG_DIR/" ' f'|| echo "No logs to copy from {host_name}"',
                 "",
             ]
         )
+
+    lines.append('echo "=== log collection finished ==="')
+    lines.append('echo "Logs saved to: $LOG_DIR"')
 
     script_content = "\n".join(lines) + "\n"
 
@@ -332,6 +331,6 @@ if __name__ == "__main__":
     args = sys.argv
     json_content, file_path = load_json_file(args)
 
-    rmw_zenoh_flag = generate_dockerfiles(json_content, file_path)
+    rmw_zenoh_flag = generate_dockerfiles(json_content)
     generate_docker_compose(json_content, rmw_zenoh_flag)
     generate_run_all_hosts_docker(json_content, rmw_zenoh_flag)

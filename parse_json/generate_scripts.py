@@ -24,7 +24,6 @@ def generate_host_scripts(json_content):
     os.makedirs(output_dir, exist_ok=True)
 
     eval_time = json_content.get("eval_time", 60)
-    payload_size = json_content.get("payload_size", 32)
     period_ms = json_content.get("period_ms", 100)
 
     # RMW Zenoh判定
@@ -45,6 +44,16 @@ def generate_host_scripts(json_content):
         lines = []
         lines.append("#!/usr/bin/env bash")
         lines.append("set -e")
+        lines.append("")
+        # 引数チェック
+        lines.append("# 引数: payload_size (必須)")
+        lines.append('if [ -z "$1" ]; then')
+        lines.append('  echo "Error: payload_size is required."')
+        lines.append('  echo "Usage: $0 <payload_size>"')
+        lines.append("  exit 1")
+        lines.append("fi")
+        lines.append('PAYLOAD_SIZE="$1"')
+        lines.append("")
         lines.append("source ~/ros2-perf-multihost-v2/install/setup.bash")
 
         if rmw_zenoh_flag:
@@ -74,7 +83,7 @@ def generate_host_scripts(json_content):
                     f"./publisher_node_exe "
                     f"--node_name {node_name} "
                     f"--topic_names {topic_names} "
-                    f"-s {payload_size} -p {period_ms} "
+                    f'-s "$PAYLOAD_SIZE" -p {period_ms} '
                     f"--eval_time {eval_time} &"
                 )
 
@@ -97,7 +106,7 @@ def generate_host_scripts(json_content):
                     f"--node_name {node_name} "
                     f"--topic_names_pub {topic_names_pub} "
                     f"--topic_names_sub {topic_names_sub} "
-                    f"-s {payload_size} -p {period_ms} "
+                    f'-s "$PAYLOAD_SIZE" -p {period_ms} '
                     f"--eval_time {eval_time} &"
                 )
 
@@ -135,13 +144,27 @@ def generate_master_launcher(json_content):
     lines.append("")
     lines.append("# このスクリプトはホストPC上で実行することを想定しています。")
     lines.append("# 事前に各ラズパイに {host_name}_start.sh をコピーしておいてください。")
+    lines.append("# 使い方: ./run_all_hosts.sh <payload_size>")
+    lines.append("")
+    # 引数チェック
+    lines.append('if [ -z "$1" ]; then')
+    lines.append('  echo "Error: payload_size is required."')
+    lines.append('  echo "Usage: $0 <payload_size>"')
+    lines.append("  exit 1")
+    lines.append("fi")
+    lines.append('PAYLOAD_SIZE="$1"')
+    # ログ保存先ディレクトリを生成（{payload_size}B_日時）
+    lines.append('TIMESTAMP=$(date +"%Y-%m-%d_%H%M%S")')
+    lines.append('LOG_DIR="../performance_test/logs/raw_${PAYLOAD_SIZE}B_${TIMESTAMP}"')
+    lines.append('mkdir -p "$LOG_DIR"')
+    lines.append('echo "=== Settings: payload_size=$PAYLOAD_SIZE, log_dir=$LOG_DIR ==="')
     lines.append("")
 
     # 0) ホストPC側のログをクリーンアップ
-    lines.append('echo "=== cleanup local logs ==="')
-    lines.append("rm -rf ../performance_test/logs")
-    lines.append("mkdir -p ../performance_test/logs")
-    lines.append("")
+    # lines.append('echo "=== cleanup local logs ==="')
+    # lines.append("rm -rf ../performance_test/logs")
+    # lines.append("mkdir -p ../performance_test/logs")
+    # lines.append("")
 
     # 各ラズパイ側のログをクリーンアップ
     lines.append('echo "=== cleanup remote logs ==="')
@@ -158,7 +181,7 @@ def generate_master_launcher(json_content):
         remote_script_path = f"ros2-perf-multihost-v2/host_scripts/{host_name}_start.sh"
 
         lines.append(f'echo "=== start {host_name} ==="')
-        lines.append(f"ssh {remote} 'chmod +x ~/{remote_script_path} && ~/\"{remote_script_path}\"' &")
+        lines.append(f"ssh {remote} 'chmod +x ~/{remote_script_path} && ~/\"{remote_script_path}\" $PAYLOAD_SIZE' &")
         lines.append("")
 
     lines.append("wait")
@@ -173,9 +196,10 @@ def generate_master_launcher(json_content):
         remote = host_name
         # 各ラズパイ上の logs_local を回収
         remote_logs = "ros2-perf-multihost-v2/src/graduate_research/performance_test/logs_local/*"
-        lines.append(f"scp -r {remote}:~/{remote_logs} ../performance_test/logs/")
+        lines.append(f'scp -r {remote}:~/{remote_logs} "$LOG_DIR/"')
 
     lines.append('echo "=== log collection finished ==="')
+    lines.append('echo "Logs saved to: $LOG_DIR"')
 
     with open(launcher_path, "w") as f:
         f.write("\n".join(lines))
