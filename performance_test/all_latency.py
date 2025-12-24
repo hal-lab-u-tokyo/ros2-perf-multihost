@@ -11,8 +11,7 @@ import argparse
 
 
 # all_node_info = [{"name": lyon, "type": Publisher, "pub_topics": ["amazon", "inazuma", ...], "sub_topics": [] }, {}]
-def get_node_and_topics():
-    logs_folder_path = "./logs"
+def get_node_and_topics(logs_folder_path):
     all_node_info = []
 
     # metadata Subscriber or Intermediate
