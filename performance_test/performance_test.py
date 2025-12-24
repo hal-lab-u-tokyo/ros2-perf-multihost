@@ -11,15 +11,19 @@ payload_sizes = [64, 256, 1024, 4096, 16384, 32768]  # 必要に応じて変更
 num_trials = 10  # 1ペイロードサイズあたりの試行回数
 
 
-def run_test(payload_size, run_idx, base_log_dir, base_result_dir, run_all_hosts_sh):
+def run_test(payload_size, run_idx, base_log_dir, base_result_dir, run_all_hosts_sh, latest_dir=None):
     print(f"=== Run payload={payload_size}B, trial={run_idx+1} ===")
     result = subprocess.run([run_all_hosts_sh, str(payload_size)], capture_output=True, text=True)
     print(result.stdout)
     log_parent = os.path.abspath(base_log_dir)
-    dirs = sorted([d for d in os.listdir(log_parent)])
-    latest_dir = max(dirs, key=lambda d: os.path.getmtime(os.path.join(log_parent, d)))
+    # 1回目はディレクトリ作成、2回目以降は引数で受け取る
+    if latest_dir is None:
+        dirs = sorted([d for d in os.listdir(log_parent) if d.startswith(f"raw_{payload_size}B_")])
+        if not dirs:
+            raise RuntimeError(f"No log directories found for payload_size={payload_size} in {log_parent}")
+        latest_dir = max(dirs, key=lambda d: os.path.getmtime(os.path.join(log_parent, d)))
     src_log_dir = os.path.join(log_parent, latest_dir)
-    run_log_dir = os.path.join(log_parent, latest_dir, f"run_{run_idx+1}")
+    run_log_dir = os.path.join(src_log_dir, f"run_{run_idx+1}")
     os.makedirs(run_log_dir, exist_ok=True)
     for item in os.listdir(src_log_dir):
         item_path = os.path.join(src_log_dir, item)
@@ -31,7 +35,7 @@ def run_test(payload_size, run_idx, base_log_dir, base_result_dir, run_all_hosts
     os.makedirs(result_dir, exist_ok=True)
     subprocess.run(["python3", "all_latency.py", "--logs", run_log_dir, "--results", result_dir])
     print(f"  Saved results to {result_dir}")
-    return result_dir
+    return latest_dir, result_dir
 
 
 def aggregate_total_latency(result_parent_dir, payload_size, latest_dir):
@@ -70,10 +74,9 @@ if __name__ == "__main__":
 
     for payload_size in payload_sizes:
         print(f"=== Payload size: {payload_size}B ===")
+        latest_dir = None
         for run_idx in range(num_trials):
-            run_test(payload_size, run_idx, base_log_dir, base_result_dir, run_all_hosts_sh)
+            latest_dir, _ = run_test(payload_size, run_idx, base_log_dir, base_result_dir, run_all_hosts_sh, latest_dir)
             time.sleep(2)
-        dirs = sorted([d for d in os.listdir(base_log_dir) if d.startswith(f"{prefix}_{payload_size}B_")])
-        latest_dir = max(dirs, key=lambda d: os.path.getmtime(os.path.join(base_log_dir, d)))
         aggregate_total_latency(base_result_dir, payload_size, latest_dir)
     print("All tests and aggregation complete.")
