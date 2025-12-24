@@ -66,13 +66,14 @@ if __name__ == "__main__":
     os.makedirs(base_result_dir, exist_ok=True)
 
     run_all_hosts_sh = "../host_scripts/run_all_hosts_docker.sh" if args.docker else "../host_scripts/run_all_hosts.sh"
+    prefix = "docker" if args.docker else "raw"
 
     for payload_size in payload_sizes:
         print(f"=== Payload size: {payload_size}B ===")
         for run_idx in range(num_trials):
             run_test(payload_size, run_idx, base_log_dir, base_result_dir, run_all_hosts_sh)
             time.sleep(2)
-        dirs = sorted([d for d in os.listdir(base_log_dir) if d.startswith(f"raw_{payload_size}B_")])
+        dirs = sorted([d for d in os.listdir(base_log_dir) if d.startswith(f"{prefix}_{payload_size}B_")])
         latest_dir = max(dirs, key=lambda d: os.path.getmtime(os.path.join(base_log_dir, d)))
         aggregate_total_latency(base_result_dir, payload_size, latest_dir)
     print("All tests and aggregation complete.")
