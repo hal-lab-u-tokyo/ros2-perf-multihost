@@ -144,27 +144,21 @@ def generate_master_launcher(json_content):
     lines.append("")
     lines.append("# このスクリプトはホストPC上で実行することを想定しています。")
     lines.append("# 事前に各ラズパイに {host_name}_start.sh をコピーしておいてください。")
-    lines.append("# 使い方: ./run_all_hosts.sh <payload_size>")
+    lines.append("# 使い方: ./run_all_hosts.sh <payload_size> <run_idx>")
     lines.append("")
     # 引数チェック
     lines.append('if [ -z "$1" ]; then')
     lines.append('  echo "Error: payload_size is required."')
-    lines.append('  echo "Usage: $0 <payload_size>"')
+    lines.append('  echo "Usage: $0 <payload_size> <run_idx>"')
     lines.append("  exit 1")
     lines.append("fi")
     lines.append('PAYLOAD_SIZE="$1"')
-    # ログ保存先ディレクトリを生成（{payload_size}B_日時）
-    lines.append('TIMESTAMP=$(date +"%Y-%m-%d_%H%M%S")')
-    lines.append('LOG_DIR="../performance_test/logs/raw_${PAYLOAD_SIZE}B_${TIMESTAMP}"')
+    lines.append('RUN_IDX="${2:-1}"')  # 2番目の引数がなければ1
+    # ログ保存先ディレクトリを生成
+    lines.append('LOG_DIR="../performance_test/logs/raw_${PAYLOAD_SIZE}B/run${RUN_IDX}"')
     lines.append('mkdir -p "$LOG_DIR"')
-    lines.append('echo "=== Settings: payload_size=$PAYLOAD_SIZE, log_dir=$LOG_DIR ==="')
+    lines.append('echo "=== Settings: payload_size=$PAYLOAD_SIZE, run_idx=$RUN_IDX, log_dir=$LOG_DIR ==="')
     lines.append("")
-
-    # 0) ホストPC側のログをクリーンアップ
-    # lines.append('echo "=== cleanup local logs ==="')
-    # lines.append("rm -rf ../performance_test/logs")
-    # lines.append("mkdir -p ../performance_test/logs")
-    # lines.append("")
 
     # 各ラズパイ側のログをクリーンアップ
     lines.append('echo "=== cleanup remote logs ==="')
