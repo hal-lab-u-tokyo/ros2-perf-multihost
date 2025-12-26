@@ -10,7 +10,13 @@ def main():
     payload_size = sys.argv[1]
     num_hosts = int(sys.argv[2])
 
-    all_hosts = ["pi0", "pi1", "pi2", "pi3", "pi4"]  # 必要に応じて拡張
+    all_hosts = [
+        "192.168.199.20",  # pi0
+        "192.168.199.21",  # pi1
+        "192.168.199.22",  # pi2
+        "192.168.199.23",  # pi3
+        "192.168.199.24",  # pi4
+    ]
     hosts = all_hosts[:num_hosts]
 
     def start(host):
