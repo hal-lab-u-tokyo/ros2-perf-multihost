@@ -18,9 +18,9 @@ def run_test(payload_size, run_idx, base_log_dir, base_result_dir, start_scripts
     print(result.stdout)
     log_parent = os.path.abspath(base_log_dir)
     latest_dir = f"raw_{payload_size}B"
-    src_log_dir = os.path.join(log_parent, latest_dir, f"run{run_idx+1}")
-    run_log_dir = src_log_dir
-    os.makedirs(run_log_dir, exist_ok=True)
+    src_log_dir = os.path.join(log_parent, latest_dir)
+    run_log_dir = os.path.join(src_log_dir, f"run{run_idx+1}")
+    os.makedirs(src_log_dir, exist_ok=True)
     for item in os.listdir(src_log_dir):
         item_path = os.path.join(src_log_dir, item)
         if os.path.isdir(item_path) and item.startswith("run"):
