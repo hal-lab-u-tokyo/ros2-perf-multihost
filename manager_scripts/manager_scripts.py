@@ -12,7 +12,8 @@ def start_script():
         return jsonify({"error": "payload_size required"}), 400
     # ホスト名取得
     hostname = socket.gethostname()
-    script_path = f"/home/pi/ros2-perf-multihost-v2/host_scripts/{hostname}_start.sh"  # ホスト名ごとに変更
+    print(hostname)
+    script_path = f"/home/ubuntu/ros2-perf-multihost-v2/host_scripts/{hostname}_start.sh"  # ホスト名ごとに変更
     try:
         subprocess.Popen(["bash", script_path, str(payload_size)])
         return jsonify({"status": "started"}), 200
