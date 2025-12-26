@@ -35,8 +35,10 @@ def run_test(payload_size, run_idx, base_log_dir, base_result_dir, start_scripts
 
 
 def aggregate_total_latency(result_parent_dir, payload_size, latest_dir):
-    run_dirs = sorted(glob.glob(os.path.join(result_parent_dir, latest_dir, "run_*")))
+    run_dir = os.path.join(result_parent_dir, latest_dir)
+    run_dirs = sorted(glob.glob(os.path.join(result_parent_dir, latest_dir, "run*")))
     rows = []
+    subprocess.run(["python3", "all_latency.py", "--logs", run_dir, "--results", run_dir])
     for run_dir in run_dirs:
         total_path = os.path.join(run_dir, "total_latency.txt")
         if not os.path.exists(total_path):

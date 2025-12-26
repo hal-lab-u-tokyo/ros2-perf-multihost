@@ -324,7 +324,7 @@ if __name__ == "__main__":
         print(f"Error: Logs directory '{logs_base_path}' does not exist.")
         exit(1)
 
-    # logsディレクトリ内のraw_*ディレクトリを取得
+    # logsディレクトリ内のディレクトリを取得
     log_dirs = [d for d in os.listdir(logs_base_path) if os.path.isdir(os.path.join(logs_base_path, d))]
 
     if not log_dirs:
