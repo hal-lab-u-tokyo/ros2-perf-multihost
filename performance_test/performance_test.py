@@ -27,18 +27,17 @@ def run_test(payload_size, run_idx, base_log_dir, base_result_dir, start_scripts
             continue
         shutil.move(item_path, run_log_dir)
     print(f"  Saved logs to {run_log_dir}")
-    result_dir = os.path.join(base_result_dir, latest_dir, f"run{run_idx+1}")
-    os.makedirs(result_dir, exist_ok=True)
-    subprocess.run(["python3", "all_latency.py", "--logs", run_log_dir, "--results", result_dir])
-    print(f"  Saved results to {result_dir}")
-    return latest_dir, result_dir
+
+    return latest_dir
 
 
-def aggregate_total_latency(result_parent_dir, payload_size, latest_dir):
+def aggregate_total_latency(base_log_dir, result_parent_dir, payload_size, latest_dir):
     run_dir = os.path.join(result_parent_dir, latest_dir)
+    log_dir = os.path.join(base_log_dir, latest_dir)
     run_dirs = sorted(glob.glob(os.path.join(result_parent_dir, latest_dir, "run*")))
     rows = []
-    subprocess.run(["python3", "all_latency.py", "--logs", run_dir, "--results", run_dir])
+    subprocess.run(["python3", "all_latency.py", "--logs", log_dir, "--results", run_dir])
+    print(f"  Saved results to {run_dir}")
     for run_dir in run_dirs:
         total_path = os.path.join(run_dir, "total_latency.txt")
         if not os.path.exists(total_path):
@@ -75,7 +74,7 @@ if __name__ == "__main__":
         print(f"=== Payload size: {payload_size}B ===")
         latest_dir = None
         for run_idx in range(num_trials):
-            latest_dir, _ = run_test(payload_size, run_idx, base_log_dir, base_result_dir, start_scripts_py, args.num_hosts)
+            latest_dir = run_test(payload_size, run_idx, base_log_dir, base_result_dir, start_scripts_py, args.num_hosts)
             time.sleep(2)
-        aggregate_total_latency(base_result_dir, payload_size, latest_dir)
+        aggregate_total_latency(base_log_dir, base_result_dir, payload_size, latest_dir)
     print("All tests and aggregation complete.")
