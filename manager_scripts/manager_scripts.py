@@ -10,13 +10,15 @@ def start_script():
     payload_size = request.json.get("payload_size")
     if not payload_size:
         return jsonify({"error": "payload_size required"}), 400
-    # ホスト名取得
     hostname = socket.gethostname()
-    print(hostname)
-    script_path = f"/home/ubuntu/ros2-perf-multihost-v2/host_scripts/{hostname}_start.sh"  # ホスト名ごとに変更
+    script_path = f"/home/ubuntu/ros2-perf-multihost-v2/host_scripts/{hostname}_start.sh"
     try:
-        subprocess.Popen(["bash", script_path, str(payload_size)])
-        return jsonify({"status": "started"}), 200
+        # スクリプトが終了するまで待つ
+        result = subprocess.run(["bash", script_path, str(payload_size)], capture_output=True, text=True)
+        if result.returncode == 0:
+            return jsonify({"status": "finished"}), 200
+        else:
+            return jsonify({"error": result.stderr}), 500
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
