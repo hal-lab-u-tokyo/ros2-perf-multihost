@@ -26,6 +26,13 @@ def run_test(payload_size, run_idx, base_log_dir, base_result_dir, start_scripts
         if os.path.isdir(item_path) and item.startswith("run"):
             continue
         shutil.move(item_path, run_log_dir)
+
+    hosts = ["pi0", "pi1", "pi2", "pi3", "pi4"][:num_hosts]
+    remote_log_dir = "/home/ubuntu/ros2-perf-multihost-v2/performance_test/logs_local"
+    for host in hosts:
+        print(f"Copying logs from {host}")
+        subprocess.run(["scp", "-r", f"ubuntu@{host}:{remote_log_dir}/*", run_log_dir + "/"])
+
     print(f"  Saved logs to {run_log_dir}")
 
     return latest_dir
