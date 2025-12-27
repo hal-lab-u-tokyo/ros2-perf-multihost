@@ -190,7 +190,7 @@ class Publisher : public rclcpp::Node
     create_metadata_file(const node_options::Options & options, const std::string& log_dir)
     {
       std::stringstream ss;
-      ss << options.node_name << "_log" <<  "/" << "metadata.txt" ;
+      ss << log_dir << "/" << options.node_name << "_log" <<  "/" << "metadata.txt" ;
       std::string metadata_file_path = ss.str();
       ss.str("");
       ss.clear();
@@ -232,7 +232,7 @@ class Publisher : public rclcpp::Node
           std::cout << "Created directory: " << destination_dir << std::endl;
         }
 
-        ss << "/" << "metadata.txt" ;
+        ss << log_dir << "/" << "metadata.txt" ;
         std::string destination_path = ss.str();
         std::filesystem::copy_file(original_path, destination_path, std::filesystem::copy_options::overwrite_existing);
         std::cout << "File copied from " << original_path << " to " << destination_path << std::endl;
@@ -253,7 +253,7 @@ class Publisher : public rclcpp::Node
     void write_all_logs(const std::map<std::string, std::vector<MessageLog>>& message_logs_) {
       for (const auto &[topic_name, topic_logs] : message_logs_) {
         std::stringstream ss;
-        ss << node_name << "_log" <<  "/" << topic_name << "_log.txt" ;
+        ss << log_dir << "/" << node_name << "_log" <<  "/" << topic_name << "_log.txt" ;
         const std::string log_file_path = ss.str();
         ss.str("");
         ss.clear();
@@ -285,7 +285,7 @@ class Publisher : public rclcpp::Node
             std::cout << "Created directory: " << destination_dir << std::endl;
           }
 
-          ss << "/" << topic_name << "_log.txt" ;
+          ss << log_dir << "/" << node_name << "_log" <<  "/" << topic_name << "_log.txt" ;
           std::string destination_path = ss.str();
           std::filesystem::copy_file(original_path, destination_path, std::filesystem::copy_options::overwrite_existing);
           std::cout << "File copied from " << original_path << " to " << destination_path << std::endl;
