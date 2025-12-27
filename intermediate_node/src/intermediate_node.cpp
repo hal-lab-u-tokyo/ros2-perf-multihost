@@ -37,10 +37,10 @@ parse_options(int argc, char ** argv)
 
 static
 void
-create_result_directory(const node_options::Options & options)
+create_result_directory(const node_options::Options & options, const std::string& log_dir)
 {
   std::stringstream ss;
-  ss << options.node_name << "_log" ;
+  ss << log_dir << "/" << options.node_name << "_log" ;
   const std::string result_dir_name = ss.str();
   std::filesystem::create_directories(result_dir_name); 
   ss.str("");
@@ -375,7 +375,7 @@ class Intermediate : public rclcpp::Node
       // ファイルのコピー
       try {
         std::string original_path = metadata_file_path;
-        ss << "../../../../src/graduate_research/performance_test/logs_local/" << node_name << "_log" ;
+        ss << log_dir << "/" << node_name << "_log" ;
         std::string destination_dir = ss.str();
         if (!std::filesystem::exists(destination_dir)) {
           std::filesystem::create_directories(destination_dir);
@@ -434,7 +434,7 @@ class Intermediate : public rclcpp::Node
         // ファイルのコピー
         try {
           std::string original_path = log_file_path;
-          ss << "../../../../src/graduate_research/performance_test/logs_local/" << node_name << "_log" ;
+          ss << log_dir << "/" << node_name << "_log" ;
           std::string destination_dir = ss.str();
           if (!std::filesystem::exists(destination_dir)) {
             std::filesystem::create_directories(destination_dir);
@@ -479,7 +479,7 @@ class Intermediate : public rclcpp::Node
         // ファイルのコピー
         try {
           std::string original_path = log_file_path;
-          ss << "../../../../src/graduate_research/performance_test/logs_local/" << node_name << "_log" ;
+          ss << log_dir << "/" << node_name << "_log" ;
           std::string destination_dir = ss.str();
           if (!std::filesystem::exists(destination_dir)) {
             std::filesystem::create_directories(destination_dir);
@@ -499,8 +499,15 @@ class Intermediate : public rclcpp::Node
 
 int main(int argc, char * argv[])
 {
+  std::string log_dir = "./"; // デフォルト
+  for (int i = 1; i < argc; ++i) {
+    if (std::string(argv[i]) == "--log_dir" && i + 1 < argc) {
+      log_dir = argv[i + 1];
+    }
+  }
+
   auto options = parse_options(argc, argv);
-  create_result_directory(options) ;
+  create_result_directory(options, log_dir);
   std::cout << options << "\n" << "Start Publisher & Subscriber!" << std::endl;
 
   // クライアントライブラリの初期化

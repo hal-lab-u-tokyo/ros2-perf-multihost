@@ -1,7 +1,6 @@
 import os
 import subprocess
 import time
-import shutil
 import glob
 import csv
 import argparse
@@ -11,34 +10,32 @@ payload_sizes = [64, 256, 1024, 4096, 16384, 32768]  # 必要に応じて変更
 num_trials = 10  # 1ペイロードサイズあたりの試行回数
 
 
-def run_test(payload_size, run_idx, base_log_dir, base_result_dir, start_scripts_py, num_hosts):
+def run_test(payload_size, run_idx, start_scripts_py, num_hosts):
     print(f"=== Run payload={payload_size}B, trial={run_idx+1} ===")
-    # start_scripts.py を呼び出し
-    result = subprocess.run(["python3", start_scripts_py, str(payload_size), str(num_hosts)], capture_output=True, text=True)
+    result = subprocess.run(
+        ["python3", start_scripts_py, str(payload_size), str(num_hosts), str(run_idx + 1)], capture_output=True, text=True
+    )
     print(result.stdout)
-    log_parent = os.path.abspath(base_log_dir)
+    # 通信テストのみ。ログコピー・解析はしない
+    return
+
+
+def aggregate_total_latency(base_log_dir, result_parent_dir, payload_size, num_trials, num_hosts):
     latest_dir = f"raw_{payload_size}B"
+    log_parent = os.path.abspath(base_log_dir)
     src_log_dir = os.path.join(log_parent, latest_dir)
-    run_log_dir = os.path.join(src_log_dir, f"run{run_idx+1}")
-    os.makedirs(src_log_dir, exist_ok=True)
-    for item in os.listdir(src_log_dir):
-        item_path = os.path.join(src_log_dir, item)
-        if os.path.isdir(item_path) and item.startswith("run"):
-            continue
-        shutil.move(item_path, run_log_dir)
 
+    # 1. 各ラズパイから全runディレクトリ分のログをまとめてコピー
     hosts = ["pi0", "pi1", "pi2", "pi3", "pi4"][:num_hosts]
-    remote_log_dir = "/home/ubuntu/ros2-perf-multihost-v2/performance_test/logs_local"
-    for host in hosts:
-        print(f"Copying logs from {host}")
-        subprocess.run(["scp", "-r", f"ubuntu@{host}:{remote_log_dir}/*", run_log_dir + "/"])
+    for run_idx in range(num_trials):
+        run_log_dir = os.path.join(src_log_dir, f"run{run_idx+1}")
+        os.makedirs(run_log_dir, exist_ok=True)
+        remote_log_dir = f"/home/ubuntu/ros2-perf-multihost-v2/logs/raw_{payload_size}B/run{run_idx+1}"
+        for host in hosts:
+            print(f"Copying logs from {host} (run{run_idx+1})")
+            subprocess.run(["scp", "-r", f"ubuntu@{host}:{remote_log_dir}/*", run_log_dir + "/"])
 
-    print(f"  Saved logs to {run_log_dir}")
-
-    return latest_dir
-
-
-def aggregate_total_latency(base_log_dir, result_parent_dir, payload_size, latest_dir):
+    # 2. 解析処理
     run_dir = os.path.join(result_parent_dir, latest_dir)
     log_dir = os.path.join(base_log_dir, latest_dir)
     run_dirs = sorted(glob.glob(os.path.join(result_parent_dir, latest_dir, "run*")))
@@ -74,14 +71,12 @@ if __name__ == "__main__":
     os.makedirs(base_log_dir, exist_ok=True)
     os.makedirs(base_result_dir, exist_ok=True)
 
-    # start_scripts.py のパス
     start_scripts_py = "../manager_scripts/start_scripts.py"
 
     for payload_size in payload_sizes:
         print(f"=== Payload size: {payload_size}B ===")
-        latest_dir = None
         for run_idx in range(num_trials):
-            latest_dir = run_test(payload_size, run_idx, base_log_dir, base_result_dir, start_scripts_py, args.num_hosts)
+            run_test(payload_size, run_idx, start_scripts_py, args.num_hosts)
             time.sleep(2)
-        aggregate_total_latency(base_log_dir, base_result_dir, payload_size, latest_dir)
+        aggregate_total_latency(base_log_dir, base_result_dir, payload_size, num_trials, args.num_hosts)
     print("All tests and aggregation complete.")
