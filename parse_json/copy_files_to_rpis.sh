@@ -12,7 +12,7 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_DIR="$(cd "${SCRIPT_DIR}/.." && pwd)"
-DOCKERFILES_DIR="${REPO_DIR}/Dockerfiles"
+# DOCKERFILES_DIR="${REPO_DIR}/Dockerfiles"
 HOST_SCRIPTS_DIR="${REPO_DIR}/host_scripts"
 
 # 配布対象ホスト（必要に応じて編集）
@@ -20,14 +20,14 @@ HOSTS=("pi0" "pi1" "pi2" "pi3" "pi4")
 
 # リモート側の受け取り先
 REMOTE_BASE="~/ros2-perf-multihost-v2"
-REMOTE_DOCKERFILES_DIR="${REMOTE_BASE}/Dockerfiles"
+# REMOTE_DOCKERFILES_DIR="${REMOTE_BASE}/Dockerfiles"
 REMOTE_HOST_SCRIPTS_DIR="${REMOTE_BASE}/host_scripts"
 
 echo "=== Checking local artifacts exist ==="
-if [[ ! -d "${DOCKERFILES_DIR}" ]]; then
-  echo "ERROR: ${DOCKERFILES_DIR} not found. First generate Dockerfiles via parse_json/generate_dockerfiles.py."
-  exit 1
-fi
+# if [[ ! -d "${DOCKERFILES_DIR}" ]]; then
+#   echo "ERROR: ${DOCKERFILES_DIR} not found. First generate Dockerfiles via parse_json/generate_dockerfiles.py."
+#   exit 1
+# fi
 if [[ ! -d "${HOST_SCRIPTS_DIR}" ]]; then
   echo "ERROR: ${HOST_SCRIPTS_DIR} not found. First generate host scripts via parse_json/generate_scripts.py or generate_dockerfiles.py."
   exit 1
@@ -35,16 +35,16 @@ fi
 
 for host in "${HOSTS[@]}"; do
   echo "=== Copying artifacts to ${host} ==="
-  ssh "${host}" "mkdir -p ${REMOTE_DOCKERFILES_DIR} ${REMOTE_HOST_SCRIPTS_DIR}"
+  # ssh "${host}" "mkdir -p ${REMOTE_DOCKERFILES_DIR} ${REMOTE_HOST_SCRIPTS_DIR}"
 
   # Dockerfiles はホスト名と一致するディレクトリのみコピー
-  host_dockerfile_dir="${DOCKERFILES_DIR}/${host}"
-  if [[ -d "${host_dockerfile_dir}" ]]; then
-    echo " -> Dockerfiles/${host} -> ${host}:${REMOTE_DOCKERFILES_DIR}/${host}"
-    scp -r "${host_dockerfile_dir}" "${host}:${REMOTE_DOCKERFILES_DIR}/"
-  else
-    echo " -> Dockerfiles/${host} not found, skipping."
-  fi
+  # host_dockerfile_dir="${DOCKERFILES_DIR}/${host}"
+  # if [[ -d "${host_dockerfile_dir}" ]]; then
+  #   echo " -> Dockerfiles/${host} -> ${host}:${REMOTE_DOCKERFILES_DIR}/${host}"
+  #   scp -r "${host_dockerfile_dir}" "${host}:${REMOTE_DOCKERFILES_DIR}/"
+  # else
+  #   echo " -> Dockerfiles/${host} not found, skipping."
+  # fi
 
   # host_scripts はホスト名と一致する *_start.sh のみコピー
   host_start_script="${HOST_SCRIPTS_DIR}/${host}_start.sh"

@@ -71,7 +71,10 @@ if __name__ == "__main__":
     os.makedirs(base_log_dir, exist_ok=True)
     os.makedirs(base_result_dir, exist_ok=True)
 
-    start_scripts_py = "../manager_scripts/start_scripts.py"
+    if args.docker:
+        start_scripts_py = "../manager_scripts/start_docker_scripts.py"
+    else:
+        start_scripts_py = "../manager_scripts/start_scripts.py"
 
     for payload_size in payload_sizes:
         print(f"=== Payload size: {payload_size}B ===")

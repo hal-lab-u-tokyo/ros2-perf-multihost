@@ -104,6 +104,10 @@ def generate_dockerfiles(json_content):
         host_name = host_dict["host_name"]
         nodes = host_dict["nodes"]
 
+        # ホスト名をイメージ名やラベルに明示
+        dockerfile_content += f"\nLABEL host_name={host_name}\n"
+        dockerfile_content += f"ARG HOST_NAME={host_name}\n"
+
         if rmw_zenoh_flag:
             zenoh_router_command = ". /root/performance_ws/install/setup.sh && ros2 run rmw_zenoh_cpp rmw_zenohd & "
             zenoh_config_command = (
@@ -221,7 +225,7 @@ def generate_docker_compose(json_content, rmw_zenoh_flag):
               context: Dockerfiles/{host_name}
               dockerfile: Dockerfile
             volumes:
-              - ${{PWD}}/performance_test/logs:/root/performance_ws/src/graduate_research/performance_test/logs_local
+              - ${{PWD}}/performance_test/logs:/root/performance_ws/performance_test/logs_local
             container_name: {host_name}
         """)
         additional_content = "  " + additional_content.replace("\n", "\n  ")
@@ -235,96 +239,96 @@ def generate_docker_compose(json_content, rmw_zenoh_flag):
     return
 
 
-def generate_run_all_hosts_docker(json_content, rmw_zenoh_flag):
-    host_scripts_dir = "../host_scripts"
-    os.makedirs(host_scripts_dir, exist_ok=True)
-    script_path = os.path.join(host_scripts_dir, "run_all_hosts_docker.sh")
+# def generate_run_all_hosts_docker(json_content, rmw_zenoh_flag):
+#     host_scripts_dir = "../host_scripts"
+#     os.makedirs(host_scripts_dir, exist_ok=True)
+#     script_path = os.path.join(host_scripts_dir, "run_all_hosts_docker.sh")
 
-    hosts = json_content["hosts"]
+#     hosts = json_content["hosts"]
 
-    lines = [
-        "#!/bin/bash",
-        "set -e",
-        "",
-        "# 使い方: ./run_all_hosts_docker.sh <payload_size>",
-        "",
-        "# 引数チェック",
-        'if [ -z "$1" ]; then',
-        '  echo "Error: payload_size is required."',
-        '  echo "Usage: $0 <payload_size>"',
-        "  exit 1",
-        "fi",
-        'PAYLOAD_SIZE="$1"',
-        "",
-        "# ログ保存先ディレクトリを生成（docker_${payload_size}B_日時）",
-        'TIMESTAMP=$(date +"%Y-%m-%d_%H%M%S")',
-        "",
-        'SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"',
-        'REPO_DIR="$(cd "${SCRIPT_DIR}/.." && pwd)"',
-        'DOCKERFILES_DIR="${REPO_DIR}/Dockerfiles"',
-        'LOG_DIR="${REPO_DIR}/performance_test/logs/docker_${PAYLOAD_SIZE}B_${TIMESTAMP}"',
-        "",
-        'mkdir -p "$LOG_DIR"',
-        'echo "=== Settings: payload_size=$PAYLOAD_SIZE, log_dir=$LOG_DIR ==="',
-        "",
-    ]
+#     lines = [
+#         "#!/bin/bash",
+#         "set -e",
+#         "",
+#         "# 使い方: ./run_all_hosts_docker.sh <payload_size>",
+#         "",
+#         "# 引数チェック",
+#         'if [ -z "$1" ]; then',
+#         '  echo "Error: payload_size is required."',
+#         '  echo "Usage: $0 <payload_size>"',
+#         "  exit 1",
+#         "fi",
+#         'PAYLOAD_SIZE="$1"',
+#         "",
+#         "# ログ保存先ディレクトリを生成（docker_${payload_size}B）",
+#         'TIMESTAMP=$(date +"%Y-%m-%d_%H%M%S")',
+#         "",
+#         'SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"',
+#         'REPO_DIR="$(cd "${SCRIPT_DIR}/.." && pwd)"',
+#         'DOCKERFILES_DIR="${REPO_DIR}/Dockerfiles"',
+#         'LOG_DIR="${REPO_DIR}/performance_test/logs/docker_${PAYLOAD_SIZE}B"',
+#         "",
+#         'mkdir -p "$LOG_DIR"',
+#         'echo "=== Settings: payload_size=$PAYLOAD_SIZE, log_dir=$LOG_DIR ==="',
+#         "",
+#     ]
 
-    # ラズパイ側のリポジトリ配置を想定
-    remote_repo_dir = "~/ros2-perf-multihost-v2"
-    remote_dockerfiles_dir = f"{remote_repo_dir}/Dockerfiles"
-    remote_logs_dir = f"{remote_repo_dir}/performance_test/logs"
+#     # ラズパイ側のリポジトリ配置を想定
+#     remote_repo_dir = "~/ros2-perf-multihost-v2"
+#     remote_dockerfiles_dir = f"{remote_repo_dir}/Dockerfiles"
+#     remote_logs_dir = f"{remote_repo_dir}/performance_test/logs"
 
-    # 各ホストのリモートログをクリーンアップ
-    lines.append('echo "=== cleanup remote logs ==="')
-    for host_dict in hosts:
-        host_name = host_dict["host_name"]
-        lines.append(f"ssh {host_name} 'rm -rf {remote_logs_dir} && mkdir -p {remote_logs_dir}' || true")
-    lines.append("")
+#     # 各ホストのリモートログをクリーンアップ
+#     lines.append('echo "=== cleanup remote logs ==="')
+#     for host_dict in hosts:
+#         host_name = host_dict["host_name"]
+#         lines.append(f"ssh {host_name} 'rm -rf {remote_logs_dir} && mkdir -p {remote_logs_dir}' || true")
+#     lines.append("")
 
-    # 各ホストに ssh接続してコンテナ起動
-    for host_dict in hosts:
-        host_name = host_dict["host_name"]
+#     # 各ホストに ssh接続してコンテナ起動
+#     for host_dict in hosts:
+#         host_name = host_dict["host_name"]
 
-        lines.extend(
-            [
-                f'echo "=== Building Docker image on {host_name} ==="',
-                f'ssh {host_name} "cd {remote_dockerfiles_dir}/{host_name} && docker build --platform=linux/arm64 -t ros2_perf_{host_name} ."',
-                "",
-                f'echo "=== Running Docker container on {host_name} ==="',
-                f'ssh {host_name} "docker run --rm --network host '
-                f"-e PAYLOAD_SIZE=$PAYLOAD_SIZE "
-                f"-v {remote_logs_dir}:/root/performance_ws/src/graduate_research/performance_test/logs_local "
-                f'ros2_perf_{host_name}" &',
-                "",
-            ]
-        )
+#         lines.extend(
+#             [
+#                 f'echo "=== Building Docker image on {host_name} ==="',
+#                 f'ssh {host_name} "cd {remote_dockerfiles_dir}/{host_name} && docker build --platform=linux/arm64 -t ros2_perf_{host_name} ."',
+#                 "",
+#                 f'echo "=== Running Docker container on {host_name} ==="',
+#                 f'ssh {host_name} "docker run --rm --network host '
+#                 f"-e PAYLOAD_SIZE=$PAYLOAD_SIZE "
+#                 f"-v {remote_logs_dir}:/root/performance_ws/performance_test/logs_local "
+#                 f'ros2_perf_{host_name}" &',
+#                 "",
+#             ]
+#         )
 
-    lines.append('echo "=== Waiting for all remote containers to finish ==="')
-    lines.append("wait")
-    lines.append("")
+#     lines.append('echo "=== Waiting for all remote containers to finish ==="')
+#     lines.append("wait")
+#     lines.append("")
 
-    # 実行終了後に各ラズパイからログを回収
-    lines.append('echo "=== Collecting logs to ${LOG_DIR} ==="')
-    for host_dict in hosts:
-        host_name = host_dict["host_name"]
+#     # 実行終了後に各ラズパイからログを回収
+#     lines.append('echo "=== Collecting logs to ${LOG_DIR} ==="')
+#     for host_dict in hosts:
+#         host_name = host_dict["host_name"]
 
-        lines.extend(
-            [
-                f'echo "=== Collecting logs from {host_name} ==="',
-                f'scp -r {host_name}:{remote_logs_dir}/* "$LOG_DIR/" ' f'|| echo "No logs to copy from {host_name}"',
-                "",
-            ]
-        )
+#         lines.extend(
+#             [
+#                 f'echo "=== Collecting logs from {host_name} ==="',
+#                 f'scp -r {host_name}:{remote_logs_dir}/* "$LOG_DIR/" ' f'|| echo "No logs to copy from {host_name}"',
+#                 "",
+#             ]
+#         )
 
-    lines.append('echo "=== log collection finished ==="')
-    lines.append('echo "Logs saved to: $LOG_DIR"')
+#     lines.append('echo "=== log collection finished ==="')
+#     lines.append('echo "Logs saved to: $LOG_DIR"')
 
-    script_content = "\n".join(lines) + "\n"
+#     script_content = "\n".join(lines) + "\n"
 
-    with open(script_path, "w") as f:
-        f.write(script_content)
+#     with open(script_path, "w") as f:
+#         f.write(script_content)
 
-    os.chmod(script_path, 0o755)
+#     os.chmod(script_path, 0o755)
 
 
 if __name__ == "__main__":
@@ -333,4 +337,4 @@ if __name__ == "__main__":
 
     rmw_zenoh_flag = generate_dockerfiles(json_content)
     generate_docker_compose(json_content, rmw_zenoh_flag)
-    generate_run_all_hosts_docker(json_content, rmw_zenoh_flag)
+    # generate_run_all_hosts_docker(json_content, rmw_zenoh_flag)
