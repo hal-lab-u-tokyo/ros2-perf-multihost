@@ -175,20 +175,20 @@ private:
     RCLCPP_INFO(this->get_logger(), "Metadata written to file: %s", metadata_file_path.c_str());
 
     // ファイルのコピー
-    try {
-      std::string original_path = metadata_file_path;
-      std::string destination_dir = options.log_dir + "/" + options.node_name + "_log";
-      if (!std::filesystem::exists(destination_dir)) {
-        std::filesystem::create_directories(destination_dir);
-        std::cout << "Created directory: " << destination_dir << std::endl;
-      }
+    // try {
+    //   std::string original_path = metadata_file_path;
+    //   std::string destination_dir = options.log_dir + "/" + options.node_name + "_log";
+    //   if (!std::filesystem::exists(destination_dir)) {
+    //     std::filesystem::create_directories(destination_dir);
+    //     std::cout << "Created directory: " << destination_dir << std::endl;
+    //   }
 
-      std::string destination_path = destination_dir + "/metadata.txt";
-      std::filesystem::copy_file(original_path, destination_path, std::filesystem::copy_options::overwrite_existing);
-      std::cout << "File copied from " << original_path << " to " << destination_path << std::endl;
-    } catch (const std::filesystem::filesystem_error &e) {
-      std::cerr << "Error copying file: " << e.what() << std::endl;
-    }
+    //   std::string destination_path = destination_dir + "/metadata.txt";
+    //   std::filesystem::copy_file(original_path, destination_path, std::filesystem::copy_options::overwrite_existing);
+    //   std::cout << "File copied from " << original_path << " to " << destination_path << std::endl;
+    // } catch (const std::filesystem::filesystem_error &e) {
+    //   std::cerr << "Error copying file: " << e.what() << std::endl;
+    // }
   }
 
   // ログ記録用
