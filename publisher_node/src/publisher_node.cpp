@@ -331,7 +331,7 @@ int main(int argc, char * argv[])
   }
 
   auto options = parse_options(argc, argv);
-  create_result_directory(options, log_dir); ;
+  create_result_directory(options);
   std::cout << options << "\n" << "Start Publisher!" << std::endl;
 
   // クライアントライブラリの初期化
