@@ -39,12 +39,12 @@ parse_options(int argc, char ** argv)
 
 static
 void
-create_result_directory(const node_options::Options & options)
+create_result_directory(const node_options::Options & options, const std::string& log_dir)
 {
   std::stringstream ss;
-  ss << options.node_name << "_log" ;
+  ss << log_dir << "/" << options.node_name << "_log";
   const std::string result_dir_name = ss.str();
-  std::filesystem::create_directories(result_dir_name); // install/publisher_node/lib/publisher_node/my_node_log みたいな感じ
+  std::filesystem::create_directories(result_dir_name);
   ss.str("");
   ss.clear();
 
@@ -58,7 +58,7 @@ create_result_directory(const node_options::Options & options)
   }
 
   for (const auto& file_path : log_file_paths) {
-    std::ofstream ofs(file_path); // ファイルを開く（存在しない場合は作成）
+    std::ofstream ofs(file_path);
     if(ofs){
       std::cout << "Log file created: " << file_path << std::endl;
       ofs.close();
