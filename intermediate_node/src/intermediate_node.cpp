@@ -37,10 +37,10 @@ parse_options(int argc, char ** argv)
 
 static
 void
-create_result_directory(const node_options::Options & options, const std::string& log_dir)
+create_result_directory(const node_options::Options & options)
 {
   std::stringstream ss;
-  ss << log_dir << "/" << options.node_name << "_log" ;
+  ss << options.log_dir << "/" << options.node_name << "_log" ;
   const std::string result_dir_name = ss.str();
   std::filesystem::create_directories(result_dir_name); 
   ss.str("");
@@ -375,7 +375,7 @@ class Intermediate : public rclcpp::Node
       // ファイルのコピー
       try {
         std::string original_path = metadata_file_path;
-        ss << log_dir << "/" << node_name << "_log" ;
+        ss << options.log_dir << "/" << node_name << "_log" ;
         std::string destination_dir = ss.str();
         if (!std::filesystem::exists(destination_dir)) {
           std::filesystem::create_directories(destination_dir);
@@ -507,7 +507,7 @@ int main(int argc, char * argv[])
   }
 
   auto options = parse_options(argc, argv);
-  create_result_directory(options, log_dir);
+  create_result_directory(options);
   std::cout << options << "\n" << "Start Publisher & Subscriber!" << std::endl;
 
   // クライアントライブラリの初期化

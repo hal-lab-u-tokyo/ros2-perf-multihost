@@ -3,7 +3,7 @@
   <version>0.0.0</version>
   <description>Custom Subscriber Node</description>
 
-  <maintainer email="user@example.com">Yuma Fujiwara</maintainer>
+  <maintainer email="user@example.com">Yugo Tanaka</maintainer>
   <license>Apache-2.0</license>
 
   <buildtool_depend>ament_cmake</buildtool_depend>
