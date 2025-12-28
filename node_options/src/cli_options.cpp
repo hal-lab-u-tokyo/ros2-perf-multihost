@@ -13,6 +13,7 @@ namespace node_options
 Options::Options()
 {
     eval_time = 60;
+    log_dir = "./logs";
     qos_history="KEEP_LAST";
     qos_depth = 1;
     qos_reliability = "RELIABLE";
