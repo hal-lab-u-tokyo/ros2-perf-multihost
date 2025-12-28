@@ -39,10 +39,10 @@ parse_options(int argc, char ** argv)
 
 static
 void
-create_result_directory(const node_options::Options & options, const std::string& log_dir)
+create_result_directory(const node_options::Options & options)
 {
   std::stringstream ss;
-  ss << log_dir << "/" << options.node_name << "_log";
+  ss << options.log_dir << "/" << options.node_name << "_log";
   const std::string result_dir_name = ss.str();
   std::filesystem::create_directories(result_dir_name);
   ss.str("");
@@ -72,12 +72,11 @@ create_result_directory(const node_options::Options & options, const std::string
 class Publisher : public rclcpp::Node
 {
   public:
-    explicit Publisher(const node_options::Options & options, const std::string& log_dir)
-    : Node(options.node_name), log_dir(log_dir)
+    explicit Publisher(const node_options::Options & options)
+    : Node(options.node_name)
     {
       node_name = options.node_name;
-      create_metadata_file(options, log_dir);
-
+      create_metadata_file(options);
       // シャットダウン予告
       RCLCPP_INFO(this->get_logger(), "Shutdown timer created with duration %d seconds", options.eval_time + 10);
 
@@ -187,10 +186,10 @@ class Publisher : public rclcpp::Node
     std::unordered_map<std::string, rclcpp::Time> end_time_;
 
     void
-    create_metadata_file(const node_options::Options & options, const std::string& log_dir)
+    create_metadata_file(const node_options::Options & options)
     {
       std::stringstream ss;
-      ss << log_dir << "/" << options.node_name << "_log" <<  "/" << "metadata.txt" ;
+      ss << options.log_dir << "/" << options.node_name << "_log" <<  "/" << "metadata.txt" ;
       std::string metadata_file_path = ss.str();
       ss.str("");
       ss.clear();
@@ -225,14 +224,14 @@ class Publisher : public rclcpp::Node
       // ファイルのコピー
       try {
         std::string original_path = metadata_file_path;
-        ss << log_dir << "/" << node_name << "_log" ;
+        ss << options.log_dir << "/" << node_name << "_log" ;
         std::string destination_dir = ss.str();
         if (!std::filesystem::exists(destination_dir)) {
           std::filesystem::create_directories(destination_dir);
           std::cout << "Created directory: " << destination_dir << std::endl;
         }
 
-        ss << log_dir << "/" << "metadata.txt" ;
+        ss << options.log_dir << "/" << "metadata.txt" ;
         std::string destination_path = ss.str();
         std::filesystem::copy_file(original_path, destination_path, std::filesystem::copy_options::overwrite_existing);
         std::cout << "File copied from " << original_path << " to " << destination_path << std::endl;
