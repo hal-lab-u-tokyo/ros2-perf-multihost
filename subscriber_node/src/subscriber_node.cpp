@@ -152,7 +152,7 @@ private:
   create_metadata_file(const node_options::Options & options, const std::string& log_dir)
   {
     std::stringstream ss;
-    ss << log_dir << "/" << options.node_name << "_log" <<  "/" << "metadata.txt" ;
+    ss << options.log_dir << "/" << options.node_name << "_log" <<  "/" << "metadata.txt" ;
     std::string metadata_file_path = ss.str();
     ss.str("");
     ss.clear();
@@ -184,7 +184,7 @@ private:
         std::cout << "Created directory: " << destination_dir << std::endl;
       }
 
-      ss << log_dir << "/" << "metadata.txt" ;
+      ss << options.log_dir << "/" << "metadata.txt" ;
       std::string destination_path = ss.str();
       std::filesystem::copy_file(original_path, destination_path, std::filesystem::copy_options::overwrite_existing);
       std::cout << "File copied from " << original_path << " to " << destination_path << std::endl;
