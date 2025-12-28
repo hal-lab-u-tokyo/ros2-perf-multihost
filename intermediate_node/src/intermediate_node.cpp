@@ -393,6 +393,7 @@ class Intermediate : public rclcpp::Node
 
     // ログ記録用
     std::string node_name;
+    std::string log_dir;
     std::map<std::string, std::vector<MessageLog>> message_logs_pub_;
     std::map<std::string, std::vector<MessageLog>> message_logs_sub_;
 
