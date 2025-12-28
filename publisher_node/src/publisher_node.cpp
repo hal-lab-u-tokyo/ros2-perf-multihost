@@ -76,6 +76,7 @@ class Publisher : public rclcpp::Node
     : Node(options.node_name)
     {
       node_name = options.node_name;
+      log_dir = options.log_dir;
       create_metadata_file(options);
       // シャットダウン予告
       RCLCPP_INFO(this->get_logger(), "Shutdown timer created with duration %d seconds", options.eval_time + 10);

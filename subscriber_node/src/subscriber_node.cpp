@@ -70,6 +70,7 @@ public:
     : Node(options.node_name)
   {
     node_name = options.node_name;
+    log_dir = options.log_dir;
     create_metadata_file(options);
     
     // 複数のトピック名を扱う場合
