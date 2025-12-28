@@ -203,6 +203,7 @@ private:
 
   void write_all_logs(const std::map<std::string, std::vector<MessageLog>>& message_logs_) {
       for (const auto &[topic_name, topic_logs] : message_logs_) {
+        std::cout << "topic: " << topic_name << ", logs: " << topic_logs.size() << std::endl;
         std::stringstream ss;
         ss << log_dir << "/" << node_name << "_log" <<  "/" << topic_name << "_log.txt" ;
         const std::string log_file_path = ss.str();
