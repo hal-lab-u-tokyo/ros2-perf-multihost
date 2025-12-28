@@ -88,8 +88,9 @@ def generate_host_scripts(json_content):
                     f"--node_name {node_name} "
                     f"--topic_names {topic_names} "
                     f'-s "$PAYLOAD_SIZE" -p {period_ms} '
-                    f"--eval_time {eval_time} &"
-                    f'> "$LOG_DIR/{node_name}_publisher.log" 2>&1 &'
+                    f"--eval_time {eval_time} "
+                    f'--log_dir "$LOG_DIR" &'
+                    # f'> "$LOG_DIR/{node_name}_publisher.log" 2>&1 &'
                 )
 
             if node.get("subscriber"):
@@ -97,8 +98,8 @@ def generate_host_scripts(json_content):
                 topic_names = ",".join(s["topic_name"] for s in sub_list)
                 lines.append("cd ~/ros2-perf-multihost-v2/install/subscriber_node/lib/subscriber_node")
                 lines.append(
-                    f"./subscriber_node --node_name {node_name} --topic_names {topic_names} --eval_time {eval_time} "
-                    f'> "$LOG_DIR/{node_name}_subscriber.log" 2>&1 &'
+                    f'./subscriber_node --node_name {node_name} --topic_names {topic_names} --eval_time {eval_time} --log_dir "$LOG_DIR" &'
+                    # f'> "$LOG_DIR/{node_name}_subscriber.log" 2>&1 &'
                 )
 
             if node.get("intermediate"):
@@ -114,7 +115,8 @@ def generate_host_scripts(json_content):
                     f"--topic_names_sub {topic_names_sub} "
                     f'-s "$PAYLOAD_SIZE" -p {period_ms} '
                     f"--eval_time {eval_time} "
-                    f'> "$LOG_DIR/{node_name}_intermediate.log" 2>&1 &'
+                    f'--log_dir "$LOG_DIR" &'
+                    # f'> "$LOG_DIR/{node_name}_intermediate.log" 2>&1 &'
                 )
 
         lines.append("wait")
