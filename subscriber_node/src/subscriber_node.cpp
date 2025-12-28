@@ -66,11 +66,11 @@ create_result_directory(const node_options::Options & options)
 class Subscriber : public rclcpp::Node
 {
 public:
-  explicit Subscriber(const node_options::Options & options)
-    : Node(options.node_name)
+  explicit Subscriber(const node_options::Options & options, const std::string& log_dir)
+    : Node(options.node_name), log_dir(log_dir)
   {
     node_name = options.node_name;
-    create_metadata_file(options);
+    create_metadata_file(options, log_dir);
     
     // 複数のトピック名を扱う場合
     for (size_t i = 0; i < options.topic_names.size(); ++i) {
@@ -195,6 +195,7 @@ private:
 
   // ログ記録用
   std::string node_name;
+  std::string log_dir;
   std::map<std::string, std::vector<MessageLog>> message_logs_;
 
   void record_log(const std::string& topic_name, const std::string& pub_node_name, const uint32_t& message_idx, const rclcpp::Time& time_stamp) {
@@ -264,7 +265,7 @@ int main(int argc, char * argv[])
   setvbuf(stdout, NULL, _IONBF, BUFSIZ);
   rclcpp::init(argc, argv);
 
-  auto node = std::make_shared<Subscriber>(options);
+  auto node = std::make_shared<Subscriber>(options, log_dir);
   rclcpp::spin(node);
   rclcpp::shutdown();
 

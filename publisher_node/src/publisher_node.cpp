@@ -72,11 +72,11 @@ create_result_directory(const node_options::Options & options)
 class Publisher : public rclcpp::Node
 {
   public:
-    explicit Publisher(const node_options::Options & options)
-    : Node(options.node_name)
+    explicit Publisher(const node_options::Options & options, const std::string& log_dir)
+    : Node(options.node_name), log_dir(log_dir)
     {
       node_name = options.node_name;
-      create_metadata_file(options);
+      create_metadata_file(options, log_dir);
 
       // シャットダウン予告
       RCLCPP_INFO(this->get_logger(), "Shutdown timer created with duration %d seconds", options.eval_time + 10);
@@ -243,6 +243,7 @@ class Publisher : public rclcpp::Node
 
     // ログ記録用
     std::string node_name;
+    std::string log_dir;
     std::map<std::string, std::vector<MessageLog>> message_logs_;
 
     void record_log(const std::string& topic_name, const uint32_t& message_idx, const rclcpp::Time& time_stamp) {
@@ -342,7 +343,7 @@ int main(int argc, char * argv[])
   std::signal(SIGTERM, sigint_handler);
 
   // Publisherノードの生成とスピン開始
-  auto node = std::make_shared<Publisher>(options);
+  auto node = std::make_shared<Publisher>(options, log_dir);
   rclcpp::spin(node);
   rclcpp::shutdown();
 
