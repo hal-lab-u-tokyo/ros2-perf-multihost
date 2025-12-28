@@ -342,7 +342,7 @@ int main(int argc, char * argv[])
   std::signal(SIGTERM, sigint_handler);
 
   // Publisherノードの生成とスピン開始
-  auto node = std::make_shared<Publisher>(options, log_dir);
+  auto node = std::make_shared<Publisher>(options);
   rclcpp::spin(node);
   rclcpp::shutdown();
 
