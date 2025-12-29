@@ -1,0 +1,86 @@
+{
+    "eval_time": 60,
+    "period_ms": 100,
+    "qos": {
+        "history": "KEEP_LAST",
+        "depth": 1,
+        "reliability": "RELIABLE"
+    },
+    "hosts": [
+        {
+            "host_name": "pi0",
+            "nodes": [
+                {
+		    "node_name": "montreal",
+		    "publisher": [
+		        {"topic_name": "amazon"},
+		        {"topic_name": "nile"},
+		        {"topic_name": "ganges"},
+		        {"topic_name": "danube"}
+		      ]
+	        },
+
+	        {
+		    "node_name": "lyon",
+		    "intermediate": [
+                        {
+                            "subscriber":[
+		        	{"topic_name": "amazon"}
+		      	    ],
+		    	    "publisher": [
+		        	{"topic_name": "tigris"}
+		      	    ]
+                        }
+                    ]
+	        }
+            ]
+        },
+        {
+            "host_name": "pi1",
+            "nodes": [
+                {
+		    "node_name": "hamburg",
+		    "intermediate": [
+                        {
+                            "subscriber":[
+		        	{"topic_name": "nile"},
+		        	{"topic_name": "tigris"},
+		       		{"topic_name": "ganges"},
+		        	{"topic_name": "danube"}
+		      	    ],
+		    	    "publisher": [
+		        	{"topic_name": "parana"}
+		      	    ]
+                        }
+                    ]
+	        },
+
+	        {
+		    "node_name": "osaka",
+		    "intermediate": [
+                        {
+                            "subscriber":[
+		        	{"topic_name": "parana"}
+		      	    ],
+		    	    "publisher": [
+		        	{"topic_name": "salween"}
+		      	    ]
+                        }
+                    ]
+	        }
+            ]
+        },
+        {
+            "host_name": "pi2",
+            "nodes": [
+                {
+		    "node_name": "mandalay",
+			"subscriber": [
+		        {"topic_name": "salween"},
+		        {"topic_name": "danube"}
+		      ]
+	        }
+            ]
+        }
+    ]
+}

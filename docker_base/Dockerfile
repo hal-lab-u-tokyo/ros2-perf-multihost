@@ -1,4 +1,4 @@
-FROM osrf/ros:jazzy-desktop
+FROM ros:jazzy-ros-base
 
 ENV ROS_DISTRO=jazzy
 ENV CMAKE_PREFIX_PATH=/opt/ros/jazzy
@@ -7,7 +7,7 @@ ENV CMAKE_PREFIX_PATH=/opt/ros/jazzy
 RUN apt update \
     && mkdir -p ~/performance_ws/src \
     && cd ~/performance_ws/src \
-    && git clone https://github.com/tropical-summer/graduate_research.git
+    && git clone https://github.com/ts5-25/ros2-perf-multihost-v2.git
 
 # プロジェクトのビルド
 # RUNコマンドではbashファイルを叩けないしsourceもつかえない。→　.でshファイルを叩く

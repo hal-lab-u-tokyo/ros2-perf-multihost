@@ -42,9 +42,9 @@ void
 create_result_directory(const node_options::Options & options)
 {
   std::stringstream ss;
-  ss << options.node_name << "_log" ;
+  ss << options.log_dir << "/" << options.node_name << "_log";
   const std::string result_dir_name = ss.str();
-  std::filesystem::create_directories(result_dir_name); // install/publisher_node/lib/publisher_node/my_node_log みたいな感じ
+  std::filesystem::create_directories(result_dir_name);
   ss.str("");
   ss.clear();
 
@@ -58,7 +58,7 @@ create_result_directory(const node_options::Options & options)
   }
 
   for (const auto& file_path : log_file_paths) {
-    std::ofstream ofs(file_path); // ファイルを開く（存在しない場合は作成）
+    std::ofstream ofs(file_path);
     if(ofs){
       std::cout << "Log file created: " << file_path << std::endl;
       ofs.close();
@@ -76,8 +76,8 @@ class Publisher : public rclcpp::Node
     : Node(options.node_name)
     {
       node_name = options.node_name;
+      log_dir = options.log_dir;
       create_metadata_file(options);
-
       // シャットダウン予告
       RCLCPP_INFO(this->get_logger(), "Shutdown timer created with duration %d seconds", options.eval_time + 10);
 
@@ -190,7 +190,7 @@ class Publisher : public rclcpp::Node
     create_metadata_file(const node_options::Options & options)
     {
       std::stringstream ss;
-      ss << options.node_name << "_log" <<  "/" << "metadata.txt" ;
+      ss << options.log_dir << "/" << options.node_name << "_log" <<  "/" << "metadata.txt" ;
       std::string metadata_file_path = ss.str();
       ss.str("");
       ss.clear();
@@ -223,26 +223,25 @@ class Publisher : public rclcpp::Node
       RCLCPP_INFO(this->get_logger(), "Metadata written to file: %s", metadata_file_path.c_str());
 
       // ファイルのコピー
-      try {
-        std::string original_path = metadata_file_path;
-        ss << "../../../../src/graduate_research/performance_test/logs_local/" << node_name << "_log" ;
-        std::string destination_dir = ss.str();
-        if (!std::filesystem::exists(destination_dir)) {
-          std::filesystem::create_directories(destination_dir);
-          std::cout << "Created directory: " << destination_dir << std::endl;
-        }
+      // try {
+      //   std::string original_path = metadata_file_path;
+      //   std::string destination_dir = options.log_dir + "/" + options.node_name + "_log";
+      //   if (!std::filesystem::exists(destination_dir)) {
+      //     std::filesystem::create_directories(destination_dir);
+      //     std::cout << "Created directory: " << destination_dir << std::endl;
+      //   }
 
-        ss << "/" << "metadata.txt" ;
-        std::string destination_path = ss.str();
-        std::filesystem::copy_file(original_path, destination_path, std::filesystem::copy_options::overwrite_existing);
-        std::cout << "File copied from " << original_path << " to " << destination_path << std::endl;
-      } catch (const std::filesystem::filesystem_error &e) {
-          std::cerr << "Error copying file: " << e.what() << std::endl;
-      }
+      //   std::string destination_path = destination_dir + "/metadata.txt";
+      //   std::filesystem::copy_file(original_path, destination_path, std::filesystem::copy_options::overwrite_existing);
+      //   std::cout << "File copied from " << original_path << " to " << destination_path << std::endl;
+      // } catch (const std::filesystem::filesystem_error &e) {
+      //   std::cerr << "Error copying file: " << e.what() << std::endl;
+      // }
     }
 
     // ログ記録用
     std::string node_name;
+    std::string log_dir;
     std::map<std::string, std::vector<MessageLog>> message_logs_;
 
     void record_log(const std::string& topic_name, const uint32_t& message_idx, const rclcpp::Time& time_stamp) {
@@ -253,7 +252,7 @@ class Publisher : public rclcpp::Node
     void write_all_logs(const std::map<std::string, std::vector<MessageLog>>& message_logs_) {
       for (const auto &[topic_name, topic_logs] : message_logs_) {
         std::stringstream ss;
-        ss << node_name << "_log" <<  "/" << topic_name << "_log.txt" ;
+        ss << log_dir << "/" << node_name << "_log" <<  "/" << topic_name << "_log.txt" ;
         const std::string log_file_path = ss.str();
         ss.str("");
         ss.clear();
@@ -278,14 +277,14 @@ class Publisher : public rclcpp::Node
         // ファイルのコピー (ローカルで実行するとき用)
         try {
           std::string original_path = log_file_path;
-          ss << "../../../../src/graduate_research/performance_test/logs_local/" << node_name << "_log" ;
+          ss << log_dir << "/" << node_name << "_log" ;
           std::string destination_dir = ss.str();
           if (!std::filesystem::exists(destination_dir)) {
             std::filesystem::create_directories(destination_dir);
             std::cout << "Created directory: " << destination_dir << std::endl;
           }
 
-          ss << "/" << topic_name << "_log.txt" ;
+          ss << log_dir << "/" << node_name << "_log" <<  "/" << topic_name << "_log.txt" ;
           std::string destination_path = ss.str();
           std::filesystem::copy_file(original_path, destination_path, std::filesystem::copy_options::overwrite_existing);
           std::cout << "File copied from " << original_path << " to " << destination_path << std::endl;
@@ -323,8 +322,15 @@ void sigint_handler (int signum)
 
 int main(int argc, char * argv[])
 {
+  std::string log_dir = "./"; // デフォルト
+  for (int i = 1; i < argc; ++i) {
+    if (std::string(argv[i]) == "--log_dir" && i + 1 < argc) {
+      log_dir = argv[i + 1];
+    }
+  }
+
   auto options = parse_options(argc, argv);
-  create_result_directory(options) ;
+  create_result_directory(options);
   std::cout << options << "\n" << "Start Publisher!" << std::endl;
 
   // クライアントライブラリの初期化

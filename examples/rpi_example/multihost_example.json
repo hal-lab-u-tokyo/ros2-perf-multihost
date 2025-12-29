@@ -1,0 +1,169 @@
+{
+    "eval_time": 60,
+    "period_ms": 100,
+    "qos": {
+        "history": "KEEP_LAST",
+        "depth": 1,
+        "reliability": "RELIABLE"
+    },
+    "hosts": [
+        {
+            "host_name": "pi0",
+            "nodes": [
+                {
+		    "node_name": "montreal",
+		    "publisher": [
+		        {"topic_name": "amazon"},
+		        {"topic_name": "nile"},
+		        {"topic_name": "ganges"},
+		        {"topic_name": "danube"}
+		      ]
+	        },
+
+	        {
+		    "node_name": "lyon",
+		    "intermediate": [
+                        {
+                            "subscriber":[
+		        	{"topic_name": "amazon"}
+		      	    ],
+		    	    "publisher": [
+		        	{"topic_name": "tigris"}
+		      	    ]
+                        }
+                    ]
+	        }
+            ]
+        },
+        {
+            "host_name": "pi1",
+            "nodes": [
+                {
+		    "node_name": "hamburg",
+		    "intermediate": [
+                        {
+                            "subscriber":[
+		        	{"topic_name": "nile"},
+		        	{"topic_name": "tigris"},
+		       		{"topic_name": "ganges"},
+		        	{"topic_name": "danube"}
+		      	    ],
+		    	    "publisher": [
+		        	{"topic_name": "parana"}
+		      	    ]
+                        }
+                    ]
+	        },
+
+	        {
+		    "node_name": "osaka",
+		    "intermediate": [
+                        {
+                            "subscriber":[
+		        	{"topic_name": "parana"}
+		      	    ],
+		    	    "publisher": [
+		        	{"topic_name": "salween"}
+		      	    ]
+                        }
+                    ]
+	        }
+            ]
+        },
+        {
+            "host_name": "pi2",
+            "nodes": [
+                {
+		    "node_name": "mandalay",
+		    "intermediate": [
+                        {
+                            "subscriber":[
+		        	{"topic_name": "salween"},
+		        	{"topic_name": "danube"}
+		      	    ],
+		    	    "publisher": [
+		        	{"topic_name": "missouri"}
+		      	    ]
+                        }
+                    ]
+	        }
+            ]
+        },
+        {
+            "host_name": "pi3",
+            "nodes": [
+                {
+		    "node_name": "ponce",
+		    "intermediate": [
+                        {
+                            "subscriber":[
+		        	{"topic_name": "missouri"},
+		        	{"topic_name": "danube"},
+		        	{"topic_name": "volga"}
+		      	    ],
+		    	    "publisher": [
+		        	{"topic_name": "mekong"},
+		        	{"topic_name": "congo"}
+		      	    ]
+                        }
+                    ]
+	        },
+
+	        {
+		    "node_name": "barcelona",
+		    "intermediate": [
+                        {
+                            "subscriber":[
+		        	{"topic_name": "mekong"}
+		      	    ],
+		    	    "publisher": [
+		        	{"topic_name": "lena"}
+		      	    ]
+                        }
+                    ]
+	        },
+
+	        {
+		    "node_name": "georgetown",
+		    "intermediate": [
+                        {
+                            "subscriber":[
+		        	{"topic_name": "lena"}
+		      	    ],
+		    	    "publisher": [
+		        	{"topic_name": "volga"}
+		      	    ]
+                        }
+                    ]
+	        }
+            ]
+        },
+        {
+            "host_name": "pi4",
+            "nodes": [
+                {
+		    "node_name": "geneva",
+		    "intermediate": [
+                        {
+                            "subscriber":[
+		        	{"topic_name": "congo"},
+		        	{"topic_name": "danube"},
+		        	{"topic_name": "parana"}
+		      	    ],
+		    	    "publisher": [
+		        	{"topic_name": "arkansas"}
+		      	    ]
+                        }
+                    ]
+	        },
+
+	        {
+		    "node_name": "arequipa",
+		    "subscriber":[
+		        {"topic_name": "arkansas"}
+		      ]
+	        }
+            ]
+        }
+    ]
+}

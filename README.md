@@ -10,7 +10,7 @@
 
 上記のノードに関する設定を、コマンドライン引数としてユーザが指定できるようにする。`options.add_options()`の項目を増やすことで、新たな設定を追加することもできる。IntermediateではPublisherとSubscriberの両方にそれぞれトピック名を指定する仕様のため、通常のPublisherおよびSubscriberの設定と分けている。
 
-`parse_json_to_dockerfiles`:
+`parse_json`:
 
 `examples`フォルダにあるようなJSONファイルを受け取り、それらの設定を反映したノードが立ち上がるようなDockerfileをホストの数だけ作成する。同時にそれらのDockerfilesを一斉起動するための`docker-compose.yml`ファイルも作成する。
 
@@ -32,7 +32,7 @@ Dockerコンテナ内にZenohルーターを立ち上げるにあたり必要な
 
 ## Build
 ```bash
-sudo apt install python3-json5
+sudo apt install python3-json5 libcxxopts-dev
 colcon build
 ```
 
@@ -59,8 +59,8 @@ cd install/intermediate_node/lib/intermediate_node
 ## Docker compose
 まずはPythonプロジェクトを用いて、JSONファイル(のパス)からDockerfileとdocker-compose.ymlを生成
 ```bash
-cd parse_json_to_dockerfiles
-python3 parse_json.py ../examples/topology_example/topology_example.json 
+cd parse_json
+python3 generate_dockerfiles.py ../examples/topology_example/topology_example.json 
 ```
 生成したdocker-compose.ymlからコンテナイメージを生成し、実行する。別のdocker-compose.ymlを実行していた場合は、`docker-compose down`を叩いておく
 ```bash
