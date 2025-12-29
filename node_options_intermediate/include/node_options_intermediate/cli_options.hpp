@@ -23,6 +23,7 @@ public:
  std::vector<int> payload_size;
  std::vector<int> period_ms;
  int eval_time;
+ std::string log_dir;
  std::string qos_history;
  int qos_depth;
  std::string qos_reliability;

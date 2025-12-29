@@ -1,0 +1,33 @@
+{
+    "eval_time": 60,
+    "period_ms": 100,
+    "qos": {
+        "history": "KEEP_LAST",
+        "depth": 1,
+        "reliability": "RELIABLE"
+    },
+    "hosts": [
+        {
+            "host_name": "pi0",
+            "nodes": [
+                {
+		        "node_name": "montreal",
+		        "publisher": [
+		            {"topic_name": "amazon"}
+		        ]
+	            }
+            ]
+        },
+        {
+            "host_name": "pi1",
+            "nodes": [
+                {
+		        "node_name": "hamburg",
+                "subscriber":[
+		        	{"topic_name": "amazon"}
+                ]
+	            }
+            ]
+        }
+    ]
+}

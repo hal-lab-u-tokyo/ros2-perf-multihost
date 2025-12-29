@@ -13,6 +13,7 @@ namespace node_options
 Options::Options()
 {
     eval_time = 60;
+    log_dir = "./logs";
     qos_history="KEEP_LAST";
     qos_depth = 1;
     qos_reliability = "RELIABLE";
@@ -36,6 +37,7 @@ void Options::parse(int argc, char ** argv)
         ("s, size", "payload size", cxxopts::value<std::vector<int>>(payload_size), "bytes")
         ("p, period", "publish frequency", cxxopts::value<std::vector<int>>(period_ms), "ms_sec")
         ("eval_time", "period of publishing", cxxopts::value<int>(eval_time), "sec")
+        ("log_dir", "directory for log files", cxxopts::value<std::string>(log_dir))
         ("qos_history", "KEEP_LAST or KEEP_ALL", cxxopts::value<std::string>(qos_history))
         ("qos_depth", "KEEP_LAST(n)", cxxopts::value<int>(qos_depth))
         ("qos_reliability", "RELIABLE or BEST_EFFORT", cxxopts::value<std::string>(qos_reliability));

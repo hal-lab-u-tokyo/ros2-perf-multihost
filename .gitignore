@@ -1,9 +1,11 @@
 build/
 install/
 log/
+venv/
 
 .vscode/
 compose.yml
 Dockerfiles/
+host_scripts/
 performance_test/logs/
 performance_test/results/
