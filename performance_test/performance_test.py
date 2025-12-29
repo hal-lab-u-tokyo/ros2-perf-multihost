@@ -5,7 +5,7 @@ import csv
 import argparse
 
 # 設定
-payload_sizes = [64, 256, 1024, 4096, 16384, 32768]  # 必要に応じて変更
+payload_sizes = [64, 256, 1024, 4096, 16384, 32768, 65536, 131072, 524288, 1048576]  # 必要に応じて変更
 
 
 def run_test(payload_size, run_idx, start_scripts_py, num_hosts):
@@ -18,8 +18,8 @@ def run_test(payload_size, run_idx, start_scripts_py, num_hosts):
     return
 
 
-def aggregate_total_latency(base_log_dir, result_parent_dir, payload_size, num_trials, num_hosts):
-    latest_dir = f"raw_{payload_size}B"
+def aggregate_total_latency(base_log_dir, result_parent_dir, prefix, payload_size, num_trials, num_hosts):
+    latest_dir = f"{prefix}_{payload_size}B"
     log_parent = os.path.abspath(base_log_dir)
     src_log_dir = os.path.join(log_parent, latest_dir)
 
@@ -28,7 +28,7 @@ def aggregate_total_latency(base_log_dir, result_parent_dir, payload_size, num_t
     for run_idx in range(num_trials):
         run_log_dir = os.path.join(src_log_dir, f"run{run_idx+1}")
         os.makedirs(run_log_dir, exist_ok=True)
-        remote_log_dir = f"/home/ubuntu/ros2-perf-multihost-v2/logs/raw_{payload_size}B/run{run_idx+1}"
+        remote_log_dir = f"/home/ubuntu/ros2-perf-multihost-v2/logs/{prefix}_{payload_size}B/run{run_idx+1}"
         for host in hosts:
             print(f"Copying logs from {host} (run{run_idx+1})")
             subprocess.run(["scp", "-r", f"ubuntu@{host}:{remote_log_dir}/*", run_log_dir + "/"])
@@ -76,13 +76,15 @@ if __name__ == "__main__":
 
     if args.docker:
         start_scripts_py = "../manager_scripts/start_docker_scripts.py"
+        prefix = "docker"
     else:
         start_scripts_py = "../manager_scripts/start_scripts.py"
+        prefix = "raw"
 
     for payload_size in payload_sizes:
         print(f"=== Payload size: {payload_size}B ===")
         for run_idx in range(args.trials):
             run_test(payload_size, run_idx, start_scripts_py, args.hosts)
             time.sleep(2)
-        aggregate_total_latency(base_log_dir, base_result_dir, payload_size, args.trials, args.hosts)
+        aggregate_total_latency(base_log_dir, base_result_dir, prefix, payload_size, args.trials, args.hosts)
     print("All tests and aggregation complete.")
