@@ -1,7 +1,6 @@
 import os
 import subprocess
 import time
-import glob
 import csv
 import argparse
 
@@ -37,12 +36,16 @@ def aggregate_total_latency(base_log_dir, result_parent_dir, payload_size, num_t
     # 2. 解析処理
     run_dir = os.path.join(result_parent_dir, latest_dir)
     log_dir = os.path.join(base_log_dir, latest_dir)
-    run_dirs = sorted(glob.glob(os.path.join(result_parent_dir, latest_dir, "run*")))
+    # run_dirs = sorted(glob.glob(os.path.join(result_parent_dir, latest_dir, "run*")))
     rows = []
     subprocess.run(["python3", "all_latency.py", "--logs", log_dir, "--results", run_dir])
     print(f"  Saved results to {run_dir}")
-    for run_dir in run_dirs:
-        total_path = os.path.join(run_dir, "total_latency.txt")
+
+    # 3. 集計
+    rows = []
+    for run_idx in range(num_trials):
+        run_results_dir = os.path.join(run_dir, f"run{run_idx+1}")
+        total_path = os.path.join(run_results_dir, "total_latency.txt")
         if not os.path.exists(total_path):
             continue
         with open(total_path) as f:
@@ -50,7 +53,7 @@ def aggregate_total_latency(base_log_dir, result_parent_dir, payload_size, num_t
             if len(lines) < 3:
                 continue
             values = lines[2].strip().split()
-            rows.append([os.path.basename(run_dir)] + values)
+            rows.append([f"run{run_idx+1}"] + values)
     csv_path = os.path.join(result_parent_dir, latest_dir, f"total_latency_{payload_size}B.csv")
     with open(csv_path, "w", newline="") as f:
         writer = csv.writer(f)
