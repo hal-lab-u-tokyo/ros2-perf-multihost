@@ -119,20 +119,21 @@ def generate_dockerfiles(json_content, rmw):
 
         for index, node in enumerate(nodes):
             node_name = node["node_name"]
+            log_dir = "/root/performance_ws/performance_test/logs_local/raw_$PAYLOAD_SIZEB/run$RUN_IDX"
 
             # 最初だけはコマンドの先頭に & をつけない
             if index == 0:
                 if node.get("publisher"):
                     publisher_list = node["publisher"]
                     topic_names = ",".join(publisher["topic_name"] for publisher in publisher_list)
-                    additional_command = f"{zenoh_router_command}. /root/performance_ws/install/setup.sh {zenoh_config_command} && cd /root/performance_ws/install/publisher_node/lib/publisher_node && ./publisher_node_exe --node_name {node_name} --topic_names {topic_names} -s $PAYLOAD_SIZE -p {period_ms} --eval_time {eval_time}"
+                    additional_command = f"{zenoh_router_command}. /root/performance_ws/install/setup.sh {zenoh_config_command} && cd /root/performance_ws/install/publisher_node/lib/publisher_node && ./publisher_node_exe --node_name {node_name} --topic_names {topic_names} -s $PAYLOAD_SIZE -p {period_ms} --eval_time {eval_time} --log_dir {log_dir}"
                     base_command += additional_command
 
                 if node.get("subscriber"):
                     subscriber_list = node["subscriber"]
                     topic_names = ",".join(subscriber["topic_name"] for subscriber in subscriber_list)
 
-                    additional_command = f"{zenoh_router_command}. /root/performance_ws/install/setup.sh {zenoh_config_command} && cd /root/performance_ws/install/subscriber_node/lib/subscriber_node && ./subscriber_node --node_name {node_name} --topic_names {topic_names} --eval_time {eval_time}"
+                    additional_command = f"{zenoh_router_command}. /root/performance_ws/install/setup.sh {zenoh_config_command} && cd /root/performance_ws/install/subscriber_node/lib/subscriber_node && ./subscriber_node --node_name {node_name} --topic_names {topic_names} --eval_time {eval_time} --log_dir {log_dir}"
                     base_command += additional_command
 
                 if node.get("intermediate"):
@@ -142,7 +143,7 @@ def generate_dockerfiles(json_content, rmw):
                     topic_names_pub = ",".join(publisher["topic_name"] for publisher in publisher_list)
                     topic_names_sub = ",".join(subscriber["topic_name"] for subscriber in subscriber_list)
 
-                    additional_command = f"{zenoh_router_command}. /root/performance_ws/install/setup.sh {zenoh_config_command} && cd /root/performance_ws/install/intermediate_node/lib/intermediate_node && ./intermediate_node --node_name {node_name} --topic_names_pub {topic_names_pub} --topic_names_sub {topic_names_sub} -s $PAYLOAD_SIZE -p {period_ms} --eval_time {eval_time}"
+                    additional_command = f"{zenoh_router_command}. /root/performance_ws/install/setup.sh {zenoh_config_command} && cd /root/performance_ws/install/intermediate_node/lib/intermediate_node && ./intermediate_node --node_name {node_name} --topic_names_pub {topic_names_pub} --topic_names_sub {topic_names_sub} -s $PAYLOAD_SIZE -p {period_ms} --eval_time {eval_time}  --log_dir {log_dir}"
                     base_command += additional_command
 
                 continue
@@ -152,14 +153,14 @@ def generate_dockerfiles(json_content, rmw):
                 publisher_list = node["publisher"]
                 topic_names = ",".join(publisher["topic_name"] for publisher in publisher_list)
 
-                additional_command = f" & . /root/performance_ws/install/setup.sh {zenoh_config_command} && cd /root/performance_ws/install/publisher_node/lib/publisher_node && ./publisher_node_exe --node_name {node_name} --topic_names {topic_names} -s $PAYLOAD_SIZE -p {period_ms} --eval_time {eval_time}"
+                additional_command = f" & . /root/performance_ws/install/setup.sh {zenoh_config_command} && cd /root/performance_ws/install/publisher_node/lib/publisher_node && ./publisher_node_exe --node_name {node_name} --topic_names {topic_names} -s $PAYLOAD_SIZE -p {period_ms} --eval_time {eval_time} --log_dir {log_dir}"
                 base_command += additional_command
 
             if node.get("subscriber"):
                 subscriber_list = node["subscriber"]
                 topic_names = ",".join(subscriber["topic_name"] for subscriber in subscriber_list)
 
-                additional_command = f" & . /root/performance_ws/install/setup.sh {zenoh_config_command} && cd /root/performance_ws/install/subscriber_node/lib/subscriber_node && ./subscriber_node --node_name {node_name} --topic_names {topic_names} --eval_time {eval_time}"
+                additional_command = f" & . /root/performance_ws/install/setup.sh {zenoh_config_command} && cd /root/performance_ws/install/subscriber_node/lib/subscriber_node && ./subscriber_node --node_name {node_name} --topic_names {topic_names} --eval_time {eval_time} --log_dir {log_dir}"
                 base_command += additional_command
 
             if node.get("intermediate"):
@@ -169,7 +170,7 @@ def generate_dockerfiles(json_content, rmw):
                 topic_names_pub = ",".join(publisher["topic_name"] for publisher in publisher_list)
                 topic_names_sub = ",".join(subscriber["topic_name"] for subscriber in subscriber_list)
 
-                additional_command = f" & . /root/performance_ws/install/setup.sh {zenoh_config_command} && cd /root/performance_ws/install/intermediate_node/lib/intermediate_node && ./intermediate_node --node_name {node_name} --topic_names_pub {topic_names_pub} --topic_names_sub {topic_names_sub} -s $PAYLOAD_SIZE -p {period_ms} --eval_time {eval_time}"
+                additional_command = f" & . /root/performance_ws/install/setup.sh {zenoh_config_command} && cd /root/performance_ws/install/intermediate_node/lib/intermediate_node && ./intermediate_node --node_name {node_name} --topic_names_pub {topic_names_pub} --topic_names_sub {topic_names_sub} -s $PAYLOAD_SIZE -p {period_ms} --eval_time {eval_time} --log_dir {log_dir}"
                 base_command += additional_command
 
             # コマンドの最後には wait 命令をつける
