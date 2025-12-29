@@ -1,4 +1,4 @@
-FROM osrf/ros:jazzy-desktop
+FROM ros:jazzy-ros-base
 
 ENV ROS_DISTRO=jazzy
 ENV CMAKE_PREFIX_PATH=/opt/ros/jazzy
