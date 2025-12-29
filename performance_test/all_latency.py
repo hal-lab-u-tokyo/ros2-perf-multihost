@@ -254,9 +254,11 @@ def write_all_latency(sub_all_node_statics, results_dir):
 
 def write_total_latency(sub_all_node_statics, all_latency_results, result_dir):
     total_loss = 0
+    total_topics = 0
     for node_statics in sub_all_node_statics:
         for topic_statics in node_statics["topics"]:
             total_loss += topic_statics["loss"]
+            total_topics += 1
 
     final_latency_results = [item for node_latency in all_latency_results for item in node_latency]  # [[], [],,,,] -> []
     total_mean = round(np.mean(final_latency_results), 6)
@@ -268,11 +270,11 @@ def write_total_latency(sub_all_node_statics, all_latency_results, result_dir):
     total_max = round(np.max(final_latency_results), 6)
 
     data = []
-    data.append(["lost[#]", "mean[ms]", "sd[ms]", "min[ms]", "q1[ms]", "mid[ms]", "q3[ms]", "max[ms]"])
+    data.append(["lost[#]", "topics[#]", "mean[ms]", "sd[ms]", "min[ms]", "q1[ms]", "mid[ms]", "q3[ms]", "max[ms]"])
     with open(f"{result_dir}/total_latency.txt", "w") as f:
-        data.append([total_loss, total_mean, total_sd, total_min, total_q1, total_mid, total_q3, total_max])
+        data.append([total_loss, total_topics, total_mean, total_sd, total_min, total_q1, total_mid, total_q3, total_max])
 
-        col_widths = [12, 12, 12, 12, 12, 12, 12, 12]
+        col_widths = [12] * len(data[0])
         header = "".join(f"{data[0][i]:<{col_widths[i]}}" for i in range(len(data[0])))
         f.write(f"{header}\n")
         f.write("-" * len(header))
