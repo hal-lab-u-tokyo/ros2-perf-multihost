@@ -336,8 +336,8 @@ if __name__ == "__main__":
     if os.path.exists(results_base_path):
         existing_results = set(os.listdir(results_base_path))
 
-    # 未解析のログディレクトリを処理
-    pending_dirs = [d for d in log_dirs if d not in existing_results]
+    # 未解析のログディレクトリを処理（ディレクトリのみ取得）
+    pending_dirs = [d for d in log_dirs if d not in existing_results and os.path.isdir(os.path.join(logs_base_path, d))]
 
     if not pending_dirs:
         print("All log directories have already been processed.")

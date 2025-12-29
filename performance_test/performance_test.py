@@ -7,7 +7,6 @@ import argparse
 
 # 設定
 payload_sizes = [64, 256, 1024, 4096, 16384, 32768]  # 必要に応じて変更
-num_trials = 10  # 1ペイロードサイズあたりの試行回数
 
 
 def run_test(payload_size, run_idx, start_scripts_py, num_hosts):
@@ -62,8 +61,9 @@ def aggregate_total_latency(base_log_dir, result_parent_dir, payload_size, num_t
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("--num-hosts", type=int, default=3, help="使用するホスト数 (デフォルト: 3)")
+    parser.add_argument("--hosts", type=int, default=3, help="使用するホスト数 (デフォルト: 3)")
     parser.add_argument("--docker", action="store_true", help="Dockerを使用する場合は指定")
+    parser.add_argument("--trials", type=int, default=10, help="1ペイロードサイズあたりの試行回数 (デフォルト: 10)")
     args = parser.parse_args()
 
     base_log_dir = "./logs"
@@ -78,8 +78,8 @@ if __name__ == "__main__":
 
     for payload_size in payload_sizes:
         print(f"=== Payload size: {payload_size}B ===")
-        for run_idx in range(num_trials):
-            run_test(payload_size, run_idx, start_scripts_py, args.num_hosts)
+        for run_idx in range(args.trials):
+            run_test(payload_size, run_idx, start_scripts_py, args.hosts)
             time.sleep(2)
-        aggregate_total_latency(base_log_dir, base_result_dir, payload_size, num_trials, args.num_hosts)
+        aggregate_total_latency(base_log_dir, base_result_dir, payload_size, args.trials, args.hosts)
     print("All tests and aggregation complete.")
