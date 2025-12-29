@@ -59,6 +59,8 @@ def aggregate_total_latency(
             values = lines[2].strip().split()
             rows.append([f"run{run_idx+1}"] + values)
             all_values.append([float(v) for v in values[1:]])
+            print(f"  Aggregated run{run_idx+1} from {total_path}")
+            print(f"    Values: {values}")
 
             # --- スループット計算 ---
             total_loss = float(values[0])
