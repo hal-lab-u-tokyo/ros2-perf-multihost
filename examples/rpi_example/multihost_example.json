@@ -1,7 +1,6 @@
 {
     "eval_time": 60,
     "period_ms": 100,
-    "rmw": "fastdds",
     "qos": {
         "history": "KEEP_LAST",
         "depth": 1,

@@ -3,22 +3,12 @@ JSONファイルを受け取ったら、ホストの数のDockerfileと、それ
 入力例: python parse_json.py examples/topology_example/topology_example.json
 """
 
-import sys
 import json
 import os
+import argparse
 
 
-# コマンドラインからJSONファイルのパスを受け取り、そのJSONファイルを取得する
-#  (args) -> json
-def load_json_file(args):
-    file_path = args[1]  # args[0]には実行ファイル名、args[1]にコマンドライン引数が来る
-    with open(file_path, "r") as f:
-        json_content = json.load(f)
-
-    return json_content, file_path
-
-
-def generate_host_scripts(json_content):
+def generate_host_scripts(json_content, rmw):
     # ホストごとの起動スクリプトを出力するディレクトリ
     output_dir = "../host_scripts"
     os.makedirs(output_dir, exist_ok=True)
@@ -27,7 +17,7 @@ def generate_host_scripts(json_content):
     period_ms = json_content.get("period_ms", 100)
 
     # RMW Zenoh判定
-    rmw_zenoh_flag = json_content.get("rmw") == "zenoh"
+    rmw_zenoh_flag = rmw == "zenoh"
 
     hosts = json_content["hosts"]
 
@@ -136,7 +126,12 @@ def generate_host_scripts(json_content):
 
 
 if __name__ == "__main__":
-    args = sys.argv
-    json_content, file_path = load_json_file(args)
+    parser = argparse.ArgumentParser()
+    parser.add_argument("json_path", help="入力JSONファイルパス")
+    parser.add_argument("--rmw", type=str, default="fastdds", help="RMW (例: zenoh)")
+    args = parser.parse_args()
 
-    generate_host_scripts(json_content)
+    with open(args.json_path, "r") as f:
+        json_content = json.load(f)
+
+    generate_host_scripts(json_content, rmw=args.rmw)
