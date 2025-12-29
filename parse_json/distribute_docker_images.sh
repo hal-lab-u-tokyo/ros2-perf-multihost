@@ -8,27 +8,21 @@ REPO_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 DOCKERFILES_DIR="${REPO_DIR}/Dockerfiles"
 
 for HOST in "${HOSTS[@]}"; do
-  IMAGE_NAME="ros2_perf_${HOST}"
-  IMAGE_TAG="latest"
-  IMAGE_FILE="${IMAGE_NAME}.tar"
-  DOCKERFILE_PATH="${DOCKERFILES_DIR}/${HOST}/Dockerfile"
+  HOST_DOCKERFILES_DIR="${DOCKERFILES_DIR}/${HOST}"
+  REMOTE_DIR="~/docker_build_${HOST}"
+
+  echo "=== Copy Dockerfile dir to ${HOST} ==="
+  ssh "${HOST}" "rm -rf ${REMOTE_DIR}"
+  scp -r "${HOST_DOCKERFILES_DIR}" "${HOST}:${REMOTE_DIR}"
 
   echo "=== Remove old image on ${HOST} ==="
-  ssh "${HOST}" "docker rmi -f ${IMAGE_NAME}:${IMAGE_TAG} || true"
+  ssh "${HOST}" "docker rmi -f ros2_perf_${HOST}:latest || true"
 
-  echo "=== Building image for ${HOST} ==="
-  docker build --platform=linux/arm64 -t ${IMAGE_NAME}:${IMAGE_TAG} -f "${DOCKERFILE_PATH}" "${DOCKERFILES_DIR}/${HOST}"
+  echo "=== Build image on ${HOST} ==="
+  ssh "${HOST}" "docker build --platform=linux/arm64 -t ros2_perf_${HOST}:latest -f ${REMOTE_DIR}/Dockerfile ${REMOTE_DIR}"
 
-  echo "=== Saving image for ${HOST} ==="
-  docker save -o "${IMAGE_FILE}" "${IMAGE_NAME}:${IMAGE_TAG}"
-
-  echo "=== Copying image to ${HOST} ==="
-  scp "${IMAGE_FILE}" "${HOST}:~/"
-
-  echo "=== Loading image on ${HOST} ==="
-  ssh "${HOST}" "docker load -i ~/${IMAGE_FILE} && rm ~/${IMAGE_FILE}"
-
-  rm "${IMAGE_FILE}"
+  echo "=== Clean up Dockerfile dir on ${HOST} ==="
+  ssh "${HOST}" "rm -rf ${REMOTE_DIR}"
 done
 
-echo "=== All host-specific Docker images distributed ==="
+echo "=== All host-specific Docker images built on each host ==="
