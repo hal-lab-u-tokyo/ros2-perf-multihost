@@ -65,8 +65,8 @@ def aggregate_total_latency(base_log_dir, result_parent_dir, prefix, payload_siz
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--hosts", type=int, default=3, help="使用するホスト数 (デフォルト: 3)")
-    parser.add_argument("--docker", action="store_true", help="Dockerを使用する場合は指定")
     parser.add_argument("--trials", type=int, default=10, help="1ペイロードサイズあたりの試行回数 (デフォルト: 10)")
+    parser.add_argument("--docker", action="store_true", help="Dockerを使用する場合は指定")
     args = parser.parse_args()
 
     base_log_dir = "./logs"
