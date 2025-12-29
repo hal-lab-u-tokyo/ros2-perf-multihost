@@ -249,5 +249,5 @@ if __name__ == "__main__":
     with open(args.json_path, "r") as f:
         json_content = json.load(f)
 
-    rmw_zenoh_flag = generate_dockerfiles(json_content)
+    rmw_zenoh_flag = generate_dockerfiles(json_content, args.rmw)
     generate_docker_compose(json_content, rmw_zenoh_flag)
