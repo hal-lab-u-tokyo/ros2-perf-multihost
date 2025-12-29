@@ -15,6 +15,7 @@ def run_test(payload_size, run_idx, start_scripts_py, num_hosts):
     result = subprocess.run(
         ["python3", start_scripts_py, str(payload_size), str(num_hosts), str(run_idx + 1)], capture_output=True, text=True
     )
+    print(result)
     print(result.stdout)
     # 通信テストのみ。ログコピー・解析はしない
     return
