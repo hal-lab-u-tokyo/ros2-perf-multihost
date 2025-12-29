@@ -56,6 +56,7 @@ def start_docker():
         if result.returncode == 0:
             return jsonify({"status": "docker finished"}), 200
         else:
+            print(result)
             return jsonify({"error": result.stderr}), 500
     except Exception as e:
         return jsonify({"error": str(e)}), 500
