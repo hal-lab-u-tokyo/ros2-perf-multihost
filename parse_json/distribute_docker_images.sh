@@ -14,7 +14,7 @@ for HOST in "${HOSTS[@]}"; do
   DOCKERFILE_PATH="${DOCKERFILES_DIR}/${HOST}/Dockerfile"
 
   echo "=== Building image for ${HOST} ==="
-  docker build -t ${IMAGE_NAME}:${IMAGE_TAG} -f "${DOCKERFILE_PATH}" "${DOCKERFILES_DIR}/${HOST}"
+  docker build --platform=linux/arm64 -t ${IMAGE_NAME}:${IMAGE_TAG} -f "${DOCKERFILE_PATH}" "${DOCKERFILES_DIR}/${HOST}"
 
   echo "=== Saving image for ${HOST} ==="
   docker save -o "${IMAGE_FILE}" "${IMAGE_NAME}:${IMAGE_TAG}"
