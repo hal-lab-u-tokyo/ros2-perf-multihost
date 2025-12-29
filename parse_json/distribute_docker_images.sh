@@ -13,6 +13,9 @@ for HOST in "${HOSTS[@]}"; do
   IMAGE_FILE="${IMAGE_NAME}.tar"
   DOCKERFILE_PATH="${DOCKERFILES_DIR}/${HOST}/Dockerfile"
 
+  echo "=== Remove old image on ${HOST} ==="
+  ssh "${HOST}" "docker rmi -f ${IMAGE_NAME}:${IMAGE_TAG} || true"
+
   echo "=== Building image for ${HOST} ==="
   docker build --platform=linux/arm64 -t ${IMAGE_NAME}:${IMAGE_TAG} -f "${DOCKERFILE_PATH}" "${DOCKERFILES_DIR}/${HOST}"
 
