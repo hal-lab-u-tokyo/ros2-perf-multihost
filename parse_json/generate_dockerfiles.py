@@ -72,13 +72,13 @@ def generate_dockerfiles(json_content):
 
         make_config_file_command = textwrap.dedent(
             """
-        COPY multihost_config.json5 ~/performance_ws/src/graduate_research/config/multihost_config.json5
+        COPY multihost_config.json5 ~/performance_ws/config/multihost_config.json5
         """
         )
         docker_base_content += make_config_file_command
 
         dockerfile_content = docker_base_content
-        new_config_path = "~/performance_ws/src/graduate_research/config/multihost_config.json5"
+        new_config_path = "~/performance_ws/config/multihost_config.json5"
         zenoh_router_bridge_command = f". ~/performance_ws/install/setup.sh &&  export ZENOH_ROUTER_CONFIG_URI={new_config_path} && ros2 run rmw_zenoh_cpp rmw_zenohd"
 
         additional_content = textwrap.dedent(f"""
