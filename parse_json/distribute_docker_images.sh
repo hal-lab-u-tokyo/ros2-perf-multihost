@@ -19,7 +19,7 @@ for HOST in "${HOSTS[@]}"; do
   ssh "${HOST}" "docker rmi -f ros2_perf_${HOST}:latest || true"
 
   echo "=== Build image on ${HOST} ==="
-  ssh "${HOST}" "docker build --platform=linux/arm64 -t ros2_perf_${HOST}:latest -f ${REMOTE_DIR}/Dockerfile ${REMOTE_DIR}"
+  ssh "${HOST}" "docker build --platform=linux/arm64 --no-cache -t ros2_perf_${HOST}:latest -f ${REMOTE_DIR}/Dockerfile ${REMOTE_DIR}"
 
   echo "=== Clean up Dockerfile dir on ${HOST} ==="
   ssh "${HOST}" "rm -rf ${REMOTE_DIR}"
