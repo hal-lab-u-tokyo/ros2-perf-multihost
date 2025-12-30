@@ -6,6 +6,7 @@ output: latency_all.txt, latency_total.txt
 """
 
 import os
+import re
 import numpy as np
 import argparse
 
@@ -69,6 +70,7 @@ def get_node_and_topics(logs_folder_path):
 def get_log(logdata_path, type):
     logdata_list = []
     rtt_map = {}
+    pattern = re.compile(r"Index:\s*(\d+),\s*RTT:\s*(-?\d+)us")
     with open(logdata_path, "r") as log_file:
         lines = log_file.readlines()
         for line in lines:
@@ -92,20 +94,13 @@ def get_log(logdata_path, type):
                     timestamp = int(parts[2].split(":")[1].strip())
                     logdata_list.append((index, timestamp))
 
-            # RTT行を解析: フォーマット "RTT: <index>, <value>us"
-            if line.startswith("RTT:"):
+            m = pattern.search(line)
+            if m:
                 try:
-                    # "RTT: 10, 12345us"
-                    parts = line.split("RTT:", 1)[1].strip().split(",")
-                    idx = int(parts[0].strip())
-                    val_str = parts[1].strip()
-                    if val_str.endswith("us"):
-                        val = int(val_str[:-2])
-                    else:
-                        val = int(val_str)
+                    idx = int(m.group(1))
+                    val = int(m.group(2))
                     rtt_map[idx] = val
                 except Exception:
-                    # 解析失敗は無視
                     pass
 
     return logdata_list, rtt_map
