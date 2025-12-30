@@ -59,7 +59,7 @@ def aggregate_total_latency(
                 continue
             values = lines[2].strip().split()
             rows.append([f"run{run_idx+1}"] + values)
-            all_values.append([float(v) for v in values[1:]])
+            all_values.append([float(values[0])] + [float(v) for v in values[2:]])
             print(f"  Aggregated run{run_idx+1} from {total_path}")
             print(f"    Values: {values}")
 
