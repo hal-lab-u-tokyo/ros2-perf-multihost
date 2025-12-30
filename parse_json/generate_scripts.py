@@ -62,8 +62,14 @@ def generate_host_scripts(json_content, rmw):
             lines.append("")
             # Zenohルーターをバックグラウンドで起動
             lines.append("# Zenohルーターを起動")
+            lines.append("if pgrep -x rmw_zenohd >/dev/null 2>&1; then")
+            lines.append('  echo "Existing rmw_zenohd found — killing it"')
+            lines.append("  pkill -x rmw_zenohd || true")
+            lines.append("  sleep 1")
+            lines.append("fi")
             lines.append("ros2 run rmw_zenoh_cpp rmw_zenohd &")
             lines.append("ZENOH_PID=$!")
+            lines.append("trap 'kill ${ZENOH_PID} 2>/dev/null || true' EXIT")
             lines.append("sleep 2  # ルーター起動待ち")
             lines.append("")
 

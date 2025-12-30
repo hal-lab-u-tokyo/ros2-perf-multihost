@@ -7,11 +7,8 @@
             client: 0,
         },
         endpoints: [
-            "tcp/host1:7447",
-            "tcp/host2:7447",
-            "tcp/host3:7447",
-            "tcp/host4:7447",
-            "tcp/host5:7447",
+            "tcp/pi0:7447",
+            "tcp/pi1:7447",
         ],
         exit_on_failure: {
             router: false,
@@ -48,7 +45,7 @@
         multicast: {
             enabled: false,
             address: "224.0.0.224:7446",
-            interface: "auto",
+            "interface": "auto",
             ttl: 1,
             autoconnect: {
                 router: [],
