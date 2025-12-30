@@ -86,7 +86,7 @@ public:
 
       auto callback = [this, topic_name, options](const publisher_node::msg::IntMessage::SharedPtr message_) -> void{
         int current_pub_idx = message_->header.pub_idx;
-        send_ack("192.168.199.20", 50051, topic_name, current_pub_idx, node_name);
+        send_ack(message_->header.publisher_ip, message_->header.publisher_port, topic_name, current_pub_idx, node_name);
         // eval_time秒過ぎてたら受け取らず終了
         auto sub_time = this->get_clock()->now();
         if((sub_time.seconds() - start_time_[topic_name].seconds()) >= options.eval_time) {
