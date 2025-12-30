@@ -380,7 +380,12 @@ class Publisher : public rclcpp::Node
     }
 
     void write_all_logs(const std::map<std::string, std::vector<MessageLog>>& message_logs_) {
-      for (const auto &[topic_name, topic_logs] : message_logs_) {
+      // トピック名の集合を作る（message_logs_ と rtt_logs_ の和）
+      std::set<std::string> topics;
+      for (const auto &kv : message_logs_) topics.insert(kv.first);
+      for (const auto &kv : rtt_logs_) topics.insert(kv.first);
+
+      for (const auto &topic_name : topics) {
         std::stringstream ss;
         ss << log_dir << "/" << node_name << "_log" <<  "/" << topic_name << "_log.txt" ;
         const std::string log_file_path = ss.str();
@@ -390,44 +395,33 @@ class Publisher : public rclcpp::Node
         std::ofstream file(log_file_path, std::ios::out | std::ios::trunc);
         if (!file.is_open()) {
             RCLCPP_ERROR(this->get_logger(), "Failed to open file: %s", log_file_path.c_str());
-            return;
+            continue;
         }
 
-        // StartTimeとEndTimeを書き込む
-        file << "StartTime: " << start_time_[topic_name].nanoseconds() << "\n" ;
-        file << "EndTime: " << end_time_[topic_name].nanoseconds() << "\n" ;
+        // StartTimeとEndTimeを書き込む（無ければ0）
+        auto it_start = start_time_.find(topic_name);
+        auto it_end = end_time_.find(topic_name);
+        file << "StartTime: " << (it_start != start_time_.end() ? it_start->second.nanoseconds() : 0) << "\n";
+        file << "EndTime: " << (it_end != end_time_.end() ? it_end->second.nanoseconds() : 0) << "\n";
 
-        for (const auto& log : topic_logs) {
+        // メッセージログ（あれば）
+        auto it_msgs = message_logs_.find(topic_name);
+        if (it_msgs != message_logs_.end()) {
+          for (const auto& log : it_msgs->second) {
             file << "Index: " << log.message_idx << ", Timestamp: " << log.time_stamp.nanoseconds() << "\n";
+          }
         }
 
-        // RTTログも出力
-        if (rtt_logs_.count(topic_name)) {
-          for (const auto& rtt_entry : rtt_logs_[topic_name]) {
+        // RTTログ（あれば）
+        auto it_rtt = rtt_logs_.find(topic_name);
+        if (it_rtt != rtt_logs_.end()) {
+          for (const auto& rtt_entry : it_rtt->second) {
             file << "RTT: " << rtt_entry.first << ", " << rtt_entry.second << "us\n";
           }
         }
 
         file.close();
         RCLCPP_INFO(this->get_logger(), "MessageLogs written to file: %s", log_file_path.c_str());
-
-        // ファイルのコピー (ローカルで実行するとき用)
-        // try {
-        //   std::string original_path = log_file_path;
-        //   ss << log_dir << "/" << node_name << "_log" ;
-        //   std::string destination_dir = ss.str();
-        //   if (!std::filesystem::exists(destination_dir)) {
-        //     std::filesystem::create_directories(destination_dir);
-        //     std::cout << "Created directory: " << destination_dir << std::endl;
-        //   }
-
-        //   ss << log_dir << "/" << node_name << "_log" <<  "/" << topic_name << "_log.txt" ;
-        //   std::string destination_path = ss.str();
-        //   std::filesystem::copy_file(original_path, destination_path, std::filesystem::copy_options::overwrite_existing);
-        //   std::cout << "File copied from " << original_path << " to " << destination_path << std::endl;
-        // } catch (const std::filesystem::filesystem_error &e) {
-        //     std::cerr << "Error copying file: " << e.what() << std::endl;
-        // }
       }
     }
 
