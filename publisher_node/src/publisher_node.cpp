@@ -252,6 +252,9 @@ class Publisher : public rclcpp::Node
     std::string local_ip_;
     int ack_server_port_ = 50051;
 
+    std::thread ack_thread_;
+    std::atomic<bool> stop_ack_server_{false};
+
     void start_ack_server(int port) {
       ack_thread_ = std::thread([this, port]() {
         int server_fd = socket(AF_INET, SOCK_DGRAM, 0);
