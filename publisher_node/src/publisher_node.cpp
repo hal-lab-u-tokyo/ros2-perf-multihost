@@ -31,6 +31,10 @@ struct MessageLog {
 };
 
 struct AckInfo {
+  // uint64_t seq;          // publish sequence
+  // uint32_t pub_id;       // publisher node ID
+  // uint32_t sub_id;       // subscriber node ID
+  // uint32_t topic_id;     // topic ID
   std::mutex mtx;
   std::condition_variable cv;
   bool received = false;
@@ -51,6 +55,24 @@ parse_options(int argc, char ** argv)
   auto options = node_options::Options(non_ros_argc, non_ros_args_c_strings.data());
 
   return options;
+}
+
+static std::string get_local_ip()
+{
+  int sock = socket(AF_INET, SOCK_DGRAM, 0);
+  if (sock < 0) return "";
+  sockaddr_in serv{};
+  serv.sin_family = AF_INET;
+  serv.sin_addr.s_addr = inet_addr("8.8.8.8"); // 外向きに接続してソースIPを得る
+  serv.sin_port = htons(53);
+  if (connect(sock, (const sockaddr*)&serv, sizeof(serv)) < 0) { close(sock); return ""; }
+  sockaddr_in name{};
+  socklen_t namelen = sizeof(name);
+  if (getsockname(sock, (sockaddr*)&name, &namelen) < 0) { close(sock); return ""; }
+  char buf[INET_ADDRSTRLEN];
+  inet_ntop(AF_INET, &name.sin_addr, buf, sizeof(buf));
+  close(sock);
+  return std::string(buf);
 }
 
 static
@@ -94,7 +116,12 @@ class Publisher : public rclcpp::Node
       node_name = options.node_name;
       log_dir = options.log_dir;
       create_metadata_file(options);
-      start_ack_server(50051);
+      local_ip_ = get_local_ip();
+      if (local_ip_.empty()) {
+        const char *env_ip = std::getenv("PUBLISHER_IP");
+        local_ip_ = env_ip ? std::string(env_ip) : std::string("127.0.0.1");
+      }
+      start_ack_server(ack_server_port_);
       // シャットダウン予告
       RCLCPP_INFO(this->get_logger(), "Shutdown timer created with duration %d seconds", options.eval_time + 10);
 
@@ -113,20 +140,6 @@ class Publisher : public rclcpp::Node
           [this, topic_name, payload_size, &options]() -> void
           {
             int current_pub_idx = pub_idx_[topic_name];
-            auto send_time = std::chrono::steady_clock::now();
-            publishers_[topic_name]->publish(*message_);
-
-            // ACK待ち
-            AckInfo& ackinfo = ack_table_[topic_name][current_pub_idx];
-            std::unique_lock<std::mutex> lock(ackinfo.mtx);
-            if (ackinfo.cv.wait_for(lock, std::chrono::milliseconds(1000), [&]{ return ackinfo.received; })) {
-              auto rtt = std::chrono::duration_cast<std::chrono::microseconds>(ackinfo.ack_time - send_time).count();
-              std::cout << "RTT: " << rtt << "us" << std::endl;
-            } else {
-              // timeout
-              std::cout << "ACK timeout: topic=" << topic_name << " idx=" << current_pub_idx << std::endl;
-            }
-            ackinfo.received = false;
             
             // 送信するメッセージの作成
             auto message_ = std::make_shared<publisher_node::msg::IntMessage>();
@@ -144,6 +157,8 @@ class Publisher : public rclcpp::Node
             message_->header.stamp.nanosec = static_cast<uint32_t>((time_stamp.nanoseconds() - start_time_[topic_name].nanoseconds()) % 1000000000);
             message_->header.pub_idx = current_pub_idx;
             message_->header.node_name = options.node_name;
+            message_->header.publisher_ip = local_ip_;
+            message_->header.publisher_port = static_cast<uint16_t>(ack_server_port_);
             record_log(topic_name, current_pub_idx, time_stamp);
 
             // message->dataを16進数形式で表示 (0埋めはしない)
@@ -156,7 +171,21 @@ class Publisher : public rclcpp::Node
             RCLCPP_INFO(this->get_logger(), "Publish/ Topic: %s, Data: %s, Index: %d", topic_name.c_str(), oss.str().c_str(), current_pub_idx);
 
             // 該当トピックのPublisherでメッセージ送信
+            auto send_time = std::chrono::steady_clock::now();
             publishers_[topic_name]->publish(*message_);
+
+            // ACK待ち
+            AckInfo& ackinfo = ack_table_[topic_name][current_pub_idx];
+            std::unique_lock<std::mutex> lock(ackinfo.mtx);
+            if (ackinfo.cv.wait_for(lock, std::chrono::milliseconds(1000), [&]{ return ackinfo.received; })) {
+              auto rtt = std::chrono::duration_cast<std::chrono::microseconds>(ackinfo.ack_time - send_time).count();
+              rtt_logs_[topic_name].emplace_back(current_pub_idx, rtt);
+              std::cout << "RTT: " << rtt << "us" << std::endl;
+            } else {
+              std::cout << "ACK timeout: topic=" << topic_name << " idx=" << current_pub_idx << std::endl;
+              rtt_logs_[topic_name].emplace_back(current_pub_idx, -1); // タイムアウトは-1
+            }
+            ackinfo.received = false;
 
             pub_idx_[topic_name]++;
         };
@@ -207,6 +236,7 @@ class Publisher : public rclcpp::Node
 
   private:
     std::map<std::string, std::map<uint32_t, AckInfo>> ack_table_; // topic -> pub_idx -> AckInfo
+    std::map<std::string, std::vector<std::pair<uint32_t, long long>>> rtt_logs_;
 
     // トピックごとのPublisher,Timer,
     std::unordered_map<std::string, rclcpp::Publisher<publisher_node::msg::IntMessage>::SharedPtr> publishers_;
@@ -219,41 +249,46 @@ class Publisher : public rclcpp::Node
     std::unordered_map<std::string, rclcpp::Time> start_time_;
     std::unordered_map<std::string, rclcpp::Time> end_time_;
 
+    std::string local_ip_;
+    int ack_server_port_ = 50051;
+
+    std::thread ack_thread_;
+    std::atomic<bool> stop_ack_server_{false};
+
     void start_ack_server(int port) {
-      std::thread([this, port]() {
+      ack_thread_ = std::thread([this, port]() {
         int server_fd = socket(AF_INET, SOCK_DGRAM, 0);
-        sockaddr_in addr;
+        if (server_fd < 0) {
+          RCLCPP_ERROR(this->get_logger(), "ACK server: socket() failed");
+          return;
+        }
+        int yes = 1;
+        setsockopt(server_fd, SOL_SOCKET, SO_REUSEADDR, &yes, sizeof(yes));
+        sockaddr_in addr{};
         addr.sin_family = AF_INET;
         addr.sin_addr.s_addr = INADDR_ANY;
         addr.sin_port = htons(port);
-        bind(server_fd, (sockaddr*)&addr, sizeof(addr));
+        if (bind(server_fd, (sockaddr*)&addr, sizeof(addr)) < 0) {
+          RCLCPP_ERROR(this->get_logger(), "ACK server: bind() failed on port %d", port);
+          close(server_fd);
+          return;
+        }
+        // optional: notify ready via promise/future
         char buf[256];
-        while (true) {
+        while (!stop_ack_server_) {
           sockaddr_in cli_addr;
           socklen_t len = sizeof(cli_addr);
-          int n = recvfrom(server_fd, buf, sizeof(buf)-1, 0, (sockaddr*)&cli_addr, &len);
-          if (n > 0) {
-            buf[n] = '\0';
-            std::string ack_msg(buf);
-            // 例: "topic,pub_idx,node"
-            auto pos1 = ack_msg.find(",");
-            auto pos2 = ack_msg.rfind(",");
-            if (pos1 != std::string::npos && pos2 != std::string::npos && pos1 != pos2) {
-              std::string topic = ack_msg.substr(0, pos1);
-              uint32_t idx = std::stoi(ack_msg.substr(pos1+1, pos2-pos1-1));
-              // std::string node = ack_msg.substr(pos2+1); // 必要なら
-              auto& ackinfo = ack_table_[topic][idx];
-              {
-                std::lock_guard<std::mutex> lock(ackinfo.mtx);
-                ackinfo.received = true;
-                ackinfo.ack_time = std::chrono::steady_clock::now();
-              }
-              ackinfo.cv.notify_all();
-            }
+          // use select with timeout to allow periodic stop flag check
+          fd_set fds; FD_ZERO(&fds); FD_SET(server_fd, &fds);
+          timeval tv{1,0};
+          int rv = select(server_fd + 1, &fds, NULL, NULL, &tv);
+          if (rv > 0 && FD_ISSET(server_fd, &fds)) {
+            int n = recvfrom(server_fd, buf, sizeof(buf)-1, 0, (sockaddr*)&cli_addr, &len);
+            if (n > 0) { /* existing parsing + notify */ }
           }
         }
         close(server_fd);
-      }).detach();
+      });
     }
 
     void
@@ -339,6 +374,13 @@ class Publisher : public rclcpp::Node
 
         for (const auto& log : topic_logs) {
             file << "Index: " << log.message_idx << ", Timestamp: " << log.time_stamp.nanoseconds() << "\n";
+        }
+
+        // RTTログも出力
+        if (rtt_logs_.count(topic_name)) {
+          for (const auto& rtt_entry : rtt_logs_[topic_name]) {
+            file << "RTT: " << rtt_entry.first << ", " << rtt_entry.second << "us\n";
+          }
         }
 
         file.close();

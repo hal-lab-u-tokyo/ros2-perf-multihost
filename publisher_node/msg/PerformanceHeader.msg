@@ -1,3 +1,5 @@
 builtin_interfaces/Time stamp
 string node_name
 uint32 pub_idx
+string publisher_ip
+uint16 publisher_port

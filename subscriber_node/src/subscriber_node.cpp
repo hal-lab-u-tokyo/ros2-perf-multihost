@@ -86,7 +86,7 @@ public:
 
       auto callback = [this, topic_name, options](const publisher_node::msg::IntMessage::SharedPtr message_) -> void{
         int current_pub_idx = message_->header.pub_idx;
-        send_ack("192.168.199.20", 50051, topic_name, current_pub_idx, node_name);
+        send_ack(message_->header.publisher_ip, message_->header.publisher_port, topic_name, current_pub_idx, node_name);
         // eval_time秒過ぎてたら受け取らず終了
         auto sub_time = this->get_clock()->now();
         if((sub_time.seconds() - start_time_[topic_name].seconds()) >= options.eval_time) {
@@ -102,7 +102,6 @@ public:
         }
         // subした時刻などを表示
         oss << std::dec <<"Time: " << std::fixed << std::setprecision(9) << static_cast<double>(sub_time.nanoseconds() - start_time_[topic_name].nanoseconds()) / 1e9;
-        int current_pub_idx = message_->header.pub_idx;
         std::string pub_node_name = message_->header.node_name;
         RCLCPP_INFO(this->get_logger(), "Subscribe/ Topic: %s Data: %s Index: %d", topic_name.c_str(), oss.str().c_str(), current_pub_idx);
 
