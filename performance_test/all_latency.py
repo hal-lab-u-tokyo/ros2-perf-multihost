@@ -17,6 +17,8 @@ def get_node_and_topics(logs_folder_path):
     # metadata Subscriber or Intermediate
     for node_folder in os.listdir(logs_folder_path):
         node_folder_path = os.path.join(logs_folder_path, node_folder)  # ./logs/node1
+        if not os.path.isdir(node_folder_path):
+            continue  # ファイルはスキップ
         metadata_path = os.path.join(node_folder_path, "metadata.txt")  # ./logs/node1/metadata.txt
         node_info = {}
 
