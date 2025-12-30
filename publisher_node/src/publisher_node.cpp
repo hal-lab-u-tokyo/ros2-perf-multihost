@@ -12,6 +12,15 @@
 #include <filesystem>
 #include <cstdlib>
 
+#include <thread>
+#include <mutex>
+#include <condition_variable>
+#include <map>
+#include <netinet/in.h>
+#include <arpa/inet.h>
+#include <sys/socket.h>
+#include <unistd.h>
+
 #include "node_options/cli_options.hpp"
 #include "publisher_node/msg/performance_header.hpp"
 #include "publisher_node/msg/int_message.hpp"
@@ -19,6 +28,13 @@
 struct MessageLog {
   uint32_t message_idx;
   rclcpp::Time time_stamp;
+};
+
+struct AckInfo {
+  std::mutex mtx;
+  std::condition_variable cv;
+  bool received = false;
+  std::chrono::steady_clock::time_point ack_time;
 };
 
 // コマンドラインオプション
@@ -78,6 +94,7 @@ class Publisher : public rclcpp::Node
       node_name = options.node_name;
       log_dir = options.log_dir;
       create_metadata_file(options);
+      start_ack_server(50051);
       // シャットダウン予告
       RCLCPP_INFO(this->get_logger(), "Shutdown timer created with duration %d seconds", options.eval_time + 10);
 
@@ -96,6 +113,20 @@ class Publisher : public rclcpp::Node
           [this, topic_name, payload_size, &options]() -> void
           {
             int current_pub_idx = pub_idx_[topic_name];
+            auto send_time = std::chrono::steady_clock::now();
+            publishers_[topic_name]->publish(*message_);
+
+            // ACK待ち
+            AckInfo& ackinfo = ack_table_[topic_name][current_pub_idx];
+            std::unique_lock<std::mutex> lock(ackinfo.mtx);
+            if (ackinfo.cv.wait_for(lock, std::chrono::milliseconds(1000), [&]{ return ackinfo.received; })) {
+              auto rtt = std::chrono::duration_cast<std::chrono::microseconds>(ackinfo.ack_time - send_time).count();
+              std::cout << "RTT: " << rtt << "us" << std::endl;
+            } else {
+              // timeout
+              std::cout << "ACK timeout: topic=" << topic_name << " idx=" << current_pub_idx << std::endl;
+            }
+            ackinfo.received = false;
             
             // 送信するメッセージの作成
             auto message_ = std::make_shared<publisher_node::msg::IntMessage>();
@@ -175,6 +206,8 @@ class Publisher : public rclcpp::Node
 
 
   private:
+    std::map<std::string, std::map<uint32_t, AckInfo>> ack_table_; // topic -> pub_idx -> AckInfo
+
     // トピックごとのPublisher,Timer,
     std::unordered_map<std::string, rclcpp::Publisher<publisher_node::msg::IntMessage>::SharedPtr> publishers_;
 
@@ -185,6 +218,43 @@ class Publisher : public rclcpp::Node
     std::unordered_map<std::string, uint32_t> pub_idx_;
     std::unordered_map<std::string, rclcpp::Time> start_time_;
     std::unordered_map<std::string, rclcpp::Time> end_time_;
+
+    void start_ack_server(int port) {
+      std::thread([this, port]() {
+        int server_fd = socket(AF_INET, SOCK_DGRAM, 0);
+        sockaddr_in addr;
+        addr.sin_family = AF_INET;
+        addr.sin_addr.s_addr = INADDR_ANY;
+        addr.sin_port = htons(port);
+        bind(server_fd, (sockaddr*)&addr, sizeof(addr));
+        char buf[256];
+        while (true) {
+          sockaddr_in cli_addr;
+          socklen_t len = sizeof(cli_addr);
+          int n = recvfrom(server_fd, buf, sizeof(buf)-1, 0, (sockaddr*)&cli_addr, &len);
+          if (n > 0) {
+            buf[n] = '\0';
+            std::string ack_msg(buf);
+            // 例: "topic,pub_idx,node"
+            auto pos1 = ack_msg.find(",");
+            auto pos2 = ack_msg.rfind(",");
+            if (pos1 != std::string::npos && pos2 != std::string::npos && pos1 != pos2) {
+              std::string topic = ack_msg.substr(0, pos1);
+              uint32_t idx = std::stoi(ack_msg.substr(pos1+1, pos2-pos1-1));
+              // std::string node = ack_msg.substr(pos2+1); // 必要なら
+              auto& ackinfo = ack_table_[topic][idx];
+              {
+                std::lock_guard<std::mutex> lock(ackinfo.mtx);
+                ackinfo.received = true;
+                ackinfo.ack_time = std::chrono::steady_clock::now();
+              }
+              ackinfo.cv.notify_all();
+            }
+          }
+        }
+        close(server_fd);
+      }).detach();
+    }
 
     void
     create_metadata_file(const node_options::Options & options)
