@@ -119,7 +119,7 @@ def generate_dockerfiles(json_content, rmw):
 
         for index, node in enumerate(nodes):
             node_name = node["node_name"]
-            log_dir = "/root/performance_ws/performance_test/logs_local/docker_$PAYLOAD_SIZEB/run$RUN_IDX"
+            log_dir = "/root/performance_ws/performance_test/logs_local/docker_${PAYLOAD_SIZE}B/run${RUN_IDX}"
 
             # 最初だけはコマンドの先頭に & をつけない
             if index == 0:

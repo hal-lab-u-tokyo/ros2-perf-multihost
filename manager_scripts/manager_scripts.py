@@ -33,7 +33,7 @@ def start_docker():
         return jsonify({"error": "payload_size required"}), 400
     hostname = socket.gethostname()
     image_name = f"ros2_perf_{hostname}:latest"
-    logs_dir = "/home/ubuntu/ros2-perf-multihost-v2/performance_test/logs"
+    logs_dir = "/home/ubuntu/ros2-perf-multihost-v2/logs"
     container_name = f"{hostname}_perf_run{run_idx}"
     try:
         # Docker runコマンドを組み立て
