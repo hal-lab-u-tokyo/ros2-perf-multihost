@@ -102,7 +102,6 @@ public:
         }
         // subした時刻などを表示
         oss << std::dec <<"Time: " << std::fixed << std::setprecision(9) << static_cast<double>(sub_time.nanoseconds() - start_time_[topic_name].nanoseconds()) / 1e9;
-        int current_pub_idx = message_->header.pub_idx;
         std::string pub_node_name = message_->header.node_name;
         RCLCPP_INFO(this->get_logger(), "Subscribe/ Topic: %s Data: %s Index: %d", topic_name.c_str(), oss.str().c_str(), current_pub_idx);
 
