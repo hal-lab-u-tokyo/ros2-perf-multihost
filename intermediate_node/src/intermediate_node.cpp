@@ -55,6 +55,20 @@ static std::string get_local_ip()
 }
 
 static
+node_options::Options
+parse_options(int argc, char ** argv)
+{
+  auto non_ros_args = rclcpp::remove_ros_arguments(argc, argv);
+  std::vector<char *> non_ros_args_c_strings;
+  for (auto & arg : non_ros_args) {
+    non_ros_args_c_strings.push_back(&arg.front());
+  }
+  int non_ros_argc = static_cast<int>(non_ros_args_c_strings.size());
+  auto options = node_options::Options(non_ros_argc, non_ros_args_c_strings.data());
+  return options;
+}
+
+static
 void
 create_result_directory(const node_options::Options & options)
 {
