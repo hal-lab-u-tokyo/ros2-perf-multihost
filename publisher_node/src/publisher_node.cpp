@@ -231,6 +231,10 @@ class Publisher : public rclcpp::Node
     ~Publisher() override {
       RCLCPP_INFO(this->get_logger(), "Node is shutting down.");
       stop_ack_server_ = true;
+      RCLCPP_INFO(this->get_logger(), "ACK thread stopping, dumping rtt_logs_ sizes");
+      for (const auto &kv : rtt_logs_) {
+        RCLCPP_INFO(this->get_logger(), "  topic=%s, rtt_count=%zu", kv.first.c_str(), kv.second.size());
+      }
       if (ack_thread_.joinable()) ack_thread_.join();
       write_all_logs(message_logs_);
     }
