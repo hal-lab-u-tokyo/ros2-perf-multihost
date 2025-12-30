@@ -7,7 +7,7 @@ ENV CMAKE_PREFIX_PATH=/opt/ros/jazzy
 RUN apt update \
     && mkdir -p ~/performance_ws/src \
     && cd ~/performance_ws/src \
-    && git clone https://github.com/hal-lab-u-tokyo/ros2-perf-multihost.git
+    && git clone https://github.com/ts5-25/ros2-perf-multihost-v2.git
 
 # プロジェクトのビルド
 # RUNコマンドではbashファイルを叩けないしsourceもつかえない。→　.でshファイルを叩く

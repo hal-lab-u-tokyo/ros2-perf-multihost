@@ -7,6 +7,11 @@
 #include <fstream>
 #include <filesystem>
 
+#include <netinet/in.h>
+#include <arpa/inet.h>
+#include <sys/socket.h>
+#include <unistd.h>
+
 #include "node_options/cli_options.hpp"
 #include "publisher_node/msg/performance_header.hpp"
 #include "publisher_node/msg/int_message.hpp"
@@ -80,6 +85,8 @@ public:
       end_time_[topic_name] = start_time_[topic_name] + rclcpp::Duration::from_seconds(options.eval_time) ;
 
       auto callback = [this, topic_name, options](const publisher_node::msg::IntMessage::SharedPtr message_) -> void{
+        int current_pub_idx = message_->header.pub_idx;
+        send_ack("192.168.199.20", 50051, topic_name, current_pub_idx, node_name);
         // eval_time秒過ぎてたら受け取らず終了
         auto sub_time = this->get_clock()->now();
         if((sub_time.seconds() - start_time_[topic_name].seconds()) >= options.eval_time) {
@@ -148,6 +155,17 @@ private:
   std::unordered_map<std::string, rclcpp::Time> end_time_;
 
   std::unordered_map<std::string, rclcpp::TimerBase::SharedPtr> shutdown_timers_;
+
+  void send_ack(const std::string& publisher_ip, int port, const std::string& topic, uint32_t idx, const std::string& node) {
+    int sock = socket(AF_INET, SOCK_DGRAM, 0);
+    sockaddr_in addr;
+    addr.sin_family = AF_INET;
+    addr.sin_port = htons(port);
+    inet_pton(AF_INET, publisher_ip.c_str(), &addr.sin_addr);
+    std::string msg = topic + "," + std::to_string(idx) + "," + node;
+    sendto(sock, msg.c_str(), msg.size(), 0, (sockaddr*)&addr, sizeof(addr));
+    close(sock);
+  }
 
   void
   create_metadata_file(const node_options::Options & options)
