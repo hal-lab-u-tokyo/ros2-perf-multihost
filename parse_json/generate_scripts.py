@@ -48,6 +48,7 @@ def generate_host_scripts(json_content, rmw):
         # ログディレクトリ作成
         lines.append("LOG_DIR=~/ros2-perf-multihost-v2/logs/raw_${PAYLOAD_SIZE}B/run${RUN_IDX}")
         lines.append('mkdir -p "$LOG_DIR"')
+        lines.append("source /opt/ros/jazzy/setup.bash")
         lines.append("source ~/ros2-perf-multihost-v2/install/setup.bash")
 
         if rmw_zenoh_flag:
