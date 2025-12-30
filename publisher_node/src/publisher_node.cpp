@@ -416,7 +416,7 @@ class Publisher : public rclcpp::Node
         auto it_rtt = rtt_logs_.find(topic_name);
         if (it_rtt != rtt_logs_.end()) {
           for (const auto& rtt_entry : it_rtt->second) {
-            file << "RTT: " << rtt_entry.first << ", " << rtt_entry.second << "us\n";
+            file << "Index: " << rtt_entry.first << ", RTT: " << rtt_entry.second << "us\n";
           }
         }
 
