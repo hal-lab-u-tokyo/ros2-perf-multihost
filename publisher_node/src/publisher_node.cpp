@@ -230,6 +230,8 @@ class Publisher : public rclcpp::Node
 
     ~Publisher() override {
       RCLCPP_INFO(this->get_logger(), "Node is shutting down.");
+      stop_ack_server_ = true;
+      if (ack_thread_.joinable()) ack_thread_.join();
       write_all_logs(message_logs_);
     }
 
@@ -284,7 +286,26 @@ class Publisher : public rclcpp::Node
           int rv = select(server_fd + 1, &fds, NULL, NULL, &tv);
           if (rv > 0 && FD_ISSET(server_fd, &fds)) {
             int n = recvfrom(server_fd, buf, sizeof(buf)-1, 0, (sockaddr*)&cli_addr, &len);
-            if (n > 0) { /* existing parsing + notify */ }
+            if (n > 0) {
+              buf[n] = '\0';
+              std::string ack_msg(buf);
+              // 期待フォーマット: "topic,pub_idx,node"
+              auto pos1 = ack_msg.find(",");
+              auto pos2 = ack_msg.rfind(",");
+              if (pos1 != std::string::npos && pos2 != std::string::npos && pos1 != pos2) {
+                std::string topic = ack_msg.substr(0, pos1);
+                uint32_t idx = static_cast<uint32_t>(std::stoul(ack_msg.substr(pos1+1, pos2-pos1-1)));
+                auto& ackinfo = ack_table_[topic][idx];
+                {
+                  std::lock_guard<std::mutex> lock(ackinfo.mtx);
+                  ackinfo.received = true;
+                  ackinfo.ack_time = std::chrono::steady_clock::now();
+                }
+                ackinfo.cv.notify_all();
+              } else {
+                RCLCPP_WARN(this->get_logger(), "ACK server: malformed ack '%s'", ack_msg.c_str());
+              }
+            }
           }
         }
         close(server_fd);
