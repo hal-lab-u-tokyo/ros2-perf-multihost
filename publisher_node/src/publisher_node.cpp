@@ -63,7 +63,7 @@ static std::string get_local_ip()
   if (sock < 0) return "";
   sockaddr_in serv{};
   serv.sin_family = AF_INET;
-  serv.sin_addr.s_addr = inet_addr("8.8.8.8"); // 外向きに接続してソースIPを得る
+  serv.sin_addr.s_addr = inet_addr("8.8.8.8");
   serv.sin_port = htons(53);
   if (connect(sock, (const sockaddr*)&serv, sizeof(serv)) < 0) { close(sock); return ""; }
   sockaddr_in name{};
