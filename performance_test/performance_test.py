@@ -7,7 +7,7 @@ import argparse
 from throughput_calc import calc_throughput
 
 # 設定
-payload_sizes = [64, 256, 1024, 4096, 16384, 32768, 65536, 131072, 524288, 1048576]  # 必要に応じて変更
+payload_sizes = [64, 256, 1024, 4096, 16384, 65536, 262144, 1048576]  # 必要に応じて変更
 
 
 def run_test(payload_size, run_idx, start_scripts_py, num_hosts):
@@ -58,7 +58,19 @@ def aggregate_total_latency(
             if len(lines) < 3:
                 continue
             values = lines[2].strip().split()
-            rows.append([f"run{run_idx+1}"] + values)
+            rows.append(
+                [
+                    f"run{run_idx+1}",
+                    values[0],  # lost
+                    values[2],  # mean
+                    values[3],  # sd
+                    values[4],  # min
+                    values[5],  # q1
+                    values[6],  # mid
+                    values[7],  # q3
+                    values[8],  # max
+                ]
+            )
             all_values.append([float(values[0])] + [float(v) for v in values[2:]])
             print(f"  Aggregated run{run_idx+1} from {total_path}")
             print(f"    Values: {values}")
@@ -102,9 +114,7 @@ def aggregate_total_latency(
     csv_path = os.path.join(result_parent_dir, latest_dir, f"total_latency_{payload_size}B.csv")
     with open(csv_path, "w", newline="") as f:
         writer = csv.writer(f)
-        writer.writerow(
-            ["run", "lost[#]", "topics[#]", "mean[ms]", "sd[ms]", "min[ms]", "q1[ms]", "mid[ms]", "q3[ms]", "max[ms]"]
-        )
+        writer.writerow(["run", "lost[#]", "mean[ms]", "sd[ms]", "min[ms]", "q1[ms]", "mid[ms]", "q3[ms]", "max[ms]"])
         writer.writerows(rows)
     print(f"  Aggregated CSV saved: {csv_path}")
 
