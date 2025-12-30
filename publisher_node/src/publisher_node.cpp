@@ -113,21 +113,6 @@ class Publisher : public rclcpp::Node
           [this, topic_name, payload_size, &options]() -> void
           {
             int current_pub_idx = pub_idx_[topic_name];
-            auto send_time = std::chrono::steady_clock::now();
-            publishers_[topic_name]->publish(*message_);
-
-            // ACK待ち
-            AckInfo& ackinfo = ack_table_[topic_name][current_pub_idx];
-            std::unique_lock<std::mutex> lock(ackinfo.mtx);
-            if (ackinfo.cv.wait_for(lock, std::chrono::milliseconds(1000), [&]{ return ackinfo.received; })) {
-              auto rtt = std::chrono::duration_cast<std::chrono::microseconds>(ackinfo.ack_time - send_time).count();
-              rtt_logs_[topic_name].emplace_back(current_pub_idx, rtt);
-              std::cout << "RTT: " << rtt << "us" << std::endl;
-            } else {
-              std::cout << "ACK timeout: topic=" << topic_name << " idx=" << current_pub_idx << std::endl;
-              rtt_logs_[topic_name].emplace_back(current_pub_idx, -1); // タイムアウトは-1
-            }
-            ackinfo.received = false;
             
             // 送信するメッセージの作成
             auto message_ = std::make_shared<publisher_node::msg::IntMessage>();
@@ -157,7 +142,21 @@ class Publisher : public rclcpp::Node
             RCLCPP_INFO(this->get_logger(), "Publish/ Topic: %s, Data: %s, Index: %d", topic_name.c_str(), oss.str().c_str(), current_pub_idx);
 
             // 該当トピックのPublisherでメッセージ送信
+            auto send_time = std::chrono::steady_clock::now();
             publishers_[topic_name]->publish(*message_);
+
+            // ACK待ち
+            AckInfo& ackinfo = ack_table_[topic_name][current_pub_idx];
+            std::unique_lock<std::mutex> lock(ackinfo.mtx);
+            if (ackinfo.cv.wait_for(lock, std::chrono::milliseconds(1000), [&]{ return ackinfo.received; })) {
+              auto rtt = std::chrono::duration_cast<std::chrono::microseconds>(ackinfo.ack_time - send_time).count();
+              rtt_logs_[topic_name].emplace_back(current_pub_idx, rtt);
+              std::cout << "RTT: " << rtt << "us" << std::endl;
+            } else {
+              std::cout << "ACK timeout: topic=" << topic_name << " idx=" << current_pub_idx << std::endl;
+              rtt_logs_[topic_name].emplace_back(current_pub_idx, -1); // タイムアウトは-1
+            }
+            ackinfo.received = false;
 
             pub_idx_[topic_name]++;
         };
@@ -208,6 +207,7 @@ class Publisher : public rclcpp::Node
 
   private:
     std::map<std::string, std::map<uint32_t, AckInfo>> ack_table_; // topic -> pub_idx -> AckInfo
+    std::map<std::string, std::vector<std::pair<uint32_t, long long>>> rtt_logs_;
 
     // トピックごとのPublisher,Timer,
     std::unordered_map<std::string, rclcpp::Publisher<publisher_node::msg::IntMessage>::SharedPtr> publishers_;
