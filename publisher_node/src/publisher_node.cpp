@@ -121,10 +121,11 @@ class Publisher : public rclcpp::Node
             std::unique_lock<std::mutex> lock(ackinfo.mtx);
             if (ackinfo.cv.wait_for(lock, std::chrono::milliseconds(1000), [&]{ return ackinfo.received; })) {
               auto rtt = std::chrono::duration_cast<std::chrono::microseconds>(ackinfo.ack_time - send_time).count();
+              rtt_logs_[topic_name].emplace_back(current_pub_idx, rtt);
               std::cout << "RTT: " << rtt << "us" << std::endl;
             } else {
-              // timeout
               std::cout << "ACK timeout: topic=" << topic_name << " idx=" << current_pub_idx << std::endl;
+              rtt_logs_[topic_name].emplace_back(current_pub_idx, -1); // タイムアウトは-1
             }
             ackinfo.received = false;
             
@@ -339,6 +340,13 @@ class Publisher : public rclcpp::Node
 
         for (const auto& log : topic_logs) {
             file << "Index: " << log.message_idx << ", Timestamp: " << log.time_stamp.nanoseconds() << "\n";
+        }
+
+        // RTTログも出力
+        if (rtt_logs_.count(topic_name)) {
+          for (const auto& rtt_entry : rtt_logs_[topic_name]) {
+            file << "RTT: " << rtt_entry.first << ", " << rtt_entry.second << "us\n";
+          }
         }
 
         file.close();
