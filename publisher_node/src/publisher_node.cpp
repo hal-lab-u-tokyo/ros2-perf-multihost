@@ -112,6 +112,10 @@ create_result_directory(const node_options::Options & options)
   }
 }
 
+static uint16_t port_from_name(const std::string &name, uint16_t base = 50050, uint16_t range = 1000) {
+  return static_cast<uint16_t>(base + (std::hash<std::string>{}(name) % range));
+}
+
 
 class Publisher : public rclcpp::Node
 {
@@ -127,6 +131,7 @@ class Publisher : public rclcpp::Node
         const char *env_ip = std::getenv("PUBLISHER_IP");
         local_ip_ = env_ip ? std::string(env_ip) : std::string("127.0.0.1");
       }
+      ack_server_port_ = port_from_name(options.node_name);
       start_ack_server(ack_server_port_);
       // シャットダウン予告
       RCLCPP_INFO(this->get_logger(), "Shutdown timer created with duration %d seconds", options.eval_time + 10);
