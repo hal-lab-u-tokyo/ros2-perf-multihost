@@ -108,47 +108,11 @@ def generate_dockerfiles(json_content, rmw):
         dockerfile_content += f"\nLABEL host_name={host_name}\n"
         dockerfile_content += f"ARG HOST_NAME={host_name}\n"
 
-        # if rmw_zenoh_flag:
-        #     zenoh_router_command = ". /root/performance_ws/install/setup.sh && ros2 run rmw_zenoh_cpp rmw_zenohd & "
-        #     zenoh_config_command = (
-        #         "&& export RMW_IMPLEMENTATION=rmw_zenoh_cpp && export RUST_LOG=zenoh=info,zenoh_transport=debug"
-        #     )
         if rmw_zenoh_flag:
-            zenoh_build_command = textwrap.dedent(
-                r"""
-            RUN cd ~/performance_ws/src \
-                && git clone https://github.com/ros2/rmw_zenoh.git -b jazzy \
-                && cd ~/performance_ws \
-                && rosdep install --from-paths src --ignore-src --rosdistro jazzy -y \
-                && apt install -y python3-json5 \
-                && . /opt/ros/jazzy/setup.sh \
-                && colcon build --cmake-args -DCMAKE_BUILD_TYPE=Release
-
-            """
+            zenoh_router_command = ". /root/performance_ws/install/setup.sh && ros2 run rmw_zenoh_cpp rmw_zenohd & "
+            zenoh_config_command = (
+                "&& export RMW_IMPLEMENTATION=rmw_zenoh_cpp && export RUST_LOG=zenoh=info,zenoh_transport=debug"
             )
-            docker_base_content += zenoh_build_command
-
-            # endpoints: include all hosts so every router knows peers
-            endpoints_list = []
-            for host_dict in hosts:
-                host_name = host_dict["host_name"]
-                endpoints_list.append(f"tcp/{host_name}:7447")
-
-            with open("../config/DEFAULT_RMW_ZENOH_ROUTER_CONFIG.json5", "r") as config:
-                config_json = json5.load(config)
-            config_json["connect"]["endpoints"] = endpoints_list
-
-            # write project-level multihost config (so local dev/tests also see it)
-            with open("../config/multihost_config.json5", "w") as f:
-                json5.dump(config_json, f, indent=4)
-
-            # ensure the multihost_config.json5 is copied into each image during build
-            make_config_file_command = textwrap.dedent(
-                """
-            COPY multihost_config.json5 ~/performance_ws/config/multihost_config.json5
-            """
-            )
-            docker_base_content += make_config_file_command
         else:
             zenoh_router_command = ""
             zenoh_config_command = ""
