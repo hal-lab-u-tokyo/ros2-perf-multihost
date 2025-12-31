@@ -106,6 +106,10 @@ create_result_directory(const node_options::Options & options)
   }
 }
 
+static uint16_t port_from_name(const std::string &name, uint16_t base = 50050, uint16_t range = 1000) {
+  return static_cast<uint16_t>(base + (std::hash<std::string>{}(name) % range));
+}
+
 class Intermediate : public rclcpp::Node
 {
   public:
@@ -137,6 +141,7 @@ class Intermediate : public rclcpp::Node
       const char *env_ip = std::getenv("PUBLISHER_IP");
       local_ip_ = env_ip ? std::string(env_ip) : std::string("127.0.0.1");
     }
+    ack_server_port_ = port_from_name(options.node_name);
     start_ack_server(ack_server_port_);
 
       // まずはPub
@@ -451,7 +456,7 @@ class Intermediate : public rclcpp::Node
     create_metadata_file(const node_options::Options & options)
     {
       std::stringstream ss;
-      ss << options.node_name << "_log" <<  "/" << "metadata.txt" ;
+      ss << options.log_dir << "/" << options.node_name << "_log" <<  "/" << "metadata.txt" ;
       std::string metadata_file_path = ss.str();
       ss.str("");
       ss.clear();
@@ -525,7 +530,7 @@ class Intermediate : public rclcpp::Node
       // publisherたちの書き込み
       for (const auto &[topic_name, topic_logs] : message_logs_pub_) {
         std::stringstream ss;
-        ss << node_name << "_log" <<  "/" << topic_name << "_pub" << "_log.txt" ;
+        ss << log_dir << "/" << node_name << "_log" <<  "/" << topic_name << "_pub" << "_log.txt" ;
         const std::string log_file_path = ss.str();
         ss.str("");
         ss.clear();
@@ -577,7 +582,7 @@ class Intermediate : public rclcpp::Node
       // subscriberたちの書き込み
       for (const auto &[topic_name, topic_logs] : message_logs_sub_) {
         std::stringstream ss;
-        ss << node_name << "_log" <<  "/" << topic_name << "_sub" << "_log.txt" ;
+        ss << log_dir << "/" << node_name << "_log" <<  "/" << topic_name << "_sub" << "_log.txt" ;
         const std::string log_file_path = ss.str();
         ss.str("");
         ss.clear();
