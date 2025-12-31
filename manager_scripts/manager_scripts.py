@@ -38,7 +38,13 @@ def start_docker():
     monitor_log = f"{logs_dir}/{container_name}_monitor.csv"
     try:
         monitor_proc = subprocess.Popen(
-            ["python3", "/home/ubuntu/ros2-perf-multihost-v2/tools/monitor_docker.py", container_name, "0.5", monitor_log]
+            [
+                "python3",
+                "/home/ubuntu/ros2-perf-multihost-v2/performance_test/monitor_docker.py",
+                container_name,
+                "0.5",
+                monitor_log,
+            ]
         )
         # Docker runコマンドを組み立て
         cmd = [

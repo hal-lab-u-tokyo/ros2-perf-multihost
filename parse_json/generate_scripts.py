@@ -72,7 +72,7 @@ def generate_host_scripts(json_content, rmw):
 
         # host-level monitor
         lines.append("# host-level monitor (host CPU/memory)")
-        lines.append('python3 ~/ros2-perf-multihost-v2/tools/monitor_host.py 0.5 "$LOG_DIR/monitor_host.csv" &')
+        lines.append('python3 ~/ros2-perf-multihost-v2/performance_test/monitor_host.py 0.5 "$LOG_DIR/monitor_host.csv" &')
         lines.append("MON_HOST_PID=$!")
         lines.append("")
 
