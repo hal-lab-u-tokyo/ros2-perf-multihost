@@ -14,6 +14,7 @@ def start_script():
     hostname = socket.gethostname()
     script_path = f"/home/ubuntu/ros2-perf-multihost-v2/host_scripts/{hostname}_start.sh"
     try:
+        print(script_path)
         # スクリプトが終了するまで待つ
         result = subprocess.run(["bash", script_path, str(payload_size), str(run_idx)], capture_output=True, text=True)
         print(result)
