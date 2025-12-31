@@ -82,7 +82,6 @@ def generate_host_scripts(json_content, rmw):
             # "[ -n \"${MON_SUB_PID:-}\" ] && kill ${MON_SUB_PID} 2>/dev/null || true; "
             # "[ -n \"${MON_INT_PID:-}\" ] && kill ${MON_INT_PID} 2>/dev/null || true; "
             '[ -n "${MON_HOST_PID:-}" ] && kill ${MON_HOST_PID} 2>/dev/null || true; '
-            '[ -n "${ZENOH_PID:-}" ] && kill ${ZENOH_PID} 2>/dev/null || true; '
             "exit' EXIT"
         )
         lines.append(trap_cmd)
@@ -106,7 +105,7 @@ def generate_host_scripts(json_content, rmw):
             lines.append("fi")
             lines.append("ros2 run rmw_zenoh_cpp rmw_zenohd &")
             lines.append("ZENOH_PID=$!")
-            # lines.append("trap 'kill ${ZENOH_PID} 2>/dev/null || true' EXIT")
+            lines.append("trap 'kill ${ZENOH_PID} 2>/dev/null || true' EXIT")
             lines.append("sleep 2  # ルーター起動待ち")
             lines.append("")
 
