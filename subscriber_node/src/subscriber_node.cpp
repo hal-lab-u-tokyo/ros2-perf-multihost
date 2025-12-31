@@ -11,6 +11,8 @@
 #include <arpa/inet.h>
 #include <sys/socket.h>
 #include <unistd.h>
+#include <cerrno>
+#include <cstring>
 
 #include "node_options/cli_options.hpp"
 #include "publisher_node/msg/performance_header.hpp"
@@ -228,6 +230,13 @@ private:
         const std::string log_file_path = ss.str();
         ss.str("");
         ss.clear();
+
+        std::filesystem::path p(log_file_path);
+        try {
+          std::filesystem::create_directories(p.parent_path());
+        } catch (const std::filesystem::filesystem_error &e) {
+          RCLCPP_ERROR(this->get_logger(), "Failed to create directory %s: %s", p.parent_path().c_str(), e.what());
+        }
 
         std::ofstream file(log_file_path, std::ios::out | std::ios::trunc);
         if (!file.is_open()) {

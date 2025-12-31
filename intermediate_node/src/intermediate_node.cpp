@@ -18,6 +18,8 @@
 #include <sys/socket.h>
 #include <unistd.h>
 #include <atomic>
+#include <cerrno>
+#include <cstring>
 
 #include "node_options_intermediate/cli_options.hpp"
 #include "publisher_node/msg/performance_header.hpp"
@@ -493,22 +495,22 @@ class Intermediate : public rclcpp::Node
       RCLCPP_INFO(this->get_logger(), "Metadata written to file: %s", metadata_file_path.c_str());
 
       // ファイルのコピー
-      try {
-        std::string original_path = metadata_file_path;
-        ss << options.log_dir << "/" << node_name << "_log" ;
-        std::string destination_dir = ss.str();
-        if (!std::filesystem::exists(destination_dir)) {
-          std::filesystem::create_directories(destination_dir);
-          std::cout << "Created directory: " << destination_dir << std::endl;
-        }
+      // try {
+      //   std::string original_path = metadata_file_path;
+      //   ss << options.log_dir << "/" << node_name << "_log" ;
+      //   std::string destination_dir = ss.str();
+      //   if (!std::filesystem::exists(destination_dir)) {
+      //     std::filesystem::create_directories(destination_dir);
+      //     std::cout << "Created directory: " << destination_dir << std::endl;
+      //   }
 
-        ss << "/" << "metadata.txt" ;
-        std::string destination_path = ss.str();
-        std::filesystem::copy_file(original_path, destination_path, std::filesystem::copy_options::overwrite_existing);
-        std::cout << "File copied from " << original_path << " to " << destination_path << std::endl;
-      } catch (const std::filesystem::filesystem_error &e) {
-          std::cerr << "Error copying file: " << e.what() << std::endl;
-      }
+      //   ss << "/" << "metadata.txt" ;
+      //   std::string destination_path = ss.str();
+      //   std::filesystem::copy_file(original_path, destination_path, std::filesystem::copy_options::overwrite_existing);
+      //   std::cout << "File copied from " << original_path << " to " << destination_path << std::endl;
+      // } catch (const std::filesystem::filesystem_error &e) {
+      //     std::cerr << "Error copying file: " << e.what() << std::endl;
+      // }
     }
 
     // ログ記録用
@@ -535,6 +537,13 @@ class Intermediate : public rclcpp::Node
         ss.str("");
         ss.clear();
 
+        std::filesystem::path p(log_file_path);
+        try {
+          std::filesystem::create_directories(p.parent_path());
+        } catch (const std::filesystem::filesystem_error &e) {
+          RCLCPP_ERROR(this->get_logger(), "Failed to create directory %s: %s", p.parent_path().c_str(), e.what());
+        }
+
         std::ofstream file(log_file_path, std::ios::out | std::ios::trunc);
         if (!file.is_open()) {
             RCLCPP_ERROR(this->get_logger(), "Failed to open file: %s", log_file_path.c_str());
@@ -560,22 +569,22 @@ class Intermediate : public rclcpp::Node
         RCLCPP_INFO(this->get_logger(), "MessageLogs written to file: %s", log_file_path.c_str());
 
         // ファイルのコピー
-        try {
-          std::string original_path = log_file_path;
-          ss << log_dir << "/" << node_name << "_log" ;
-          std::string destination_dir = ss.str();
-          if (!std::filesystem::exists(destination_dir)) {
-            std::filesystem::create_directories(destination_dir);
-            std::cout << "Created directory: " << destination_dir << std::endl;
-          }
+        // try {
+        //   std::string original_path = log_file_path;
+        //   ss << log_dir << "/" << node_name << "_log" ;
+        //   std::string destination_dir = ss.str();
+        //   if (!std::filesystem::exists(destination_dir)) {
+        //     std::filesystem::create_directories(destination_dir);
+        //     std::cout << "Created directory: " << destination_dir << std::endl;
+        //   }
 
-          ss << "/" << topic_name << "_pub" << "_log.txt" ;
-          std::string destination_path = ss.str();
-          std::filesystem::copy_file(original_path, destination_path, std::filesystem::copy_options::overwrite_existing);
-          std::cout << "File copied from " << original_path << " to " << destination_path << std::endl;
-        } catch (const std::filesystem::filesystem_error &e) {
-            std::cerr << "Error copying file: " << e.what() << std::endl;
-        }
+        //   ss << "/" << topic_name << "_pub" << "_log.txt" ;
+        //   std::string destination_path = ss.str();
+        //   std::filesystem::copy_file(original_path, destination_path, std::filesystem::copy_options::overwrite_existing);
+        //   std::cout << "File copied from " << original_path << " to " << destination_path << std::endl;
+        // } catch (const std::filesystem::filesystem_error &e) {
+        //     std::cerr << "Error copying file: " << e.what() << std::endl;
+        // }
       }
     }
     void write_all_logs_sub_(const std::map<std::string, std::vector<MessageLog>>& message_logs_sub_) {
@@ -587,6 +596,12 @@ class Intermediate : public rclcpp::Node
         ss.str("");
         ss.clear();
 
+        std::filesystem::path p(log_file_path);
+        try {
+          std::filesystem::create_directories(p.parent_path());
+        } catch (const std::filesystem::filesystem_error &e) {
+          RCLCPP_ERROR(this->get_logger(), "Failed to create directory %s: %s", p.parent_path().c_str(), e.what());
+        }
         std::ofstream file(log_file_path, std::ios::out | std::ios::trunc);
         if (!file.is_open()) {
             RCLCPP_ERROR(this->get_logger(), "Failed to open file: %s", log_file_path.c_str());
@@ -605,22 +620,22 @@ class Intermediate : public rclcpp::Node
         RCLCPP_INFO(this->get_logger(), "MessageLogs written to file: %s", log_file_path.c_str());
 
         // ファイルのコピー
-        try {
-          std::string original_path = log_file_path;
-          ss << log_dir << "/" << node_name << "_log" ;
-          std::string destination_dir = ss.str();
-          if (!std::filesystem::exists(destination_dir)) {
-            std::filesystem::create_directories(destination_dir);
-            std::cout << "Created directory: " << destination_dir << std::endl;
-          }
+        // try {
+        //   std::string original_path = log_file_path;
+        //   ss << log_dir << "/" << node_name << "_log" ;
+        //   std::string destination_dir = ss.str();
+        //   if (!std::filesystem::exists(destination_dir)) {
+        //     std::filesystem::create_directories(destination_dir);
+        //     std::cout << "Created directory: " << destination_dir << std::endl;
+        //   }
 
-          ss << "/" << topic_name << "_sub" << "_log.txt" ;
-          std::string destination_path = ss.str();
-          std::filesystem::copy_file(original_path, destination_path, std::filesystem::copy_options::overwrite_existing);
-          std::cout << "File copied from " << original_path << " to " << destination_path << std::endl;
-        } catch (const std::filesystem::filesystem_error &e) {
-            std::cerr << "Error copying file: " << e.what() << std::endl;
-        }
+        //   ss << "/" << topic_name << "_sub" << "_log.txt" ;
+        //   std::string destination_path = ss.str();
+        //   std::filesystem::copy_file(original_path, destination_path, std::filesystem::copy_options::overwrite_existing);
+        //   std::cout << "File copied from " << original_path << " to " << destination_path << std::endl;
+        // } catch (const std::filesystem::filesystem_error &e) {
+        //     std::cerr << "Error copying file: " << e.what() << std::endl;
+        // }
       }
     }
 
