@@ -70,12 +70,12 @@ def generate_dockerfiles(json_content, rmw):
         with open("../config/multihost_config.json5", "w") as f:
             json5.dump(config_json, f, indent=4)
 
-        make_config_file_command = textwrap.dedent(
-            """
-        COPY multihost_config.json5 ~/performance_ws/config/multihost_config.json5
-        """
-        )
-        docker_base_content += make_config_file_command
+        # make_config_file_command = textwrap.dedent(
+        #     """
+        # COPY multihost_config.json5 ~/performance_ws/config/multihost_config.json5
+        # """
+        # )
+        # docker_base_content += make_config_file_command
 
         dockerfile_content = docker_base_content
         new_config_path = "~/performance_ws/config/multihost_config.json5"
