@@ -60,15 +60,21 @@ parse_options(int argc, char ** argv)
 static std::string get_local_ip()
 {
   int sock = socket(AF_INET, SOCK_DGRAM, 0);
-  if (sock < 0) return "";
-  sockaddr_in serv{};
+  if (sock < 0) return std::string("127.0.0.1");
+  struct sockaddr_in serv{};
   serv.sin_family = AF_INET;
-  serv.sin_addr.s_addr = inet_addr("8.8.8.8");
-  serv.sin_port = htons(53);
-  if (connect(sock, (const sockaddr*)&serv, sizeof(serv)) < 0) { close(sock); return ""; }
-  sockaddr_in name{};
+  serv.sin_port = htons(80);
+  inet_pton(AF_INET, "8.8.8.8", &serv.sin_addr); // 外向きアドレスへ connect してローカル IP を取得
+  if (connect(sock, (struct sockaddr*)&serv, sizeof(serv)) < 0) {
+    close(sock);
+    return std::string("127.0.0.1");
+  }
+  struct sockaddr_in name{};
   socklen_t namelen = sizeof(name);
-  if (getsockname(sock, (sockaddr*)&name, &namelen) < 0) { close(sock); return ""; }
+  if (getsockname(sock, (struct sockaddr*)&name, &namelen) != 0) {
+    close(sock);
+    return std::string("127.0.0.1");
+  }
   char buf[INET_ADDRSTRLEN];
   inet_ntop(AF_INET, &name.sin_addr, buf, sizeof(buf));
   close(sock);

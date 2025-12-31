@@ -86,6 +86,7 @@ public:
 
       auto callback = [this, topic_name, options](const publisher_node::msg::IntMessage::SharedPtr message_) -> void{
         int current_pub_idx = message_->header.pub_idx;
+        RCLCPP_INFO(this->get_logger(), "Sending ACK to %s:%d for topic %s idx %u", message_->header.publisher_ip.c_str(), message_->header.publisher_port, topic_name.c_str(), current_pub_idx);
         send_ack(message_->header.publisher_ip, message_->header.publisher_port, topic_name, current_pub_idx, node_name);
         // eval_time秒過ぎてたら受け取らず終了
         auto sub_time = this->get_clock()->now();
