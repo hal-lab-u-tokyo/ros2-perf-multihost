@@ -284,8 +284,14 @@ class Intermediate : public rclcpp::Node
                 oss << std::dec <<"Time: " << std::fixed << std::setprecision(9) << static_cast<double>(sub_time.nanoseconds() - start_time_sub_[topic_name].nanoseconds()) / 1e9;
                 int current_pub_idx = message_->header.pub_idx;
                 std::string pub_node_name = message_->header.node_name;
+                
                 RCLCPP_INFO(this->get_logger(), "Subscribe/ Topic: %s Data: %s Index: %d", topic_name.c_str(), oss.str().c_str(), current_pub_idx);
-                record_log_sub_(topic_name, pub_node_name, current_pub_idx, sub_time);
+                RCLCPP_INFO(this->get_logger(), "Sending ACK to %s:%d for topic %s idx %u",
+                            message_->header.publisher_ip.c_str(),
+                            message_->header.publisher_port,
+                            topic_name.c_str(),
+                            current_pub_idx);
+                send_ack(message_->header.publisher_ip, message_->header.publisher_port, topic_name, current_pub_idx, node_name);
             };
 
             // Subscriber作成
@@ -330,8 +336,15 @@ class Intermediate : public rclcpp::Node
                 oss << std::dec <<"Time: " << std::fixed << std::setprecision(9) << static_cast<double>(sub_time.nanoseconds() - start_time_sub_[topic_name].nanoseconds()) / 1e9;
                 int current_pub_idx = message_->header.pub_idx;
                 std::string pub_node_name = message_->header.node_name;
+                std::string upstream_ip = message_->header.publisher_ip;
+                int upstream_port = message_->header.publisher_port;
+                
                 RCLCPP_INFO(this->get_logger(), "Subscribe/ Topic: %s Data: %s Index: %d", topic_name.c_str(), oss.str().c_str(), current_pub_idx);
                 record_log_sub_(topic_name, pub_node_name, current_pub_idx, sub_time);
+
+                RCLCPP_INFO(this->get_logger(), "Sending ACK to %s:%d for topic %s idx %u",
+                            upstream_ip.c_str(), upstream_port, topic_name.c_str(), current_pub_idx);
+                send_ack(upstream_ip, upstream_port, topic_name, current_pub_idx, options.node_name);
 
                 // ヘッダのタイムスタンプを書き換え
                 message_->header.stamp.sec = static_cast<int32_t>(sub_time.seconds() - start_time_sub_[topic_name].seconds());
@@ -418,6 +431,21 @@ class Intermediate : public rclcpp::Node
     std::unordered_map<std::string, rclcpp::Time> start_time_sub_;
     std::unordered_map<std::string, rclcpp::Time> end_time_pub_;
     std::unordered_map<std::string, rclcpp::Time> end_time_sub_;
+
+    void send_ack(const std::string& publisher_ip, int port, const std::string& topic, uint32_t idx, const std::string& node) {
+      int sock = socket(AF_INET, SOCK_DGRAM, 0);
+      if (sock < 0) {
+        RCLCPP_ERROR(this->get_logger(), "send_ack: socket() failed");
+        return;
+      }
+      sockaddr_in addr{};
+      addr.sin_family = AF_INET;
+      addr.sin_port = htons(port);
+      inet_pton(AF_INET, publisher_ip.c_str(), &addr.sin_addr);
+      std::string msg = topic + "," + std::to_string(idx) + "," + node;
+      sendto(sock, msg.c_str(), static_cast<int>(msg.size()), 0, (sockaddr*)&addr, sizeof(addr));
+      close(sock);
+    }
 
     void
     create_metadata_file(const node_options::Options & options)
