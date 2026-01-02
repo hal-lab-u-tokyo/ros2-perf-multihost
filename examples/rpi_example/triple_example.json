@@ -11,62 +11,61 @@
             "host_name": "pi0",
             "nodes": [
                 {
-		    "node_name": "montreal",
-		    "publisher": [
-		        {"topic_name": "amazon"},
-		        {"topic_name": "nile"},
-		        {"topic_name": "ganges"},
-		        {"topic_name": "danube"}
-		      ]
-	        },
-
-	        {
-		    "node_name": "lyon",
-		    "intermediate": [
-                        {
-                            "subscriber":[
-		        	{"topic_name": "amazon"}
-		      	    ],
-		    	    "publisher": [
-		        	{"topic_name": "tigris"}
-		      	    ]
-                        }
-                    ]
-	        }
+				"node_name": "montreal",
+				"publisher": [
+					{"topic_name": "amazon"},
+					{"topic_name": "nile"},
+					{"topic_name": "ganges"},
+					{"topic_name": "danube"}
+				]
+				},
+				{
+				"node_name": "lyon",
+				"intermediate": [
+					{
+						"subscriber":[
+							{"topic_name": "amazon"}
+						],
+						"publisher": [
+							{"topic_name": "tigris"}
+						]
+					}
+					]
+				}
             ]
         },
         {
             "host_name": "pi1",
             "nodes": [
                 {
-		    "node_name": "hamburg",
-		    "intermediate": [
-                        {
-                            "subscriber":[
-		        	{"topic_name": "nile"},
-		        	{"topic_name": "tigris"},
-		       		{"topic_name": "ganges"},
-		        	{"topic_name": "danube"}
-		      	    ],
-		    	    "publisher": [
-		        	{"topic_name": "parana"}
-		      	    ]
-                        }
-                    ]
-	        },
+				"node_name": "hamburg",
+				"intermediate": [
+					{
+						"subscriber":[
+							{"topic_name": "nile"},
+							{"topic_name": "tigris"},
+							{"topic_name": "ganges"},
+							{"topic_name": "danube"}
+						],
+						"publisher": [
+							{"topic_name": "parana"}
+						]
+					}
+					]
+				},
 
 	        {
 		    "node_name": "osaka",
 		    "intermediate": [
-                        {
-                            "subscriber":[
-		        	{"topic_name": "parana"}
+                {
+                    "subscriber":[
+		        		{"topic_name": "parana"}
 		      	    ],
 		    	    "publisher": [
-		        	{"topic_name": "salween"}
+		        		{"topic_name": "salween"}
 		      	    ]
-                        }
-                    ]
+                 }
+                ]
 	        }
             ]
         },
