@@ -51,6 +51,13 @@ void Options::parse(int argc, char ** argv)
             exit(1);
         }
 
+        if (!payload_size.empty() && payload_size.size() == 1 && !topic_names_pub.empty()) {
+            payload_size = std::vector<int>(topic_names_pub.size(), payload_size[0]);
+        }
+        if (!period_ms.empty() && period_ms.size() == 1 && !topic_names_pub.empty()) {
+            period_ms = std::vector<int>(topic_names_pub.size(), period_ms[0]);
+        }
+        
         if(result.count("topic_names_pub") == 0 && result.count("topic_names_sub") == 0){
             std::cout << "Please specify the topic_name for this node" << std::endl;
             exit(1);
