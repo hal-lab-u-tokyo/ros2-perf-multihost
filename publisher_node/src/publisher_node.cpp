@@ -12,15 +12,6 @@
 #include <filesystem>
 #include <cstdlib>
 
-#include <thread>
-#include <mutex>
-#include <condition_variable>
-#include <map>
-#include <netinet/in.h>
-#include <arpa/inet.h>
-#include <sys/socket.h>
-#include <unistd.h>
-
 #include "node_options/cli_options.hpp"
 #include "publisher_node/msg/performance_header.hpp"
 #include "publisher_node/msg/int_message.hpp"
@@ -28,17 +19,6 @@
 struct MessageLog {
   uint32_t message_idx;
   rclcpp::Time time_stamp;
-};
-
-struct AckInfo {
-  // uint64_t seq;          // publish sequence
-  // uint32_t pub_id;       // publisher node ID
-  // uint32_t sub_id;       // subscriber node ID
-  // uint32_t topic_id;     // topic ID
-  std::mutex mtx;
-  std::condition_variable cv;
-  bool received = false;
-  std::chrono::steady_clock::time_point ack_time;
 };
 
 // コマンドラインオプション
@@ -55,24 +35,6 @@ parse_options(int argc, char ** argv)
   auto options = node_options::Options(non_ros_argc, non_ros_args_c_strings.data());
 
   return options;
-}
-
-static std::string get_local_ip()
-{
-  int sock = socket(AF_INET, SOCK_DGRAM, 0);
-  if (sock < 0) return "";
-  sockaddr_in serv{};
-  serv.sin_family = AF_INET;
-  serv.sin_addr.s_addr = inet_addr("8.8.8.8");
-  serv.sin_port = htons(53);
-  if (connect(sock, (const sockaddr*)&serv, sizeof(serv)) < 0) { close(sock); return ""; }
-  sockaddr_in name{};
-  socklen_t namelen = sizeof(name);
-  if (getsockname(sock, (sockaddr*)&name, &namelen) < 0) { close(sock); return ""; }
-  char buf[INET_ADDRSTRLEN];
-  inet_ntop(AF_INET, &name.sin_addr, buf, sizeof(buf));
-  close(sock);
-  return std::string(buf);
 }
 
 static
@@ -114,14 +76,7 @@ class Publisher : public rclcpp::Node
     : Node(options.node_name)
     {
       node_name = options.node_name;
-      log_dir = options.log_dir;
       create_metadata_file(options);
-      local_ip_ = get_local_ip();
-      if (local_ip_.empty()) {
-        const char *env_ip = std::getenv("PUBLISHER_IP");
-        local_ip_ = env_ip ? std::string(env_ip) : std::string("127.0.0.1");
-      }
-      start_ack_server(ack_server_port_);
       // シャットダウン予告
       RCLCPP_INFO(this->get_logger(), "Shutdown timer created with duration %d seconds", options.eval_time + 10);
 
@@ -157,8 +112,6 @@ class Publisher : public rclcpp::Node
             message_->header.stamp.nanosec = static_cast<uint32_t>((time_stamp.nanoseconds() - start_time_[topic_name].nanoseconds()) % 1000000000);
             message_->header.pub_idx = current_pub_idx;
             message_->header.node_name = options.node_name;
-            message_->header.publisher_ip = local_ip_;
-            message_->header.publisher_port = static_cast<uint16_t>(ack_server_port_);
             record_log(topic_name, current_pub_idx, time_stamp);
 
             // message->dataを16進数形式で表示 (0埋めはしない)
@@ -171,21 +124,7 @@ class Publisher : public rclcpp::Node
             RCLCPP_INFO(this->get_logger(), "Publish/ Topic: %s, Data: %s, Index: %d", topic_name.c_str(), oss.str().c_str(), current_pub_idx);
 
             // 該当トピックのPublisherでメッセージ送信
-            auto send_time = std::chrono::steady_clock::now();
             publishers_[topic_name]->publish(*message_);
-
-            // ACK待ち
-            AckInfo& ackinfo = ack_table_[topic_name][current_pub_idx];
-            std::unique_lock<std::mutex> lock(ackinfo.mtx);
-            if (ackinfo.cv.wait_for(lock, std::chrono::milliseconds(1000), [&]{ return ackinfo.received; })) {
-              auto rtt = std::chrono::duration_cast<std::chrono::microseconds>(ackinfo.ack_time - send_time).count();
-              rtt_logs_[topic_name].emplace_back(current_pub_idx, rtt);
-              std::cout << "RTT: " << rtt << "us" << std::endl;
-            } else {
-              std::cout << "ACK timeout: topic=" << topic_name << " idx=" << current_pub_idx << std::endl;
-              rtt_logs_[topic_name].emplace_back(current_pub_idx, -1); // タイムアウトは-1
-            }
-            ackinfo.received = false;
 
             pub_idx_[topic_name]++;
         };
@@ -230,20 +169,11 @@ class Publisher : public rclcpp::Node
 
     ~Publisher() override {
       RCLCPP_INFO(this->get_logger(), "Node is shutting down.");
-      stop_ack_server_ = true;
-      RCLCPP_INFO(this->get_logger(), "ACK thread stopping, dumping rtt_logs_ sizes");
-      for (const auto &kv : rtt_logs_) {
-        RCLCPP_INFO(this->get_logger(), "  topic=%s, rtt_count=%zu", kv.first.c_str(), kv.second.size());
-      }
-      if (ack_thread_.joinable()) ack_thread_.join();
       write_all_logs(message_logs_);
     }
 
 
   private:
-    std::map<std::string, std::map<uint32_t, AckInfo>> ack_table_; // topic -> pub_idx -> AckInfo
-    std::map<std::string, std::vector<std::pair<uint32_t, long long>>> rtt_logs_;
-
     // トピックごとのPublisher,Timer,
     std::unordered_map<std::string, rclcpp::Publisher<publisher_node::msg::IntMessage>::SharedPtr> publishers_;
 
@@ -254,67 +184,6 @@ class Publisher : public rclcpp::Node
     std::unordered_map<std::string, uint32_t> pub_idx_;
     std::unordered_map<std::string, rclcpp::Time> start_time_;
     std::unordered_map<std::string, rclcpp::Time> end_time_;
-
-    std::string local_ip_;
-    int ack_server_port_ = 50051;
-
-    std::thread ack_thread_;
-    std::atomic<bool> stop_ack_server_{false};
-
-    void start_ack_server(int port) {
-      ack_thread_ = std::thread([this, port]() {
-        int server_fd = socket(AF_INET, SOCK_DGRAM, 0);
-        if (server_fd < 0) {
-          RCLCPP_ERROR(this->get_logger(), "ACK server: socket() failed");
-          return;
-        }
-        int yes = 1;
-        setsockopt(server_fd, SOL_SOCKET, SO_REUSEADDR, &yes, sizeof(yes));
-        sockaddr_in addr{};
-        addr.sin_family = AF_INET;
-        addr.sin_addr.s_addr = INADDR_ANY;
-        addr.sin_port = htons(port);
-        if (bind(server_fd, (sockaddr*)&addr, sizeof(addr)) < 0) {
-          RCLCPP_ERROR(this->get_logger(), "ACK server: bind() failed on port %d", port);
-          close(server_fd);
-          return;
-        }
-        // optional: notify ready via promise/future
-        char buf[256];
-        while (!stop_ack_server_) {
-          sockaddr_in cli_addr;
-          socklen_t len = sizeof(cli_addr);
-          // use select with timeout to allow periodic stop flag check
-          fd_set fds; FD_ZERO(&fds); FD_SET(server_fd, &fds);
-          timeval tv{1,0};
-          int rv = select(server_fd + 1, &fds, NULL, NULL, &tv);
-          if (rv > 0 && FD_ISSET(server_fd, &fds)) {
-            int n = recvfrom(server_fd, buf, sizeof(buf)-1, 0, (sockaddr*)&cli_addr, &len);
-            if (n > 0) {
-              buf[n] = '\0';
-              std::string ack_msg(buf);
-              // 期待フォーマット: "topic,pub_idx,node"
-              auto pos1 = ack_msg.find(",");
-              auto pos2 = ack_msg.rfind(",");
-              if (pos1 != std::string::npos && pos2 != std::string::npos && pos1 != pos2) {
-                std::string topic = ack_msg.substr(0, pos1);
-                uint32_t idx = static_cast<uint32_t>(std::stoul(ack_msg.substr(pos1+1, pos2-pos1-1)));
-                auto& ackinfo = ack_table_[topic][idx];
-                {
-                  std::lock_guard<std::mutex> lock(ackinfo.mtx);
-                  ackinfo.received = true;
-                  ackinfo.ack_time = std::chrono::steady_clock::now();
-                }
-                ackinfo.cv.notify_all();
-              } else {
-                RCLCPP_WARN(this->get_logger(), "ACK server: malformed ack '%s'", ack_msg.c_str());
-              }
-            }
-          }
-        }
-        close(server_fd);
-      });
-    }
 
     void
     create_metadata_file(const node_options::Options & options)
@@ -380,12 +249,7 @@ class Publisher : public rclcpp::Node
     }
 
     void write_all_logs(const std::map<std::string, std::vector<MessageLog>>& message_logs_) {
-      // トピック名の集合を作る（message_logs_ と rtt_logs_ の和）
-      std::set<std::string> topics;
-      for (const auto &kv : message_logs_) topics.insert(kv.first);
-      for (const auto &kv : rtt_logs_) topics.insert(kv.first);
-
-      for (const auto &topic_name : topics) {
+      for (const auto &[topic_name, topic_logs] : message_logs_) {
         std::stringstream ss;
         ss << log_dir << "/" << node_name << "_log" <<  "/" << topic_name << "_log.txt" ;
         const std::string log_file_path = ss.str();
@@ -395,33 +259,37 @@ class Publisher : public rclcpp::Node
         std::ofstream file(log_file_path, std::ios::out | std::ios::trunc);
         if (!file.is_open()) {
             RCLCPP_ERROR(this->get_logger(), "Failed to open file: %s", log_file_path.c_str());
-            continue;
+            return;
         }
 
-        // StartTimeとEndTimeを書き込む（無ければ0）
-        auto it_start = start_time_.find(topic_name);
-        auto it_end = end_time_.find(topic_name);
-        file << "StartTime: " << (it_start != start_time_.end() ? it_start->second.nanoseconds() : 0) << "\n";
-        file << "EndTime: " << (it_end != end_time_.end() ? it_end->second.nanoseconds() : 0) << "\n";
+        // StartTimeとEndTimeを書き込む
+        file << "StartTime: " << start_time_[topic_name].nanoseconds() << "\n" ;
+        file << "EndTime: " << end_time_[topic_name].nanoseconds() << "\n" ;
 
-        // メッセージログ（あれば）
-        auto it_msgs = message_logs_.find(topic_name);
-        if (it_msgs != message_logs_.end()) {
-          for (const auto& log : it_msgs->second) {
+        for (const auto& log : topic_logs) {
             file << "Index: " << log.message_idx << ", Timestamp: " << log.time_stamp.nanoseconds() << "\n";
-          }
-        }
-
-        // RTTログ（あれば）
-        auto it_rtt = rtt_logs_.find(topic_name);
-        if (it_rtt != rtt_logs_.end()) {
-          for (const auto& rtt_entry : it_rtt->second) {
-            file << "Index: " << rtt_entry.first << ", RTT: " << rtt_entry.second << "us\n";
-          }
         }
 
         file.close();
         RCLCPP_INFO(this->get_logger(), "MessageLogs written to file: %s", log_file_path.c_str());
+
+        // ファイルのコピー (ローカルで実行するとき用)
+        // try {
+        //   std::string original_path = log_file_path;
+        //   ss << log_dir << "/" << node_name << "_log" ;
+        //   std::string destination_dir = ss.str();
+        //   if (!std::filesystem::exists(destination_dir)) {
+        //     std::filesystem::create_directories(destination_dir);
+        //     std::cout << "Created directory: " << destination_dir << std::endl;
+        //   }
+
+        //   ss << log_dir << "/" << node_name << "_log" <<  "/" << topic_name << "_log.txt" ;
+        //   std::string destination_path = ss.str();
+        //   std::filesystem::copy_file(original_path, destination_path, std::filesystem::copy_options::overwrite_existing);
+        //   std::cout << "File copied from " << original_path << " to " << destination_path << std::endl;
+        // } catch (const std::filesystem::filesystem_error &e) {
+        //     std::cerr << "Error copying file: " << e.what() << std::endl;
+        // }
       }
     }
 
@@ -447,7 +315,7 @@ void sigint_handler (int signum)
 {
   // シグナルを受け取ったときにrclcpp::shutdown()を呼ぶ。Dockerコンテナ用
   rclcpp::shutdown();
-  // exit(0);
+  exit(0);
 }
 
 

@@ -51,6 +51,42 @@ def generate_host_scripts(json_content, rmw):
         lines.append("source /opt/ros/jazzy/setup.bash")
         lines.append("source ~/ros2-perf-multihost-v2/install/setup.bash")
 
+        # --- start monitors ---
+        # lines.append("# start resource monitors for nodes (background)")
+        # # publisher monitor
+        # lines.append(
+        #     'python3 ~/ros2-perf-multihost-v2/tools/monitor_proc.py publisher_node_exe 0.5 "$LOG_DIR/monitor_publisher.csv" &'
+        # )
+        # lines.append("MON_PUB_PID=$!")
+        # # subscriber monitor
+        # lines.append(
+        #     'python3 ~/ros2-perf-multihost-v2/tools/monitor_proc.py subscriber_node 0.5 "$LOG_DIR/monitor_subscriber.csv" &'
+        # )
+        # lines.append("MON_SUB_PID=$!")
+        # # intermediate monitor
+        # lines.append(
+        #     'python3 ~/ros2-perf-multihost-v2/tools/monitor_proc.py intermediate_node 0.5 "$LOG_DIR/monitor_intermediate.csv" &'
+        # )
+        # lines.append("MON_INT_PID=$!")
+        # lines.append("")
+
+        # host-level monitor
+        lines.append("# host-level monitor (host CPU/memory)")
+        lines.append('python3 ~/ros2-perf-multihost-v2/performance_test/monitor_host.py 0.5 "$LOG_DIR/monitor_host.csv" &')
+        lines.append("MON_HOST_PID=$!")
+        lines.append("")
+
+        trap_cmd = (
+            "trap 'set +e; "
+            # "[ -n \"${MON_PUB_PID:-}\" ] && kill ${MON_PUB_PID} 2>/dev/null || true; "
+            # "[ -n \"${MON_SUB_PID:-}\" ] && kill ${MON_SUB_PID} 2>/dev/null || true; "
+            # "[ -n \"${MON_INT_PID:-}\" ] && kill ${MON_INT_PID} 2>/dev/null || true; "
+            '[ -n "${MON_HOST_PID:-}" ] && kill ${MON_HOST_PID} 2>/dev/null || true; '
+            "exit' EXIT"
+        )
+        lines.append(trap_cmd)
+        lines.append("")
+
         if rmw_zenoh_flag:
             # Zenoh用の環境変数設定
             lines.append("")
@@ -62,8 +98,14 @@ def generate_host_scripts(json_content, rmw):
             lines.append("")
             # Zenohルーターをバックグラウンドで起動
             lines.append("# Zenohルーターを起動")
+            lines.append("if pgrep -x rmw_zenohd >/dev/null 2>&1; then")
+            lines.append('  echo "Existing rmw_zenohd found — killing it"')
+            lines.append("  pkill -x rmw_zenohd || true")
+            lines.append("  sleep 1")
+            lines.append("fi")
             lines.append("ros2 run rmw_zenoh_cpp rmw_zenohd &")
             lines.append("ZENOH_PID=$!")
+            lines.append("trap 'kill ${ZENOH_PID} 2>/dev/null || true' EXIT")
             lines.append("sleep 2  # ルーター起動待ち")
             lines.append("")
 
@@ -81,7 +123,7 @@ def generate_host_scripts(json_content, rmw):
                     f'-s "$PAYLOAD_SIZE" -p {period_ms} '
                     f"--eval_time {eval_time} "
                     f'--log_dir "$LOG_DIR" &'
-                    f'> "$LOG_DIR/{node_name}_publisher.log" 2>&1 &'
+                    f'> "$LOG_DIR/{node_name}_publisher.log" 2>&1'
                 )
 
             if node.get("subscriber"):
@@ -90,7 +132,7 @@ def generate_host_scripts(json_content, rmw):
                 lines.append("cd ~/ros2-perf-multihost-v2/install/subscriber_node/lib/subscriber_node")
                 lines.append(
                     f'./subscriber_node --node_name {node_name} --topic_names {topic_names} --eval_time {eval_time} --log_dir "$LOG_DIR" &'
-                    f'> "$LOG_DIR/{node_name}_subscriber.log" 2>&1 &'
+                    f'> "$LOG_DIR/{node_name}_subscriber.log" 2>&1'
                 )
 
             if node.get("intermediate"):
@@ -107,10 +149,16 @@ def generate_host_scripts(json_content, rmw):
                     f'-s "$PAYLOAD_SIZE" -p {period_ms} '
                     f"--eval_time {eval_time} "
                     f'--log_dir "$LOG_DIR" &'
-                    f'> "$LOG_DIR/{node_name}_intermediate.log" 2>&1 &'
+                    f'> "$LOG_DIR/{node_name}_intermediate.log" 2>&1'
                 )
 
-        lines.append("wait")
+        # lines.append("wait")
+
+        # stop monitors if running
+        # lines.append("kill ${MON_PUB_PID} 2>/dev/null || true")
+        # lines.append("kill ${MON_SUB_PID} 2>/dev/null || true")
+        # lines.append("kill ${MON_INT_PID} 2>/dev/null || true")
+        lines.append("kill ${MON_HOST_PID} 2>/dev/null || true")
 
         if rmw_zenoh_flag:
             # Zenohルーターを終了

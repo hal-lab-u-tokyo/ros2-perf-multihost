@@ -35,7 +35,17 @@ def start_docker():
     image_name = f"ros2_perf_{hostname}:latest"
     logs_dir = "/home/ubuntu/ros2-perf-multihost-v2/logs"
     container_name = f"{hostname}_perf_run{run_idx}"
+    monitor_log = f"{logs_dir}/{container_name}_monitor.csv"
     try:
+        monitor_proc = subprocess.Popen(
+            [
+                "python3",
+                "/home/ubuntu/ros2-perf-multihost-v2/performance_test/monitor_docker.py",
+                container_name,
+                "0.5",
+                monitor_log,
+            ]
+        )
         # Docker runコマンドを組み立て
         cmd = [
             "docker",
@@ -61,6 +71,15 @@ def start_docker():
             return jsonify({"error": result.stderr}), 500
     except Exception as e:
         return jsonify({"error": str(e)}), 500
+    finally:
+        try:
+            monitor_proc.terminate()
+            monitor_proc.wait(timeout=5)
+        except Exception:
+            try:
+                monitor_proc.kill()
+            except Exception:
+                pass
 
 
 if __name__ == "__main__":

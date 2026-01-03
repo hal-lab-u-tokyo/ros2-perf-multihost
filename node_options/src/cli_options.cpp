@@ -54,6 +54,14 @@ void Options::parse(int argc, char ** argv)
             std::cout << "Please specify the topic_name for this node" << std::endl;
             exit(1);
         }
+
+        if (!payload_size.empty() && payload_size.size() == 1 && !topic_names.empty()) {
+            payload_size = std::vector<int>(topic_names.size(), payload_size[0]);
+        }
+        if (!period_ms.empty() && period_ms.size() == 1 && !topic_names.empty()) {
+            period_ms = std::vector<int>(topic_names.size(), period_ms[0]);
+        }
+        
     } catch (const cxxopts::exceptions::exception & e) {
         std::cout << "Error parsing options: " << e.what() << std::endl;
         exit(1);

@@ -7,11 +7,6 @@
 #include <fstream>
 #include <filesystem>
 
-#include <netinet/in.h>
-#include <arpa/inet.h>
-#include <sys/socket.h>
-#include <unistd.h>
-
 #include "node_options/cli_options.hpp"
 #include "publisher_node/msg/performance_header.hpp"
 #include "publisher_node/msg/int_message.hpp"
@@ -75,7 +70,6 @@ public:
     : Node(options.node_name)
   {
     node_name = options.node_name;
-    log_dir = options.log_dir;
     create_metadata_file(options);
     
     // 複数のトピック名を扱う場合
@@ -85,8 +79,6 @@ public:
       end_time_[topic_name] = start_time_[topic_name] + rclcpp::Duration::from_seconds(options.eval_time) ;
 
       auto callback = [this, topic_name, options](const publisher_node::msg::IntMessage::SharedPtr message_) -> void{
-        int current_pub_idx = message_->header.pub_idx;
-        send_ack(message_->header.publisher_ip, message_->header.publisher_port, topic_name, current_pub_idx, node_name);
         // eval_time秒過ぎてたら受け取らず終了
         auto sub_time = this->get_clock()->now();
         if((sub_time.seconds() - start_time_[topic_name].seconds()) >= options.eval_time) {
@@ -102,6 +94,7 @@ public:
         }
         // subした時刻などを表示
         oss << std::dec <<"Time: " << std::fixed << std::setprecision(9) << static_cast<double>(sub_time.nanoseconds() - start_time_[topic_name].nanoseconds()) / 1e9;
+        int current_pub_idx = message_->header.pub_idx;
         std::string pub_node_name = message_->header.node_name;
         RCLCPP_INFO(this->get_logger(), "Subscribe/ Topic: %s Data: %s Index: %d", topic_name.c_str(), oss.str().c_str(), current_pub_idx);
 
@@ -154,17 +147,6 @@ private:
   std::unordered_map<std::string, rclcpp::Time> end_time_;
 
   std::unordered_map<std::string, rclcpp::TimerBase::SharedPtr> shutdown_timers_;
-
-  void send_ack(const std::string& publisher_ip, int port, const std::string& topic, uint32_t idx, const std::string& node) {
-    int sock = socket(AF_INET, SOCK_DGRAM, 0);
-    sockaddr_in addr;
-    addr.sin_family = AF_INET;
-    addr.sin_port = htons(port);
-    inet_pton(AF_INET, publisher_ip.c_str(), &addr.sin_addr);
-    std::string msg = topic + "," + std::to_string(idx) + "," + node;
-    sendto(sock, msg.c_str(), msg.size(), 0, (sockaddr*)&addr, sizeof(addr));
-    close(sock);
-  }
 
   void
   create_metadata_file(const node_options::Options & options)
@@ -246,22 +228,22 @@ private:
         RCLCPP_INFO(this->get_logger(), "MessageLogs written to file: %s", log_file_path.c_str());
 
         // ファイルのコピー
-        // try {
-        //   std::string original_path = log_file_path;
-        //   ss << log_dir << "/" << node_name << "_log" ;
-        //   std::string destination_dir = ss.str();
-        //   if (!std::filesystem::exists(destination_dir)) {
-        //     std::filesystem::create_directories(destination_dir);
-        //     std::cout << "Created directory: " << destination_dir << std::endl;
-        //   }
+        try {
+          std::string original_path = log_file_path;
+          ss << log_dir << "/" << node_name << "_log" ;
+          std::string destination_dir = ss.str();
+          if (!std::filesystem::exists(destination_dir)) {
+            std::filesystem::create_directories(destination_dir);
+            std::cout << "Created directory: " << destination_dir << std::endl;
+          }
 
-        //   ss << log_dir << "/" << node_name << "_log" <<  "/" << topic_name << "_log.txt" ;
-        //   std::string destination_path = ss.str();
-        //   std::filesystem::copy_file(original_path, destination_path, std::filesystem::copy_options::overwrite_existing);
-        //   std::cout << "File copied from " << original_path << " to " << destination_path << std::endl;
-        // } catch (const std::filesystem::filesystem_error &e) {
-        //     std::cerr << "Error copying file: " << e.what() << std::endl;
-        // }
+          ss << log_dir << "/" << node_name << "_log" <<  "/" << topic_name << "_log.txt" ;
+          std::string destination_path = ss.str();
+          std::filesystem::copy_file(original_path, destination_path, std::filesystem::copy_options::overwrite_existing);
+          std::cout << "File copied from " << original_path << " to " << destination_path << std::endl;
+        } catch (const std::filesystem::filesystem_error &e) {
+            std::cerr << "Error copying file: " << e.what() << std::endl;
+        }
       }
   }
 
