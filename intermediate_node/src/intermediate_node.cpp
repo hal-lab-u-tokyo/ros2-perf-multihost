@@ -337,7 +337,7 @@ class Intermediate : public rclcpp::Node
     create_metadata_file(const node_options::Options & options)
     {
       std::stringstream ss;
-      ss << options.node_name << "_log" <<  "/" << "metadata.txt" ;
+      ss << options.log_dir << "/" << options.node_name << "_log" <<  "/" << "metadata.txt" ;
       std::string metadata_file_path = ss.str();
       ss.str("");
       ss.clear();
@@ -411,7 +411,7 @@ class Intermediate : public rclcpp::Node
       // publisherたちの書き込み
       for (const auto &[topic_name, topic_logs] : message_logs_pub_) {
         std::stringstream ss;
-        ss << node_name << "_log" <<  "/" << topic_name << "_pub" << "_log.txt" ;
+        ss << log_dir << "/" << node_name << "_log" <<  "/" << topic_name << "_pub" << "_log.txt" ;
         const std::string log_file_path = ss.str();
         ss.str("");
         ss.clear();
@@ -456,7 +456,7 @@ class Intermediate : public rclcpp::Node
       // subscriberたちの書き込み
       for (const auto &[topic_name, topic_logs] : message_logs_sub_) {
         std::stringstream ss;
-        ss << node_name << "_log" <<  "/" << topic_name << "_sub" << "_log.txt" ;
+        ss << log_dir << "/" << node_name << "_log" <<  "/" << topic_name << "_sub" << "_log.txt" ;
         const std::string log_file_path = ss.str();
         ss.str("");
         ss.clear();
