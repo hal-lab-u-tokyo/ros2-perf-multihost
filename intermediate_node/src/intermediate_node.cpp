@@ -80,7 +80,8 @@ class Intermediate : public rclcpp::Node
     : Node(options.node_name)
     {
     node_name = options.node_name;
-    log_dir = options.log_dir;
+    log_dir = std::filesystem::absolute(options.log_dir).string();
+    RCLCPP_INFO(this->get_logger(), "Intermediate log_dir set to: %s", log_dir.c_str());
     create_metadata_file(options);
 
     // Qos設定
@@ -336,61 +337,58 @@ class Intermediate : public rclcpp::Node
     void
     create_metadata_file(const node_options::Options & options)
     {
-      std::stringstream ss;
-      ss << options.log_dir << "/" << options.node_name << "_log" <<  "/" << "metadata.txt" ;
-      std::string metadata_file_path = ss.str();
-      ss.str("");
-      ss.clear();
+      // 常に絶対パスで作る
+      std::filesystem::path p = std::filesystem::path(log_dir) / (options.node_name + "_log") / "metadata.txt";
 
-      std::ofstream file(metadata_file_path, std::ios::out | std::ios::trunc);
+      std::error_code ec;
+      std::filesystem::create_directories(p.parent_path(), ec);
+      if (ec) {
+        RCLCPP_WARN(this->get_logger(), "Failed to ensure metadata dir: %s (errno=%d: %s)",
+                    p.parent_path().string().c_str(), errno, std::strerror(errno));
+      }
+
+      std::ofstream file(p.string(), std::ios::out | std::ios::trunc);
       if (!file.is_open()) {
-          RCLCPP_ERROR(this->get_logger(), "Failed to open file: %s", metadata_file_path.c_str());
-          return;
+        RCLCPP_ERROR(this->get_logger(), "Failed to open file: %s (errno=%d: %s)",
+                    p.string().c_str(), errno, std::strerror(errno));
+        return;
       }
 
       file << "Name: " << options.node_name << "\n";
       file << "NodeType: " << "Intermediate" << "\n";
       file << "Topics(Pub): ";
-      for (const std::string& topic_name : options.topic_names_pub) {
-        file << topic_name << ",";
-      }
+      for (const std::string& topic_name : options.topic_names_pub) file << topic_name << ",";
       file << "\n";
       file << "PayloadSize: ";
-      for (const int& payload_size : options.payload_size) {
-        file << payload_size << ",";
-      }
+      for (const int& payload_size : options.payload_size) file << payload_size << ",";
       file << "\n";
       file << "Period: ";
-      for (const int& period_ms : options.period_ms) {
-        file << period_ms << ",";
-      }
+      for (const int& period_ms : options.period_ms) file << period_ms << ",";
       file << "\n";
       file << "Topics(Sub): ";
-      for (const std::string& topic_name : options.topic_names_sub) {
-        file << topic_name << ",";
-      }
+      for (const std::string& topic_name : options.topic_names_sub) file << topic_name << ",";
 
       file.close();
-      RCLCPP_INFO(this->get_logger(), "Metadata written to file: %s", metadata_file_path.c_str());
-
-      // ファイルのコピー
-      try {
-        std::string original_path = metadata_file_path;
-        ss << options.log_dir << "/" << node_name << "_log" ;
-        std::string destination_dir = ss.str();
-        if (!std::filesystem::exists(destination_dir)) {
-          std::filesystem::create_directories(destination_dir);
-          std::cout << "Created directory: " << destination_dir << std::endl;
-        }
-
-        ss << "/" << "metadata.txt" ;
-        std::string destination_path = ss.str();
-        std::filesystem::copy_file(original_path, destination_path, std::filesystem::copy_options::overwrite_existing);
-        std::cout << "File copied from " << original_path << " to " << destination_path << std::endl;
-      } catch (const std::filesystem::filesystem_error &e) {
-          std::cerr << "Error copying file: " << e.what() << std::endl;
-      }
+      RCLCPP_INFO(this->get_logger(), "Metadata written to file: %s", p.string().c_str());
     }
+      // ファイルのコピー
+      // try {
+      //   std::string original_path = metadata_file_path;
+      //   ss << options.log_dir << "/" << node_name << "_log" ;
+      //   std::string destination_dir = ss.str();
+      //   if (!std::filesystem::exists(destination_dir)) {
+      //     std::filesystem::create_directories(destination_dir);
+      //     std::cout << "Created directory: " << destination_dir << std::endl;
+      //   }
+
+      //   ss << "/" << "metadata.txt" ;
+      //   std::string destination_path = ss.str();
+      //   std::filesystem::copy_file(original_path, destination_path, std::filesystem::copy_options::overwrite_existing);
+      //   std::cout << "File copied from " << original_path << " to " << destination_path << std::endl;
+      // } catch (const std::filesystem::filesystem_error &e) {
+      //     std::cerr << "Error copying file: " << e.what() << std::endl;
+      // }
+    
 
     // ログ記録用
     std::string node_name;
@@ -407,107 +405,112 @@ class Intermediate : public rclcpp::Node
       message_logs_sub_[topic_name].emplace_back(log);
     }
 
-    void write_all_logs_pub_(const std::map<std::string, std::vector<MessageLog>>& message_logs_pub_) {
-      // publisherたちの書き込み
+    void write_all_logs_pub_(const std::map<std::string, std::vector<MessageLog>>& message_logs_pub_)
+    {
       for (const auto &[topic_name, topic_logs] : message_logs_pub_) {
-        std::stringstream ss;
-        ss << log_dir << "/" << node_name << "_log" <<  "/" << topic_name << "_pub" << "_log.txt" ;
-        const std::string log_file_path = ss.str();
-        ss.str("");
-        ss.clear();
+        std::filesystem::path p = std::filesystem::path(log_dir) / (node_name + "_log") / (topic_name + "_pub_log.txt");
 
-        std::ofstream file(log_file_path, std::ios::out | std::ios::trunc);
-        if (!file.is_open()) {
-            RCLCPP_ERROR(this->get_logger(), "Failed to open file: %s", log_file_path.c_str());
-            return;
+        std::error_code ec;
+        std::filesystem::create_directories(p.parent_path(), ec);
+        if (ec) {
+          RCLCPP_WARN(this->get_logger(), "Failed to ensure pub log dir: %s (errno=%d: %s)",
+                      p.parent_path().string().c_str(), errno, std::strerror(errno));
         }
 
-        // StartTimeとEndTimeを書き込む
-        file << "StartTime: " << start_time_pub_[topic_name].nanoseconds() << "\n" ;
-        file << "EndTime: " << end_time_pub_[topic_name].nanoseconds() << "\n" ;
+        std::ofstream file(p.string(), std::ios::out | std::ios::trunc);
+        if (!file.is_open()) {
+          RCLCPP_ERROR(this->get_logger(), "Failed to open file: %s (errno=%d: %s)",
+                      p.string().c_str(), errno, std::strerror(errno));
+          continue; // 他トピックは続行
+        }
+
+        file << "StartTime: " << start_time_pub_[topic_name].nanoseconds() << "\n";
+        file << "EndTime: " << end_time_pub_[topic_name].nanoseconds() << "\n";
 
         for (const auto& log : topic_logs) {
-            file << "Pub Node_Name: " << log.pub_node_name << ", Index: " << log.message_idx << ", Timestamp: " << log.time_stamp.nanoseconds() << "\n";
+          file << "Pub Node_Name: " << log.pub_node_name
+              << ", Index: " << log.message_idx
+              << ", Timestamp: " << log.time_stamp.nanoseconds() << "\n";
         }
 
         file.close();
-        RCLCPP_INFO(this->get_logger(), "MessageLogs written to file: %s", log_file_path.c_str());
+        RCLCPP_INFO(this->get_logger(), "MessageLogs written to file: %s", p.string().c_str());
 
         // ファイルのコピー
-        try {
-          std::string original_path = log_file_path;
-          ss << log_dir << "/" << node_name << "_log" ;
-          std::string destination_dir = ss.str();
-          if (!std::filesystem::exists(destination_dir)) {
-            std::filesystem::create_directories(destination_dir);
-            std::cout << "Created directory: " << destination_dir << std::endl;
-          }
+        // try {
+        //   std::string original_path = log_file_path;
+        //   ss << log_dir << "/" << node_name << "_log" ;
+        //   std::string destination_dir = ss.str();
+        //   if (!std::filesystem::exists(destination_dir)) {
+        //     std::filesystem::create_directories(destination_dir);
+        //     std::cout << "Created directory: " << destination_dir << std::endl;
+        //   }
 
-          ss << "/" << topic_name << "_pub" << "_log.txt" ;
-          std::string destination_path = ss.str();
-          std::filesystem::copy_file(original_path, destination_path, std::filesystem::copy_options::overwrite_existing);
-          std::cout << "File copied from " << original_path << " to " << destination_path << std::endl;
-        } catch (const std::filesystem::filesystem_error &e) {
-            std::cerr << "Error copying file: " << e.what() << std::endl;
-        }
+        //   ss << "/" << topic_name << "_pub" << "_log.txt" ;
+        //   std::string destination_path = ss.str();
+        //   std::filesystem::copy_file(original_path, destination_path, std::filesystem::copy_options::overwrite_existing);
+        //   std::cout << "File copied from " << original_path << " to " << destination_path << std::endl;
+        // } catch (const std::filesystem::filesystem_error &e) {
+        //     std::cerr << "Error copying file: " << e.what() << std::endl;
+        // }
       }
     }
-    void write_all_logs_sub_(const std::map<std::string, std::vector<MessageLog>>& message_logs_sub_) {
+
+    void write_all_logs_sub_(const std::map<std::string, std::vector<MessageLog>>& message_logs_sub_)
+    {
       // subscriberたちの書き込み
       for (const auto &[topic_name, topic_logs] : message_logs_sub_) {
-        std::stringstream ss;
-        ss << log_dir << "/" << node_name << "_log" <<  "/" << topic_name << "_sub" << "_log.txt" ;
-        const std::string log_file_path = ss.str();
-        ss.str("");
-        ss.clear();
+        std::filesystem::path p = std::filesystem::path(log_dir) / (node_name + "_log") / (topic_name + "_sub_log.txt");
 
-        std::ofstream file(log_file_path, std::ios::out | std::ios::trunc);
-        if (!file.is_open()) {
-            RCLCPP_ERROR(this->get_logger(), "Failed to open file: %s", log_file_path.c_str());
-            return;
+        std::error_code ec;
+        std::filesystem::create_directories(p.parent_path(), ec);
+        if (ec) {
+          RCLCPP_WARN(this->get_logger(), "Failed to ensure sub log dir: %s (errno=%d: %s)",
+                      p.parent_path().string().c_str(), errno, std::strerror(errno));
         }
 
-        // StartTimeとEndTimeを書き込む
-        file << "StartTime: " << start_time_sub_[topic_name].nanoseconds() << "\n" ;
-        file << "EndTime: " << end_time_sub_[topic_name].nanoseconds() << "\n" ;
+        std::ofstream file(p.string(), std::ios::out | std::ios::trunc);
+        if (!file.is_open()) {
+          RCLCPP_ERROR(this->get_logger(), "Failed to open file: %s (errno=%d: %s)",
+                      p.string().c_str(), errno, std::strerror(errno));
+          continue; // 他トピックは続行
+        }
+
+        file << "StartTime: " << start_time_sub_[topic_name].nanoseconds() << "\n";
+        file << "EndTime: " << end_time_sub_[topic_name].nanoseconds() << "\n";
 
         for (const auto& log : topic_logs) {
-            file << "Pub Node_Name: " << log.pub_node_name << ", Index: " << log.message_idx << ", Timestamp: " << log.time_stamp.nanoseconds() << "\n";
+          file << "Pub Node_Name: " << log.pub_node_name
+              << ", Index: " << log.message_idx
+              << ", Timestamp: " << log.time_stamp.nanoseconds() << "\n";
         }
 
-        file.close();
-        RCLCPP_INFO(this->get_logger(), "MessageLogs written to file: %s", log_file_path.c_str());
+      file.close();
+      RCLCPP_INFO(this->get_logger(), "MessageLogs written to file: %s", log_file_path.c_str());
 
         // ファイルのコピー
-        try {
-          std::string original_path = log_file_path;
-          ss << log_dir << "/" << node_name << "_log" ;
-          std::string destination_dir = ss.str();
-          if (!std::filesystem::exists(destination_dir)) {
-            std::filesystem::create_directories(destination_dir);
-            std::cout << "Created directory: " << destination_dir << std::endl;
-          }
+        // try {
+        //   std::string original_path = log_file_path;
+        //   ss << log_dir << "/" << node_name << "_log" ;
+        //   std::string destination_dir = ss.str();
+        //   if (!std::filesystem::exists(destination_dir)) {
+        //     std::filesystem::create_directories(destination_dir);
+        //     std::cout << "Created directory: " << destination_dir << std::endl;
+        //   }
 
-          ss << "/" << topic_name << "_sub" << "_log.txt" ;
-          std::string destination_path = ss.str();
-          std::filesystem::copy_file(original_path, destination_path, std::filesystem::copy_options::overwrite_existing);
-          std::cout << "File copied from " << original_path << " to " << destination_path << std::endl;
-        } catch (const std::filesystem::filesystem_error &e) {
-            std::cerr << "Error copying file: " << e.what() << std::endl;
-        }
+        //   ss << "/" << topic_name << "_sub" << "_log.txt" ;
+        //   std::string destination_path = ss.str();
+        //   std::filesystem::copy_file(original_path, destination_path, std::filesystem::copy_options::overwrite_existing);
+        //   std::cout << "File copied from " << original_path << " to " << destination_path << std::endl;
+        // } catch (const std::filesystem::filesystem_error &e) {
+        //     std::cerr << "Error copying file: " << e.what() << std::endl;
+        // }
       }
     }
 };
 
 int main(int argc, char * argv[])
 {
-  std::string log_dir = "./"; // デフォルト
-  for (int i = 1; i < argc; ++i) {
-    if (std::string(argv[i]) == "--log_dir" && i + 1 < argc) {
-      log_dir = argv[i + 1];
-    }
-  }
-
   auto options = parse_options(argc, argv);
   create_result_directory(options);
   std::cout << options << "\n" << "Start Publisher & Subscriber!" << std::endl;
