@@ -323,13 +323,6 @@ void sigint_handler (int signum)
 
 int main(int argc, char * argv[])
 {
-  std::string log_dir = "./"; // デフォルト
-  for (int i = 1; i < argc; ++i) {
-    if (std::string(argv[i]) == "--log_dir" && i + 1 < argc) {
-      log_dir = argv[i + 1];
-    }
-  }
-
   auto options = parse_options(argc, argv);
   create_result_directory(options);
   std::cout << options << "\n" << "Start Publisher!" << std::endl;
