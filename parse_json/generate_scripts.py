@@ -122,42 +122,41 @@ def generate_host_scripts(json_content, rmw):
             if node.get("publisher"):
                 pub_list = node["publisher"]
                 topic_names = ",".join(p["topic_name"] for p in pub_list)
-                lines.append("cd ~/ros2-perf-multihost-v2/install/publisher_node/lib/publisher_node")
+                lines.append(f"# {node_name} publisher")
+                lines.append("( cd ~/ros2-perf-multihost-v2/install/publisher_node/lib/publisher_node \\")
                 lines.append(
-                    f"./publisher_node_exe "
-                    f"--node_name {node_name} "
-                    f"--topic_names {topic_names} "
-                    f'-s "$PAYLOAD_SIZE" -p {period_ms} '
-                    f"--eval_time {eval_time} "
-                    f'--log_dir "$LOG_DIR"'
-                    f'> "$LOG_DIR/{node_name}_publisher.log" 2>&1 &'
+                    f"  && ./publisher_node_exe --node_name {node_name} --topic_names {topic_names} "
+                    f'-s "$PAYLOAD_SIZE" -p {period_ms} --eval_time {eval_time} --log_dir "$LOG_DIR" \\'
                 )
+                lines.append(f') > "$LOG_DIR/{node_name}_publisher.log" 2>&1 &')
+                lines.append(f'echo "Started {node_name} publisher at $(date +%s)"')
 
             if node.get("subscriber"):
                 sub_list = node["subscriber"]
                 topic_names = ",".join(s["topic_name"] for s in sub_list)
-                lines.append("cd ~/ros2-perf-multihost-v2/install/subscriber_node/lib/subscriber_node")
+                lines.append(f"# {node_name} subscriber")
+                lines.append("( cd ~/ros2-perf-multihost-v2/install/subscriber_node/lib/subscriber_node \\")
                 lines.append(
-                    f'./subscriber_node --node_name {node_name} --topic_names {topic_names} --eval_time {eval_time} --log_dir "$LOG_DIR"'
-                    f'> "$LOG_DIR/{node_name}_subscriber.log" 2>&1 &'
+                    f"  && ./subscriber_node --node_name {node_name} --topic_names {topic_names} "
+                    f'--eval_time {eval_time} --log_dir "$LOG_DIR" \\'
                 )
+                lines.append(f') > "$LOG_DIR/{node_name}_subscriber.log" 2>&1 &')
+                lines.append(f'echo "Started {node_name} subscriber at $(date +%s)"')
 
             if node.get("intermediate"):
                 pub_list = node["intermediate"][0]["publisher"]
                 sub_list = node["intermediate"][0]["subscriber"]
                 topic_names_pub = ",".join(p["topic_name"] for p in pub_list)
                 topic_names_sub = ",".join(s["topic_name"] for s in sub_list)
-                lines.append("cd ~/ros2-perf-multihost-v2/install/intermediate_node/lib/intermediate_node")
+                lines.append(f"# {node_name} intermediate")
+                lines.append("( cd ~/ros2-perf-multihost-v2/install/intermediate_node/lib/intermediate_node \\")
                 lines.append(
-                    f"./intermediate_node "
-                    f"--node_name {node_name} "
-                    f"--topic_names_pub {topic_names_pub} "
-                    f"--topic_names_sub {topic_names_sub} "
-                    f'-s "$PAYLOAD_SIZE" -p {period_ms} '
-                    f"--eval_time {eval_time} "
-                    f'--log_dir "$LOG_DIR"'
-                    f'> "$LOG_DIR/{node_name}_intermediate.log" 2>&1 &'
+                    f"  && ./intermediate_node --node_name {node_name} "
+                    f"--topic_names_pub {topic_names_pub} --topic_names_sub {topic_names_sub} "
+                    f'-s "$PAYLOAD_SIZE" -p {period_ms} --eval_time {eval_time} --log_dir "$LOG_DIR" \\'
                 )
+                lines.append(f') > "$LOG_DIR/{node_name}_intermediate.log" 2>&1 &')
+                lines.append(f'echo "Started {node_name} at $(date +%s)"')
 
         lines.append("wait")
 
