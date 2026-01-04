@@ -171,7 +171,7 @@ def generate_host_scripts(json_content, rmw):
             # Zenohルーターを終了
             lines.append("")
             lines.append("# Zenohルーターを終了")
-            lines.append("kill $ZENOH_PID 2>/dev/null || true")
+            lines.append("kill ${ZENOH_PID} 2>/dev/null || true")
 
         lines.append(f'echo "All nodes on host {host_name} finished."')
 
