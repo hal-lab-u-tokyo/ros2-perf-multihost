@@ -486,7 +486,7 @@ class Intermediate : public rclcpp::Node
         }
 
       file.close();
-      RCLCPP_INFO(this->get_logger(), "MessageLogs written to file: %s", log_file_path.c_str());
+      RCLCPP_INFO(this->get_logger(), "MessageLogs written to file: %s", p.string().c_str());
 
         // ファイルのコピー
         // try {
