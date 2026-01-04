@@ -66,7 +66,7 @@ def get_node_and_topics(logs_folder_path):
     return all_node_info
 
 
-def cal_all_latency(all_node_info):
+def cal_all_latency(all_node_info, logs_folder_path):
     # make log.txt -> [("StartTime, 1111"), ("EndTime, 2222"), (0, 1120), (1, 1125)...]
     def get_log(logdata_path, type):
         logdata_list = []
@@ -124,15 +124,19 @@ def cal_all_latency(all_node_info):
                     if sub_topic in pub_topic_list:
                         pub_logdata_path = ""
                         if pub_node_type == "Publisher":
-                            pub_logdata_path = os.path.join("./logs", f"{pub_node_name}_log", f"{sub_topic}_log.txt")
+                            pub_logdata_path = os.path.join(logs_folder_path, f"{pub_node_name}_log", f"{sub_topic}_log.txt")
                         elif pub_node_type == "Intermediate":
-                            pub_logdata_path = os.path.join("./logs", f"{pub_node_name}_log", f"{sub_topic}_pub_log.txt")
+                            pub_logdata_path = os.path.join(
+                                logs_folder_path, f"{pub_node_name}_log", f"{sub_topic}_pub_log.txt"
+                            )
 
                         sub_logdata_path = ""
                         if sub_node_type == "Subscriber":
-                            sub_logdata_path = os.path.join("./logs", f"{sub_node_name}_log", f"{sub_topic}_log.txt")
+                            sub_logdata_path = os.path.join(logs_folder_path, f"{sub_node_name}_log", f"{sub_topic}_log.txt")
                         elif sub_node_type == "Intermediate":
-                            sub_logdata_path = os.path.join("./logs", f"{sub_node_name}_log", f"{sub_topic}_sub_log.txt")
+                            sub_logdata_path = os.path.join(
+                                logs_folder_path, f"{sub_node_name}_log", f"{sub_topic}_sub_log.txt"
+                            )
 
                         pub_logdata_list = get_log(
                             pub_logdata_path, pub_node_type
