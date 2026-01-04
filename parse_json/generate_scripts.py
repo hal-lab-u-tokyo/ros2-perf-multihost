@@ -47,8 +47,8 @@ def generate_host_scripts(json_content, rmw):
         lines.append("")
         # ログディレクトリ作成（既存なら安全に消去→再作成）
         lines.append("LOG_DIR=~/ros2-perf-multihost-v2/logs/raw_${PAYLOAD_SIZE}B/run${RUN_IDX}")
-        lines.append('rm -rf "$LOG_DIR" || { echo "Failed to remove $LOG_DIR"; exit 1; }')
-        lines.append('mkdir -p "$LOG_DIR" || { echo "Failed to create $LOG_DIR"; exit 1; }')
+        lines.append('/bin/rm -rf "$LOG_DIR" || { echo >&2 "Failed to remove $LOG_DIR"; exit 1; }')
+        lines.append('mkdir -p "$LOG_DIR" || { echo >&2 "Failed to create $LOG_DIR"; exit 1; }')
         # --- start monitors ---
         # lines.append("# start resource monitors for nodes (background)")
         # # publisher monitor
