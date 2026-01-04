@@ -47,11 +47,6 @@ def generate_host_scripts(json_content, rmw):
         lines.append("")
         # ログディレクトリ作成（既存なら安全に消去→再作成）
         lines.append("LOG_DIR=~/ros2-perf-multihost-v2/logs/raw_${PAYLOAD_SIZE}B/run${RUN_IDX}")
-        lines.append("BASE_DIR=~/ros2-perf-multihost-v2/logs")
-        # 安全ガード: BASE_DIR配下のみ削除許可
-        lines.append('case "$LOG_DIR" in "$BASE_DIR"/*) ;; *) echo "Unsafe LOG_DIR: $LOG_DIR"; exit 1 ;; esac')
-        lines.append('[ -n "$LOG_DIR" ] || { echo "LOG_DIR is empty"; exit 1; }')
-        lines.append('[ "$LOG_DIR" != "/" ] || { echo "LOG_DIR cannot be root"; exit 1; }')
         lines.append('rm -rf "$LOG_DIR" || { echo "Failed to remove $LOG_DIR"; exit 1; }')
         lines.append('mkdir -p "$LOG_DIR" || { echo "Failed to create $LOG_DIR"; exit 1; }')
         # --- start monitors ---
