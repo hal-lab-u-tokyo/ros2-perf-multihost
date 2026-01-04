@@ -91,9 +91,9 @@ class Publisher : public rclcpp::Node
           [this, topic_name, payload_size, eval_time = options.eval_time, self_node = options.node_name]() -> void
           {
             // 購読者がいない間は送信しない
-            if (publishers_[topic_name]->get_subscription_count() == 0) {
-              return;
-            }
+            // if (publishers_[topic_name]->get_subscription_count() == 0) {
+            //   return;
+            // }
 
             int current_pub_idx = pub_idx_[topic_name];
 
