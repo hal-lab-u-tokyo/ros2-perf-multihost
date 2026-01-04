@@ -54,7 +54,6 @@ def generate_host_scripts(json_content, rmw):
         lines.append('[ "$LOG_DIR" != "/" ] || { echo "LOG_DIR cannot be root"; exit 1; }')
         lines.append('rm -rf "$LOG_DIR" || { echo "Failed to remove $LOG_DIR"; exit 1; }')
         lines.append('mkdir -p "$LOG_DIR" || { echo "Failed to create $LOG_DIR"; exit 1; }')
-
         # --- start monitors ---
         # lines.append("# start resource monitors for nodes (background)")
         # # publisher monitor

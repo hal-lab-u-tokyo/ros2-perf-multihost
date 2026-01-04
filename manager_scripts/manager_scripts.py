@@ -1,6 +1,7 @@
 from flask import Flask, request, jsonify
 import subprocess
 import socket
+import sys
 
 app = Flask(__name__)
 
@@ -14,14 +15,18 @@ def start_script():
     hostname = socket.gethostname()
     script_path = f"/home/ubuntu/ros2-perf-multihost-v2/host_scripts/{hostname}_start.sh"
     try:
-        # スクリプトが終了するまで待つ
         result = subprocess.run(["bash", script_path, str(payload_size), str(run_idx)], capture_output=True, text=True)
-        print(result)
+        # 終了コードに応じてターミナル出力
         if result.returncode == 0:
-            return jsonify({"status": "finished"}), 200
+            print(f"[start] OK rc=0\nstdout:\n{result.stdout}", flush=True)
+            return jsonify({"status": "finished", "stdout": result.stdout}), 200
         else:
-            return jsonify({"error": result.stderr}), 500
+            print(f"[start] FAIL rc={result.returncode}\nstdout:\n{result.stdout}\nstderr:\n{result.stderr}", flush=True)
+            return jsonify(
+                {"error": "script failed", "returncode": result.returncode, "stdout": result.stdout, "stderr": result.stderr}
+            ), 500
     except Exception as e:
+        print(f"[start] EXCEPTION: {e}", file=sys.stderr, flush=True)
         return jsonify({"error": str(e)}), 500
 
 
@@ -36,6 +41,7 @@ def start_docker():
     logs_dir = "/home/ubuntu/ros2-perf-multihost-v2/logs"
     container_name = f"{hostname}_perf_run{run_idx}"
     monitor_log = f"{logs_dir}/{container_name}_monitor.csv"
+    monitor_proc = None
     try:
         monitor_proc = subprocess.Popen(
             [
@@ -46,7 +52,6 @@ def start_docker():
                 monitor_log,
             ]
         )
-        # Docker runコマンドを組み立て
         cmd = [
             "docker",
             "run",
@@ -65,22 +70,28 @@ def start_docker():
         ]
         result = subprocess.run(cmd, capture_output=True, text=True)
         if result.returncode == 0:
-            return jsonify({"status": "docker finished"}), 200
+            print(f"[docker] OK rc=0\nstdout:\n{result.stdout}", flush=True)
+            return jsonify({"status": "docker finished", "stdout": result.stdout}), 200
         else:
-            print(result)
-            return jsonify({"error": result.stderr}), 500
+            print(f"[docker] FAIL rc={result.returncode}\nstdout:\n{result.stdout}\nstderr:\n{result.stderr}", flush=True)
+            return jsonify(
+                {
+                    "error": "docker run failed",
+                    "returncode": result.returncode,
+                    "stdout": result.stdout,
+                    "stderr": result.stderr,
+                }
+            ), 500
     except Exception as e:
+        print(f"[docker] EXCEPTION: {e}", file=sys.stderr, flush=True)
         return jsonify({"error": str(e)}), 500
     finally:
-        try:
-            monitor_proc.terminate()
-            monitor_proc.wait(timeout=5)
-        except Exception:
+        if monitor_proc:
             try:
-                monitor_proc.kill()
+                monitor_proc.terminate()
+                monitor_proc.wait(timeout=5)
             except Exception:
-                pass
-
-
-if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=5000)
+                try:
+                    monitor_proc.kill()
+                except Exception:
+                    pass
