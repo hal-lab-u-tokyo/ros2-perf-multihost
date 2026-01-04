@@ -42,7 +42,7 @@ create_result_directory(const node_options::Options & options)
   std::stringstream ss;
   ss << options.log_dir << "/" << options.node_name << "_log" ;
   const std::string result_dir_name = ss.str();
-  std::filesystem::create_directories(result_dir_name); 
+  std::filesystem::create_directories(result_dir_name);
   ss.str("");
   ss.clear();
 
@@ -63,7 +63,7 @@ create_result_directory(const node_options::Options & options)
   }
 
   for (const auto& file_path : log_file_paths) {
-    std::ofstream ofs(file_path); // ファイルを開く（存在しない場合は作成）
+    std::ofstream ofs(file_path);
     if(ofs){
       std::cout << "Log file created: " << file_path << std::endl;
       ofs.close();
@@ -90,7 +90,7 @@ class Intermediate : public rclcpp::Node
     if(options.qos_history == "KEEP_LAST") {
       int qos_keep_depth = options.qos_depth;
       qos.keep_last(qos_keep_depth);
-    } 
+    }
     else if (options.qos_history == "KEEP_ALL") {
       qos.keep_all();
     }
@@ -99,7 +99,7 @@ class Intermediate : public rclcpp::Node
       qos.best_effort();
     }
 
-      // まずはPub
+    // まずはPub
     for (size_t i = 0; i < options.topic_names_pub.size(); ++i) {
         const std::string & topic_name = options.topic_names_pub[i];
         int payload_size = options.payload_size[i];
@@ -109,60 +109,56 @@ class Intermediate : public rclcpp::Node
         start_time_pub_[topic_name] = this->get_clock()->now();
         end_time_pub_[topic_name] = start_time_pub_[topic_name] + rclcpp::Duration::from_seconds(options.eval_time) ;
 
-        // 各トピックに対し、単独のpubか、pub/sub兼任のpubかで分ける。
-
         // 単独なら、通常通りtimerでpub
         if (std::find(options.topic_names_sub.begin(), options.topic_names_sub.end(), topic_name) == options.topic_names_sub.end()) {
             auto publish_message =
-            [this, topic_name, payload_size, &options]() -> void
+            [this, topic_name, payload_size, eval_time = options.eval_time]() -> void
             {
+                // 購読者がいない間は送信しない
+                if (publishers_[topic_name]->get_subscription_count() == 0) {
+                  return;
+                }
+
                 int current_pub_idx = pub_idx_[topic_name];
-                
-                // 送信するメッセージの作成
+
                 auto message_ = std::make_shared<publisher_node::msg::IntMessage>();
                 message_->data.resize(payload_size);
                 std::fill(message_->data.begin(), message_->data.end(), 0);
 
-                // 送信するメッセージにタイムスタンプをつける
                 auto time_stamp = this->get_clock()->now();
-                if((time_stamp.seconds() - start_time_pub_[topic_name].seconds()) >= options.eval_time) {
-                RCLCPP_INFO(this->get_logger(), "Topic %s has reached the evaluation time.", topic_name.c_str());
-                timers_[topic_name]->cancel();
-                return;
+                if((time_stamp.seconds() - start_time_pub_[topic_name].seconds()) >= eval_time) {
+                  RCLCPP_INFO(this->get_logger(), "Topic %s has reached the evaluation time.", topic_name.c_str());
+                  timers_[topic_name]->cancel();
+                  return;
                 }
 
                 message_->header.stamp.sec = static_cast<int32_t>(time_stamp.seconds() - start_time_pub_[topic_name].seconds());
                 message_->header.stamp.nanosec = static_cast<uint32_t>((time_stamp.nanoseconds() - start_time_pub_[topic_name].nanoseconds()) % 1000000000);
                 message_->header.pub_idx = current_pub_idx;
-                message_->header.node_name = options.node_name;
+                message_->header.node_name = node_name;
                 record_log_pub_(topic_name, node_name, current_pub_idx, time_stamp);
 
-                // message->dataを16進数形式で表示 (0埋めはしない)
                 std::ostringstream oss;
                 for (const auto& byte : message_->data) {
-                oss << std::hex << (int)byte << " ";
+                  oss << std::hex << (int)byte << " ";
                 }
                 oss << std::dec <<"Time: " << std::fixed << std::setprecision(9) << static_cast<double>(time_stamp.nanoseconds() - start_time_pub_[topic_name].nanoseconds()) / 1e9;
 
                 RCLCPP_INFO(this->get_logger(), "Publish/ Topic: %s, Data: %s, Index: %d", topic_name.c_str(), oss.str().c_str(), current_pub_idx);
 
-                // 該当トピックのPublisherでメッセージ送信
                 publishers_[topic_name]->publish(*message_);
 
                 pub_idx_[topic_name]++;
             };
 
-            // Publisher作成
             auto publisher = create_publisher<publisher_node::msg::IntMessage>(topic_name, qos);
             publishers_.emplace(topic_name, publisher);
 
-            // Timer作成
             auto timer = create_wall_timer(std::chrono::milliseconds(period_ms), publish_message);
             timers_.emplace(topic_name, timer);
 
-            // shutdownタイマー
-            auto shutdown_node = 
-              [this, &options]() -> void
+            auto shutdown_node =
+              [this]() -> void
               {
                 RCLCPP_INFO(this->get_logger(), "Shutting down node...");
                 rclcpp::shutdown();
@@ -171,25 +167,21 @@ class Intermediate : public rclcpp::Node
             auto shutdown_timer = create_wall_timer(std::chrono::seconds(options.eval_time + 10), shutdown_node);
             shutdown_timers_.emplace(topic_name, shutdown_timer);
         }
-
         // 兼任なら、timerでのpubはせずsubからのcallbackを待つ
         else {
-            // Publisher作成
             auto publisher = create_publisher<publisher_node::msg::IntMessage>(topic_name, qos);
             publishers_.emplace(topic_name, publisher);
 
-            // shutdownタイマー
-            auto shutdown_node = 
-              [this, &options]() -> void
+            auto shutdown_node =
+              [this]() -> void
               {
                 RCLCPP_INFO(this->get_logger(), "Shutting down node...");
                 rclcpp::shutdown();
-            };
+              };
 
             auto shutdown_timer = create_wall_timer(std::chrono::seconds(options.eval_time + 10), shutdown_node);
             shutdown_timers_.emplace(topic_name, shutdown_timer);
         }
-
     }
 
     // Subscriberの宣言
@@ -198,28 +190,24 @@ class Intermediate : public rclcpp::Node
         start_time_sub_[topic_name] = this->get_clock()->now();
         end_time_sub_[topic_name] = start_time_sub_[topic_name] + rclcpp::Duration::from_seconds(options.eval_time) ;
 
-        // 各トピックに対し、単独のsubか、pub/sub兼任のsubかで分ける。
         // `callback`を事前に宣言
         std::function<void(const publisher_node::msg::IntMessage::SharedPtr)> callback;
 
-        // 単独なら、受け取ったものを表示するだけのcallback
+        // 単独なら
         if (std::find(options.topic_names_pub.begin(), options.topic_names_pub.end(), topic_name) == options.topic_names_pub.end()) {
-            auto callback = [this, topic_name, options](const publisher_node::msg::IntMessage::SharedPtr message_) -> void
+            auto callback = [this, topic_name, eval_time = options.eval_time](const publisher_node::msg::IntMessage::SharedPtr message_) -> void
             {
-                // eval_time秒過ぎてたら受け取らず終了
                 auto sub_time = this->get_clock()->now();
-                if((sub_time.seconds() - start_time_sub_[topic_name].seconds()) >= options.eval_time) {
+                if((sub_time.seconds() - start_time_sub_[topic_name].seconds()) >= eval_time) {
                     RCLCPP_INFO(this->get_logger(), "Topic %s has reached the evaluation time.", topic_name.c_str());
                     return;
                 }
 
-                // message_->dataを16進数形式で表示 (0埋めはしない)
                 std::ostringstream oss;
                 for (const auto& byte : message_->data)
                 {
                     oss << std::hex << (int)byte << " ";
                 }
-                // subした時刻などを表示
                 oss << std::dec <<"Time: " << std::fixed << std::setprecision(9) << static_cast<double>(sub_time.nanoseconds() - start_time_sub_[topic_name].nanoseconds()) / 1e9;
                 int current_pub_idx = message_->header.pub_idx;
                 std::string pub_node_name = message_->header.node_name;
@@ -227,13 +215,11 @@ class Intermediate : public rclcpp::Node
                 record_log_sub_(topic_name, pub_node_name, current_pub_idx, sub_time);
             };
 
-            // Subscriber作成
             auto subscriber = create_subscription<publisher_node::msg::IntMessage>(topic_name, qos, callback);
             subscribers_.emplace(topic_name, subscriber);
 
-            // shutdownタイマー
-            auto shutdown_node = 
-              [this, &options]() -> void
+            auto shutdown_node =
+              [this]() -> void
               {
                 RCLCPP_INFO(this->get_logger(), "Shutting down node...");
                 rclcpp::shutdown();
@@ -241,47 +227,42 @@ class Intermediate : public rclcpp::Node
 
               auto shutdown_timer = create_wall_timer(std::chrono::seconds(options.eval_time + 10), shutdown_node);
               shutdown_timers_.emplace(topic_name, shutdown_timer);
-        } 
-        // 兼任なら、受け取ったものを表示するだけでなく、同トピックのpubをpublishさせるcallback
+        }
+        // 兼任なら
         else {
-            auto callback = 
-            [this, topic_name, options](const publisher_node::msg::IntMessage::SharedPtr message_) -> void
+            auto callback =
+            [this, topic_name, self_node = node_name, eval_time = options.eval_time](const publisher_node::msg::IntMessage::SharedPtr message_) -> void
             {
-                // 無限ループを避けるため、自身からのpubは受け取らない
                 auto publisher_name = message_->header.node_name;
-                if(publisher_name == options.node_name) {
+                if(publisher_name == self_node) {
                     return;
                 }
 
                 auto sub_time = this->get_clock()->now();
-                if((sub_time.seconds() - start_time_sub_[topic_name].seconds()) >= options.eval_time) {
+                if((sub_time.seconds() - start_time_sub_[topic_name].seconds()) >= eval_time) {
                     RCLCPP_INFO(this->get_logger(), "Topic %s has reached the evaluation time.", topic_name.c_str());
                     return;
                 }
 
-                // message_->dataを16進数形式で表示 (0埋めはしない)
                 std::ostringstream oss;
                 for (const auto& byte : message_->data)
                 {
                     oss << std::hex << (int)byte << " ";
                 }
-                // subした時刻などを表示
                 oss << std::dec <<"Time: " << std::fixed << std::setprecision(9) << static_cast<double>(sub_time.nanoseconds() - start_time_sub_[topic_name].nanoseconds()) / 1e9;
                 int current_pub_idx = message_->header.pub_idx;
                 std::string pub_node_name = message_->header.node_name;
                 RCLCPP_INFO(this->get_logger(), "Subscribe/ Topic: %s Data: %s Index: %d", topic_name.c_str(), oss.str().c_str(), current_pub_idx);
                 record_log_sub_(topic_name, pub_node_name, current_pub_idx, sub_time);
 
-                // ヘッダのタイムスタンプを書き換え
                 message_->header.stamp.sec = static_cast<int32_t>(sub_time.seconds() - start_time_sub_[topic_name].seconds());
                 message_->header.stamp.nanosec = static_cast<uint32_t>((sub_time.nanoseconds() - start_time_sub_[topic_name].nanoseconds()) % 1000000000);
-                message_->header.node_name = options.node_name;
+                message_->header.node_name = self_node;
 
-                // 同じトピックを扱うpublisherを起動
                 oss.str("");
                 oss.clear();
                 auto pub_time = this->get_clock()->now();
-                if((pub_time.seconds() - start_time_pub_[topic_name].seconds()) >= options.eval_time) {
+                if((pub_time.seconds() - start_time_pub_[topic_name].seconds()) >= eval_time) {
                     RCLCPP_INFO(this->get_logger(), "Topic %s has reached the evaluation time.", topic_name.c_str());
                     end_time_pub_[topic_name] = this->get_clock()->now();
                     return;
@@ -290,20 +271,17 @@ class Intermediate : public rclcpp::Node
                 {
                     oss << std::hex << (int)byte << " ";
                 }
-                // pubした時刻などを表示
                 oss << std::dec <<"Time: " << std::fixed << std::setprecision(9) << static_cast<double>(pub_time.nanoseconds() - start_time_pub_[topic_name].nanoseconds()) / 1e9;
                 RCLCPP_INFO(this->get_logger(), "Publish/ Topic: %s Data: %s Index: %d", topic_name.c_str(), oss.str().c_str(), current_pub_idx);
                 record_log_pub_(topic_name, pub_node_name, current_pub_idx, pub_time);
                 publishers_[topic_name]->publish(*message_);
             };
 
-            // Subscriber作成
             auto subscriber = create_subscription<publisher_node::msg::IntMessage>(topic_name, qos, callback);
             subscribers_.emplace(topic_name, subscriber);
 
-            // shutdownタイマー
-            auto shutdown_node = 
-              [this, &options]() -> void
+            auto shutdown_node =
+              [this]() -> void
               {
                 RCLCPP_INFO(this->get_logger(), "Shutting down node...");
                 rclcpp::shutdown();
@@ -337,7 +315,6 @@ class Intermediate : public rclcpp::Node
     void
     create_metadata_file(const node_options::Options & options)
     {
-      // 常に絶対パスで作る
       std::filesystem::path p = std::filesystem::path(log_dir) / (options.node_name + "_log") / "metadata.txt";
 
       std::error_code ec;
@@ -371,24 +348,6 @@ class Intermediate : public rclcpp::Node
       file.close();
       RCLCPP_INFO(this->get_logger(), "Metadata written to file: %s", p.string().c_str());
     }
-      // ファイルのコピー
-      // try {
-      //   std::string original_path = metadata_file_path;
-      //   ss << options.log_dir << "/" << node_name << "_log" ;
-      //   std::string destination_dir = ss.str();
-      //   if (!std::filesystem::exists(destination_dir)) {
-      //     std::filesystem::create_directories(destination_dir);
-      //     std::cout << "Created directory: " << destination_dir << std::endl;
-      //   }
-
-      //   ss << "/" << "metadata.txt" ;
-      //   std::string destination_path = ss.str();
-      //   std::filesystem::copy_file(original_path, destination_path, std::filesystem::copy_options::overwrite_existing);
-      //   std::cout << "File copied from " << original_path << " to " << destination_path << std::endl;
-      // } catch (const std::filesystem::filesystem_error &e) {
-      //     std::cerr << "Error copying file: " << e.what() << std::endl;
-      // }
-    
 
     // ログ記録用
     std::string node_name;
@@ -421,7 +380,7 @@ class Intermediate : public rclcpp::Node
         if (!file.is_open()) {
           RCLCPP_ERROR(this->get_logger(), "Failed to open file: %s (errno=%d: %s)",
                       p.string().c_str(), errno, std::strerror(errno));
-          continue; // 他トピックは続行
+          continue;
         }
 
         file << "StartTime: " << start_time_pub_[topic_name].nanoseconds() << "\n";
@@ -435,30 +394,11 @@ class Intermediate : public rclcpp::Node
 
         file.close();
         RCLCPP_INFO(this->get_logger(), "MessageLogs written to file: %s", p.string().c_str());
-
-        // ファイルのコピー
-        // try {
-        //   std::string original_path = log_file_path;
-        //   ss << log_dir << "/" << node_name << "_log" ;
-        //   std::string destination_dir = ss.str();
-        //   if (!std::filesystem::exists(destination_dir)) {
-        //     std::filesystem::create_directories(destination_dir);
-        //     std::cout << "Created directory: " << destination_dir << std::endl;
-        //   }
-
-        //   ss << "/" << topic_name << "_pub" << "_log.txt" ;
-        //   std::string destination_path = ss.str();
-        //   std::filesystem::copy_file(original_path, destination_path, std::filesystem::copy_options::overwrite_existing);
-        //   std::cout << "File copied from " << original_path << " to " << destination_path << std::endl;
-        // } catch (const std::filesystem::filesystem_error &e) {
-        //     std::cerr << "Error copying file: " << e.what() << std::endl;
-        // }
       }
     }
 
     void write_all_logs_sub_(const std::map<std::string, std::vector<MessageLog>>& message_logs_sub_)
     {
-      // subscriberたちの書き込み
       for (const auto &[topic_name, topic_logs] : message_logs_sub_) {
         std::filesystem::path p = std::filesystem::path(log_dir) / (node_name + "_log") / (topic_name + "_sub_log.txt");
 
@@ -473,7 +413,7 @@ class Intermediate : public rclcpp::Node
         if (!file.is_open()) {
           RCLCPP_ERROR(this->get_logger(), "Failed to open file: %s (errno=%d: %s)",
                       p.string().c_str(), errno, std::strerror(errno));
-          continue; // 他トピックは続行
+          continue;
         }
 
         file << "StartTime: " << start_time_sub_[topic_name].nanoseconds() << "\n";
@@ -485,26 +425,8 @@ class Intermediate : public rclcpp::Node
               << ", Timestamp: " << log.time_stamp.nanoseconds() << "\n";
         }
 
-      file.close();
-      RCLCPP_INFO(this->get_logger(), "MessageLogs written to file: %s", p.string().c_str());
-
-        // ファイルのコピー
-        // try {
-        //   std::string original_path = log_file_path;
-        //   ss << log_dir << "/" << node_name << "_log" ;
-        //   std::string destination_dir = ss.str();
-        //   if (!std::filesystem::exists(destination_dir)) {
-        //     std::filesystem::create_directories(destination_dir);
-        //     std::cout << "Created directory: " << destination_dir << std::endl;
-        //   }
-
-        //   ss << "/" << topic_name << "_sub" << "_log.txt" ;
-        //   std::string destination_path = ss.str();
-        //   std::filesystem::copy_file(original_path, destination_path, std::filesystem::copy_options::overwrite_existing);
-        //   std::cout << "File copied from " << original_path << " to " << destination_path << std::endl;
-        // } catch (const std::filesystem::filesystem_error &e) {
-        //     std::cerr << "Error copying file: " << e.what() << std::endl;
-        // }
+        file.close();
+        RCLCPP_INFO(this->get_logger(), "MessageLogs written to file: %s", p.string().c_str());
       }
     }
 };
@@ -515,11 +437,9 @@ int main(int argc, char * argv[])
   create_result_directory(options);
   std::cout << options << "\n" << "Start Publisher & Subscriber!" << std::endl;
 
-  // クライアントライブラリの初期化
   setvbuf(stdout, NULL, _IONBF, BUFSIZ);
   rclcpp::init(argc, argv);
 
-  // Publisherノードの生成とスピン開始
   auto node = std::make_shared<Intermediate>(options);
   rclcpp::spin(node);
   rclcpp::shutdown();

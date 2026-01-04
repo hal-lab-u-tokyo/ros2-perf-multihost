@@ -3,7 +3,7 @@
     "period_ms": 100,
     "qos": {
         "history": "KEEP_LAST",
-        "depth": 1,
+        "depth": 10,
         "reliability": "RELIABLE"
     },
     "hosts": [
