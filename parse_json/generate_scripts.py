@@ -159,7 +159,7 @@ def generate_host_scripts(json_content, rmw):
                     f'> "$LOG_DIR/{node_name}_intermediate.log" 2>&1'
                 )
 
-        # lines.append("wait")
+        lines.append("wait")
 
         # stop monitors if running
         # lines.append("kill ${MON_PUB_PID} 2>/dev/null || true")

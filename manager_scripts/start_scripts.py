@@ -23,7 +23,7 @@ def main():
     def start(host):
         try:
             r = requests.post(
-                f"http://{host}:5000/start", json={"payload_size": payload_size, "run_idx": run_idx}, timeout=100
+                f"http://{host}:5000/start", json={"payload_size": payload_size, "run_idx": run_idx}, timeout=300
             )
             print(f"{host}: {r.status_code} {r.text}")
         except Exception as e:
