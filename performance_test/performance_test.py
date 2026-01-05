@@ -101,12 +101,12 @@ def aggregate_total_latency(
         all_values_np = np.array(all_values)
         total_lost = int(np.sum(all_values_np[:, 0]))
         mean = round(np.mean(all_values_np[:, 1]), 6)
-        sd = round(np.std(all_values_np[:, 1]), 6)
-        min_v = round(np.min(all_values_np[:, 2]), 6)
-        q1 = round(np.percentile(all_values_np[:, 3], 25), 6)
-        mid = round(np.percentile(all_values_np[:, 4], 50), 6)
-        q3 = round(np.percentile(all_values_np[:, 5], 75), 6)
-        max_v = round(np.max(all_values_np[:, 6]), 6)
+        sd = round(np.std(all_values_np[:, 1]), 6)  # 平均値の標準偏差
+        min_v = round(np.min(all_values_np[:, 3]), 6)
+        q1 = round(np.mean(all_values_np[:, 4]), 6)
+        mid = round(np.mean(all_values_np[:, 5]), 6)
+        q3 = round(np.mean(all_values_np[:, 6]), 6)
+        max_v = round(np.max(all_values_np[:, 7]), 6)
         total_row = ["total", total_lost, mean, sd, min_v, q1, mid, q3, max_v]
         rows.append(total_row)
 
