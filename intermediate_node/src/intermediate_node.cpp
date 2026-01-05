@@ -109,130 +109,130 @@ class Intermediate : public rclcpp::Node
         start_time_pub_[topic_name] = this->get_clock()->now();
         end_time_pub_[topic_name] = start_time_pub_[topic_name] + rclcpp::Duration::from_seconds(options.eval_time) ;
 
-        auto publisher = create_publisher<publisher_node::msg::IntMessage>(topic_name, qos);
-        publishers_.emplace(topic_name, publisher);
+    //     auto publisher = create_publisher<publisher_node::msg::IntMessage>(topic_name, qos);
+    //     publishers_.emplace(topic_name, publisher);
 
-        auto publish_message =
-          [this, topic_name, payload_size, eval_time = options.eval_time]() -> void
-        {
-          int current_pub_idx = pub_idx_[topic_name];
-          auto time_stamp = this->get_clock()->now();
+    //     auto publish_message =
+    //       [this, topic_name, payload_size, eval_time = options.eval_time]() -> void
+    //     {
+    //       int current_pub_idx = pub_idx_[topic_name];
+    //       auto time_stamp = this->get_clock()->now();
 
-          if ((time_stamp.seconds() - start_time_pub_[topic_name].seconds()) >= eval_time) {
-            RCLCPP_INFO(this->get_logger(), "Topic %s has reached the evaluation time.", topic_name.c_str());
-            end_time_pub_[topic_name] = time_stamp;
-            timers_[topic_name]->cancel();
-            return;
-          }
+    //       if ((time_stamp.seconds() - start_time_pub_[topic_name].seconds()) >= eval_time) {
+    //         RCLCPP_INFO(this->get_logger(), "Topic %s has reached the evaluation time.", topic_name.c_str());
+    //         end_time_pub_[topic_name] = time_stamp;
+    //         timers_[topic_name]->cancel();
+    //         return;
+    //       }
 
-          auto message_ = std::make_shared<publisher_node::msg::IntMessage>();
-          message_->data.resize(payload_size);
-          std::fill(message_->data.begin(), message_->data.end(), 0);
+    //       auto message_ = std::make_shared<publisher_node::msg::IntMessage>();
+    //       message_->data.resize(payload_size);
+    //       std::fill(message_->data.begin(), message_->data.end(), 0);
 
-          message_->header.stamp.sec = static_cast<int32_t>(time_stamp.seconds() - start_time_pub_[topic_name].seconds());
-          message_->header.stamp.nanosec = static_cast<uint32_t>((time_stamp.nanoseconds() - start_time_pub_[topic_name].nanoseconds()) % 1000000000);
-          message_->header.pub_idx = current_pub_idx;
-          message_->header.node_name = node_name;
+    //       message_->header.stamp.sec = static_cast<int32_t>(time_stamp.seconds() - start_time_pub_[topic_name].seconds());
+    //       message_->header.stamp.nanosec = static_cast<uint32_t>((time_stamp.nanoseconds() - start_time_pub_[topic_name].nanoseconds()) % 1000000000);
+    //       message_->header.pub_idx = current_pub_idx;
+    //       message_->header.node_name = node_name;
 
-          record_log_pub_(topic_name, node_name, current_pub_idx, time_stamp);
+    //       record_log_pub_(topic_name, node_name, current_pub_idx, time_stamp);
 
-          std::ostringstream oss;
-          for (const auto& byte : message_->data) {
-            oss << std::hex << (int)byte << " ";
-          }
-          oss << std::dec << "Time: " << std::fixed << std::setprecision(9)
-              << static_cast<double>(time_stamp.nanoseconds() - start_time_pub_[topic_name].nanoseconds()) / 1e9;
+    //       std::ostringstream oss;
+    //       for (const auto& byte : message_->data) {
+    //         oss << std::hex << (int)byte << " ";
+    //       }
+    //       oss << std::dec << "Time: " << std::fixed << std::setprecision(9)
+    //           << static_cast<double>(time_stamp.nanoseconds() - start_time_pub_[topic_name].nanoseconds()) / 1e9;
 
-          RCLCPP_INFO(this->get_logger(), "Publish/ Topic: %s, Data: %s, Index: %d", topic_name.c_str(), oss.str().c_str(), current_pub_idx);
-          publishers_[topic_name]->publish(*message_);
-          pub_idx_[topic_name]++;
-        };
+    //       RCLCPP_INFO(this->get_logger(), "Publish/ Topic: %s, Data: %s, Index: %d", topic_name.c_str(), oss.str().c_str(), current_pub_idx);
+    //       publishers_[topic_name]->publish(*message_);
+    //       pub_idx_[topic_name]++;
+    //     };
 
-        auto timer = create_wall_timer(std::chrono::milliseconds(period_ms), publish_message);
-      timers_.emplace(topic_name, timer);
+    //     auto timer = create_wall_timer(std::chrono::milliseconds(period_ms), publish_message);
+    //   timers_.emplace(topic_name, timer);
 
-      auto shutdown_node = [this]() -> void {
-        RCLCPP_INFO(this->get_logger(), "Shutting down node...");
-        rclcpp::shutdown();
-      };
-      auto shutdown_timer = create_wall_timer(std::chrono::seconds(options.eval_time + 10), shutdown_node);
-      shutdown_timers_.emplace(topic_name, shutdown_timer);
-    }
+    //   auto shutdown_node = [this]() -> void {
+    //     RCLCPP_INFO(this->get_logger(), "Shutting down node...");
+    //     rclcpp::shutdown();
+    //   };
+    //   auto shutdown_timer = create_wall_timer(std::chrono::seconds(options.eval_time + 10), shutdown_node);
+    //   shutdown_timers_.emplace(topic_name, shutdown_timer);
+    // }
 
         // 単独なら、通常通りtimerでpub
-    //     if (std::find(options.topic_names_sub.begin(), options.topic_names_sub.end(), topic_name) == options.topic_names_sub.end()) {
-    //         auto publish_message =
-    //         [this, topic_name, payload_size, eval_time = options.eval_time]() -> void
-    //         {
-    //             // 購読者がいない間は送信しない
-    //             if (publishers_[topic_name]->get_subscription_count() == 0) {
-    //               return;
-    //             }
+        if (std::find(options.topic_names_sub.begin(), options.topic_names_sub.end(), topic_name) == options.topic_names_sub.end()) {
+            auto publish_message =
+            [this, topic_name, payload_size, eval_time = options.eval_time]() -> void
+            {
+                // 購読者がいない間は送信しない
+                if (publishers_[topic_name]->get_subscription_count() == 0) {
+                  return;
+                }
 
-    //             int current_pub_idx = pub_idx_[topic_name];
+                int current_pub_idx = pub_idx_[topic_name];
 
-    //             auto message_ = std::make_shared<publisher_node::msg::IntMessage>();
-    //             message_->data.resize(payload_size);
-    //             std::fill(message_->data.begin(), message_->data.end(), 0);
+                auto message_ = std::make_shared<publisher_node::msg::IntMessage>();
+                message_->data.resize(payload_size);
+                std::fill(message_->data.begin(), message_->data.end(), 0);
 
-    //             auto time_stamp = this->get_clock()->now();
-    //             if((time_stamp.seconds() - start_time_pub_[topic_name].seconds()) >= eval_time) {
-    //               RCLCPP_INFO(this->get_logger(), "Topic %s has reached the evaluation time.", topic_name.c_str());
-    //               timers_[topic_name]->cancel();
-    //               return;
-    //             }
+                auto time_stamp = this->get_clock()->now();
+                if((time_stamp.seconds() - start_time_pub_[topic_name].seconds()) >= eval_time) {
+                  RCLCPP_INFO(this->get_logger(), "Topic %s has reached the evaluation time.", topic_name.c_str());
+                  timers_[topic_name]->cancel();
+                  return;
+                }
 
-    //             message_->header.stamp.sec = static_cast<int32_t>(time_stamp.seconds() - start_time_pub_[topic_name].seconds());
-    //             message_->header.stamp.nanosec = static_cast<uint32_t>((time_stamp.nanoseconds() - start_time_pub_[topic_name].nanoseconds()) % 1000000000);
-    //             message_->header.pub_idx = current_pub_idx;
-    //             message_->header.node_name = node_name;
-    //             record_log_pub_(topic_name, node_name, current_pub_idx, time_stamp);
+                message_->header.stamp.sec = static_cast<int32_t>(time_stamp.seconds() - start_time_pub_[topic_name].seconds());
+                message_->header.stamp.nanosec = static_cast<uint32_t>((time_stamp.nanoseconds() - start_time_pub_[topic_name].nanoseconds()) % 1000000000);
+                message_->header.pub_idx = current_pub_idx;
+                message_->header.node_name = node_name;
+                record_log_pub_(topic_name, node_name, current_pub_idx, time_stamp);
 
-    //             std::ostringstream oss;
-    //             for (const auto& byte : message_->data) {
-    //               oss << std::hex << (int)byte << " ";
-    //             }
-    //             oss << std::dec <<"Time: " << std::fixed << std::setprecision(9) << static_cast<double>(time_stamp.nanoseconds() - start_time_pub_[topic_name].nanoseconds()) / 1e9;
+                std::ostringstream oss;
+                for (const auto& byte : message_->data) {
+                  oss << std::hex << (int)byte << " ";
+                }
+                oss << std::dec <<"Time: " << std::fixed << std::setprecision(9) << static_cast<double>(time_stamp.nanoseconds() - start_time_pub_[topic_name].nanoseconds()) / 1e9;
 
-    //             RCLCPP_INFO(this->get_logger(), "Publish/ Topic: %s, Data: %s, Index: %d", topic_name.c_str(), oss.str().c_str(), current_pub_idx);
+                RCLCPP_INFO(this->get_logger(), "Publish/ Topic: %s, Data: %s, Index: %d", topic_name.c_str(), oss.str().c_str(), current_pub_idx);
 
-    //             publishers_[topic_name]->publish(*message_);
+                publishers_[topic_name]->publish(*message_);
 
-    //             pub_idx_[topic_name]++;
-    //         };
+                pub_idx_[topic_name]++;
+            };
 
-    //         auto publisher = create_publisher<publisher_node::msg::IntMessage>(topic_name, qos);
-    //         publishers_.emplace(topic_name, publisher);
+            auto publisher = create_publisher<publisher_node::msg::IntMessage>(topic_name, qos);
+            publishers_.emplace(topic_name, publisher);
 
-    //         auto timer = create_wall_timer(std::chrono::milliseconds(period_ms), publish_message);
-    //         timers_.emplace(topic_name, timer);
+            auto timer = create_wall_timer(std::chrono::milliseconds(period_ms), publish_message);
+            timers_.emplace(topic_name, timer);
 
-    //         auto shutdown_node =
-    //           [this]() -> void
-    //           {
-    //             RCLCPP_INFO(this->get_logger(), "Shutting down node...");
-    //             rclcpp::shutdown();
-    //         };
+            auto shutdown_node =
+              [this]() -> void
+              {
+                RCLCPP_INFO(this->get_logger(), "Shutting down node...");
+                rclcpp::shutdown();
+            };
 
-    //         auto shutdown_timer = create_wall_timer(std::chrono::seconds(options.eval_time + 10), shutdown_node);
-    //         shutdown_timers_.emplace(topic_name, shutdown_timer);
-    //     }
-    //     // 兼任なら、timerでのpubはせずsubからのcallbackを待つ
-    //     else {
-    //         auto publisher = create_publisher<publisher_node::msg::IntMessage>(topic_name, qos);
-    //         publishers_.emplace(topic_name, publisher);
+            auto shutdown_timer = create_wall_timer(std::chrono::seconds(options.eval_time + 10), shutdown_node);
+            shutdown_timers_.emplace(topic_name, shutdown_timer);
+        }
+        // 兼任なら、timerでのpubはせずsubからのcallbackを待つ
+        else {
+            auto publisher = create_publisher<publisher_node::msg::IntMessage>(topic_name, qos);
+            publishers_.emplace(topic_name, publisher);
 
-    //         auto shutdown_node =
-    //           [this]() -> void
-    //           {
-    //             RCLCPP_INFO(this->get_logger(), "Shutting down node...");
-    //             rclcpp::shutdown();
-    //           };
+            auto shutdown_node =
+              [this]() -> void
+              {
+                RCLCPP_INFO(this->get_logger(), "Shutting down node...");
+                rclcpp::shutdown();
+              };
 
-    //         auto shutdown_timer = create_wall_timer(std::chrono::seconds(options.eval_time + 10), shutdown_node);
-    //         shutdown_timers_.emplace(topic_name, shutdown_timer);
-    //     }
-    // }
+            auto shutdown_timer = create_wall_timer(std::chrono::seconds(options.eval_time + 10), shutdown_node);
+            shutdown_timers_.emplace(topic_name, shutdown_timer);
+        }
+    }
 
 
 
@@ -242,143 +242,144 @@ class Intermediate : public rclcpp::Node
         start_time_sub_[topic_name] = this->get_clock()->now();
         end_time_sub_[topic_name] = start_time_sub_[topic_name] + rclcpp::Duration::from_seconds(options.eval_time) ;
 
-        auto callback =
-        [this, topic_name, self_node = node_name, eval_time = options.eval_time](const publisher_node::msg::IntMessage::SharedPtr message_) -> void
-      {
-        if (message_->header.node_name == self_node) {
-          return; // 自ノードの送信は記録しない
+    //     auto callback =
+    //     [this, topic_name, self_node = node_name, eval_time = options.eval_time](const publisher_node::msg::IntMessage::SharedPtr message_) -> void
+    //   {
+    //     if (message_->header.node_name == self_node) {
+    //       return; // 自ノードの送信は記録しない
+    //     }
+
+    //     auto sub_time = this->get_clock()->now();
+    //     if ((sub_time.seconds() - start_time_sub_[topic_name].seconds()) >= eval_time) {
+    //       RCLCPP_INFO(this->get_logger(), "Topic %s has reached the evaluation time.", topic_name.c_str());
+    //       end_time_sub_[topic_name] = sub_time;
+    //       return;
+    //     }
+
+    //     std::ostringstream oss;
+    //     for (const auto& byte : message_->data) {
+    //       oss << std::hex << (int)byte << " ";
+    //     }
+    //     oss << std::dec << "Time: " << std::fixed << std::setprecision(9)
+    //         << static_cast<double>(sub_time.nanoseconds() - start_time_sub_[topic_name].nanoseconds()) / 1e9;
+
+    //     int current_pub_idx = message_->header.pub_idx;
+    //     std::string pub_node_name = message_->header.node_name;
+    //     RCLCPP_INFO(this->get_logger(), "Subscribe/ Topic: %s Data: %s Index: %d", topic_name.c_str(), oss.str().c_str(), current_pub_idx);
+    //     record_log_sub_(topic_name, pub_node_name, current_pub_idx, sub_time);
+    //   };
+
+    //   auto subscriber = create_subscription<publisher_node::msg::IntMessage>(topic_name, qos, callback);
+    //   subscribers_.emplace(topic_name, subscriber);
+
+    //   auto shutdown_node = [this]() -> void {
+    //     RCLCPP_INFO(this->get_logger(), "Shutting down node...");
+    //     rclcpp::shutdown();
+    //   };
+    //   auto shutdown_timer = create_wall_timer(std::chrono::seconds(options.eval_time + 10), shutdown_node);
+    //   shutdown_timers_.emplace(topic_name, shutdown_timer);
+    // }
+        // `callback`を事前に宣言
+        std::function<void(const publisher_node::msg::IntMessage::SharedPtr)> callback;
+
+        // 単独なら
+        if (std::find(options.topic_names_pub.begin(), options.topic_names_pub.end(), topic_name) == options.topic_names_pub.end()) {
+            auto callback = [this, topic_name, eval_time = options.eval_time](const publisher_node::msg::IntMessage::SharedPtr message_) -> void
+            {
+                auto sub_time = this->get_clock()->now();
+                if((sub_time.seconds() - start_time_sub_[topic_name].seconds()) >= eval_time) {
+                    RCLCPP_INFO(this->get_logger(), "Topic %s has reached the evaluation time.", topic_name.c_str());
+                    return;
+                }
+
+                std::ostringstream oss;
+                for (const auto& byte : message_->data)
+                {
+                    oss << std::hex << (int)byte << " ";
+                }
+                oss << std::dec <<"Time: " << std::fixed << std::setprecision(9) << static_cast<double>(sub_time.nanoseconds() - start_time_sub_[topic_name].nanoseconds()) / 1e9;
+                int current_pub_idx = message_->header.pub_idx;
+                std::string pub_node_name = message_->header.node_name;
+                RCLCPP_INFO(this->get_logger(), "Subscribe/ Topic: %s Data: %s Index: %d", topic_name.c_str(), oss.str().c_str(), current_pub_idx);
+                record_log_sub_(topic_name, pub_node_name, current_pub_idx, sub_time);
+            };
+
+            auto subscriber = create_subscription<publisher_node::msg::IntMessage>(topic_name, qos, callback);
+            subscribers_.emplace(topic_name, subscriber);
+
+            auto shutdown_node =
+              [this]() -> void
+              {
+                RCLCPP_INFO(this->get_logger(), "Shutting down node...");
+                rclcpp::shutdown();
+              };
+
+              auto shutdown_timer = create_wall_timer(std::chrono::seconds(options.eval_time + 10), shutdown_node);
+              shutdown_timers_.emplace(topic_name, shutdown_timer);
         }
+        // 兼任なら
+        else {
+            auto callback =
+            [this, topic_name, self_node = node_name, eval_time = options.eval_time](const publisher_node::msg::IntMessage::SharedPtr message_) -> void
+            {
+                auto publisher_name = message_->header.node_name;
+                if(publisher_name == self_node) {
+                    return;
+                }
 
-        auto sub_time = this->get_clock()->now();
-        if ((sub_time.seconds() - start_time_sub_[topic_name].seconds()) >= eval_time) {
-          RCLCPP_INFO(this->get_logger(), "Topic %s has reached the evaluation time.", topic_name.c_str());
-          end_time_sub_[topic_name] = sub_time;
-          return;
+                auto sub_time = this->get_clock()->now();
+                if((sub_time.seconds() - start_time_sub_[topic_name].seconds()) >= eval_time) {
+                    RCLCPP_INFO(this->get_logger(), "Topic %s has reached the evaluation time.", topic_name.c_str());
+                    return;
+                }
+
+                std::ostringstream oss;
+                for (const auto& byte : message_->data)
+                {
+                    oss << std::hex << (int)byte << " ";
+                }
+                oss << std::dec <<"Time: " << std::fixed << std::setprecision(9) << static_cast<double>(sub_time.nanoseconds() - start_time_sub_[topic_name].nanoseconds()) / 1e9;
+                int current_pub_idx = message_->header.pub_idx;
+                std::string pub_node_name = message_->header.node_name;
+                RCLCPP_INFO(this->get_logger(), "Subscribe/ Topic: %s Data: %s Index: %d", topic_name.c_str(), oss.str().c_str(), current_pub_idx);
+                record_log_sub_(topic_name, pub_node_name, current_pub_idx, sub_time);
+
+                message_->header.stamp.sec = static_cast<int32_t>(sub_time.seconds() - start_time_sub_[topic_name].seconds());
+                message_->header.stamp.nanosec = static_cast<uint32_t>((sub_time.nanoseconds() - start_time_sub_[topic_name].nanoseconds()) % 1000000000);
+                message_->header.node_name = self_node;
+
+                oss.str("");
+                oss.clear();
+                auto pub_time = this->get_clock()->now();
+                if((pub_time.seconds() - start_time_pub_[topic_name].seconds()) >= eval_time) {
+                    RCLCPP_INFO(this->get_logger(), "Topic %s has reached the evaluation time.", topic_name.c_str());
+                    end_time_pub_[topic_name] = this->get_clock()->now();
+                    return;
+                }
+                for (const auto& byte : message_->data)
+                {
+                    oss << std::hex << (int)byte << " ";
+                }
+                oss << std::dec <<"Time: " << std::fixed << std::setprecision(9) << static_cast<double>(pub_time.nanoseconds() - start_time_pub_[topic_name].nanoseconds()) / 1e9;
+                RCLCPP_INFO(this->get_logger(), "Publish/ Topic: %s Data: %s Index: %d", topic_name.c_str(), oss.str().c_str(), current_pub_idx);
+                record_log_pub_(topic_name, pub_node_name, current_pub_idx, pub_time);
+                publishers_[topic_name]->publish(*message_);
+            };
+
+            auto subscriber = create_subscription<publisher_node::msg::IntMessage>(topic_name, qos, callback);
+            subscribers_.emplace(topic_name, subscriber);
+
+            auto shutdown_node =
+              [this]() -> void
+              {
+                RCLCPP_INFO(this->get_logger(), "Shutting down node...");
+                rclcpp::shutdown();
+            };
+
+            auto shutdown_timer = create_wall_timer(std::chrono::seconds(options.eval_time + 10), shutdown_node);
+            shutdown_timers_.emplace(topic_name, shutdown_timer);
         }
-
-        std::ostringstream oss;
-        for (const auto& byte : message_->data) {
-          oss << std::hex << (int)byte << " ";
-        }
-        oss << std::dec << "Time: " << std::fixed << std::setprecision(9)
-            << static_cast<double>(sub_time.nanoseconds() - start_time_sub_[topic_name].nanoseconds()) / 1e9;
-
-        int current_pub_idx = message_->header.pub_idx;
-        std::string pub_node_name = message_->header.node_name;
-        RCLCPP_INFO(this->get_logger(), "Subscribe/ Topic: %s Data: %s Index: %d", topic_name.c_str(), oss.str().c_str(), current_pub_idx);
-        record_log_sub_(topic_name, pub_node_name, current_pub_idx, sub_time);
-      };
-
-      auto subscriber = create_subscription<publisher_node::msg::IntMessage>(topic_name, qos, callback);
-      subscribers_.emplace(topic_name, subscriber);
-
-      auto shutdown_node = [this]() -> void {
-        RCLCPP_INFO(this->get_logger(), "Shutting down node...");
-        rclcpp::shutdown();
-      };
-      auto shutdown_timer = create_wall_timer(std::chrono::seconds(options.eval_time + 10), shutdown_node);
-      shutdown_timers_.emplace(topic_name, shutdown_timer);
-    }
-        // // `callback`を事前に宣言
-        // std::function<void(const publisher_node::msg::IntMessage::SharedPtr)> callback;
-
-        // // 単独なら
-        // if (std::find(options.topic_names_pub.begin(), options.topic_names_pub.end(), topic_name) == options.topic_names_pub.end()) {
-        //     auto callback = [this, topic_name, eval_time = options.eval_time](const publisher_node::msg::IntMessage::SharedPtr message_) -> void
-        //     {
-        //         auto sub_time = this->get_clock()->now();
-        //         if((sub_time.seconds() - start_time_sub_[topic_name].seconds()) >= eval_time) {
-        //             RCLCPP_INFO(this->get_logger(), "Topic %s has reached the evaluation time.", topic_name.c_str());
-        //             return;
-        //         }
-
-        //         std::ostringstream oss;
-        //         for (const auto& byte : message_->data)
-        //         {
-        //             oss << std::hex << (int)byte << " ";
-        //         }
-        //         oss << std::dec <<"Time: " << std::fixed << std::setprecision(9) << static_cast<double>(sub_time.nanoseconds() - start_time_sub_[topic_name].nanoseconds()) / 1e9;
-        //         int current_pub_idx = message_->header.pub_idx;
-        //         std::string pub_node_name = message_->header.node_name;
-        //         RCLCPP_INFO(this->get_logger(), "Subscribe/ Topic: %s Data: %s Index: %d", topic_name.c_str(), oss.str().c_str(), current_pub_idx);
-        //         record_log_sub_(topic_name, pub_node_name, current_pub_idx, sub_time);
-        //     };
-
-        //     auto subscriber = create_subscription<publisher_node::msg::IntMessage>(topic_name, qos, callback);
-        //     subscribers_.emplace(topic_name, subscriber);
-
-        //     auto shutdown_node =
-        //       [this]() -> void
-        //       {
-        //         RCLCPP_INFO(this->get_logger(), "Shutting down node...");
-        //         rclcpp::shutdown();
-        //       };
-
-        //       auto shutdown_timer = create_wall_timer(std::chrono::seconds(options.eval_time + 10), shutdown_node);
-        //       shutdown_timers_.emplace(topic_name, shutdown_timer);
-        // }
-        // // 兼任なら
-        // else {
-        //     auto callback =
-        //     [this, topic_name, self_node = node_name, eval_time = options.eval_time](const publisher_node::msg::IntMessage::SharedPtr message_) -> void
-        //     {
-        //         auto publisher_name = message_->header.node_name;
-        //         if(publisher_name == self_node) {
-        //             return;
-        //         }
-
-        //         auto sub_time = this->get_clock()->now();
-        //         if((sub_time.seconds() - start_time_sub_[topic_name].seconds()) >= eval_time) {
-        //             RCLCPP_INFO(this->get_logger(), "Topic %s has reached the evaluation time.", topic_name.c_str());
-        //             return;
-        //         }
-
-        //         std::ostringstream oss;
-        //         for (const auto& byte : message_->data)
-        //         {
-        //             oss << std::hex << (int)byte << " ";
-        //         }
-        //         oss << std::dec <<"Time: " << std::fixed << std::setprecision(9) << static_cast<double>(sub_time.nanoseconds() - start_time_sub_[topic_name].nanoseconds()) / 1e9;
-        //         int current_pub_idx = message_->header.pub_idx;
-        //         std::string pub_node_name = message_->header.node_name;
-        //         RCLCPP_INFO(this->get_logger(), "Subscribe/ Topic: %s Data: %s Index: %d", topic_name.c_str(), oss.str().c_str(), current_pub_idx);
-        //         record_log_sub_(topic_name, pub_node_name, current_pub_idx, sub_time);
-
-        //         message_->header.stamp.sec = static_cast<int32_t>(sub_time.seconds() - start_time_sub_[topic_name].seconds());
-        //         message_->header.stamp.nanosec = static_cast<uint32_t>((sub_time.nanoseconds() - start_time_sub_[topic_name].nanoseconds()) % 1000000000);
-        //         message_->header.node_name = self_node;
-
-        //         oss.str("");
-        //         oss.clear();
-        //         auto pub_time = this->get_clock()->now();
-        //         if((pub_time.seconds() - start_time_pub_[topic_name].seconds()) >= eval_time) {
-        //             RCLCPP_INFO(this->get_logger(), "Topic %s has reached the evaluation time.", topic_name.c_str());
-        //             end_time_pub_[topic_name] = this->get_clock()->now();
-        //             return;
-        //         }
-        //         for (const auto& byte : message_->data)
-        //         {
-        //             oss << std::hex << (int)byte << " ";
-        //         }
-        //         oss << std::dec <<"Time: " << std::fixed << std::setprecision(9) << static_cast<double>(pub_time.nanoseconds() - start_time_pub_[topic_name].nanoseconds()) / 1e9;
-        //         RCLCPP_INFO(this->get_logger(), "Publish/ Topic: %s Data: %s Index: %d", topic_name.c_str(), oss.str().c_str(), current_pub_idx);
-        //         record_log_pub_(topic_name, pub_node_name, current_pub_idx, pub_time);
-        //         publishers_[topic_name]->publish(*message_);
-        //     };
-
-        //     auto subscriber = create_subscription<publisher_node::msg::IntMessage>(topic_name, qos, callback);
-        //     subscribers_.emplace(topic_name, subscriber);
-
-        //     auto shutdown_node =
-        //       [this]() -> void
-        //       {
-        //         RCLCPP_INFO(this->get_logger(), "Shutting down node...");
-        //         rclcpp::shutdown();
-        //     };
-
-        //     auto shutdown_timer = create_wall_timer(std::chrono::seconds(options.eval_time + 10), shutdown_node);
-        //     shutdown_timers_.emplace(topic_name, shutdown_timer);
-        // }
+      }
     }
 
     ~Intermediate() override {

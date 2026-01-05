@@ -20,7 +20,7 @@ def start_script():
     print(f"Starting script {script_path} with payload_size={payload_size}, run_idx={run_idx}")
     try:
         # スクリプトが終了するまで待つ
-        result = subprocess.run(["bash", script_path, str(payload_size), str(run_idx)], capture_output=True, text=True)
+        result = subprocess.run(["bash", script_path, str(payload_size), str(run_idx)], text=True)
         if result.returncode == 0:
             app.logger.info("[start] rc=0 stdout:\n%s", result.stdout)
             return jsonify({"status": "finished", "stdout": result.stdout}), 200
