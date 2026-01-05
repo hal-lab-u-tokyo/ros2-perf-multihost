@@ -158,7 +158,13 @@ def generate_host_scripts(json_content, rmw):
                 lines.append(f') > "$LOG_DIR/{node_name}_intermediate.log" 2>&1 &')
                 lines.append(f'echo "Started {node_name} at $(date +%s)"')
 
-        lines.append("wait")
+        # ノードだけを待機（監視とZenohは除外）
+        lines.append("# wait only for node processes (exclude monitor and zenoh)")
+        lines.append("for pid in $(jobs -p); do")
+        lines.append('  if [ "$pid" != "${MON_HOST_PID:-}" ] && [ "$pid" != "${ZENOH_PID:-}" ]; then')
+        lines.append('    wait "$pid"')
+        lines.append("  fi")
+        lines.append("done")
 
         # stop monitors if running
         # lines.append("kill ${MON_PUB_PID} 2>/dev/null || true")
