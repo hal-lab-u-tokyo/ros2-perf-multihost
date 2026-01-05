@@ -116,6 +116,9 @@ def generate_host_scripts(json_content, rmw):
             lines.append("sleep 2  # ルーター起動待ち")
             lines.append("")
 
+        lines.append("# start ROS2 nodes")
+        lines.append("node_pids=()")
+
         for node in nodes:
             node_name = node["node_name"]
 
@@ -128,8 +131,9 @@ def generate_host_scripts(json_content, rmw):
                     f"  && ./publisher_node_exe --node_name {node_name} --topic_names {topic_names} "
                     f'-s "$PAYLOAD_SIZE" -p {period_ms} --eval_time {eval_time} --log_dir "$LOG_DIR" \\'
                 )
-                lines.append(f') > "$LOG_DIR/{node_name}_publisher.log" 2>&1 &')
-                lines.append(f'echo "Started {node_name} publisher at $(date +%s%3N)"')
+                # lines.append(f') > "$LOG_DIR/{node_name}_publisher.log" 2>&1 &')
+                lines.append(") & node_pids+=($!)")
+                lines.append(f'echo "Started {node_name} publisher at $(date +%Y-%m-%dT%H:%M:%S.%3N%z)"')
 
             if node.get("subscriber"):
                 sub_list = node["subscriber"]
@@ -140,8 +144,9 @@ def generate_host_scripts(json_content, rmw):
                     f"  && ./subscriber_node --node_name {node_name} --topic_names {topic_names} "
                     f'--eval_time {eval_time} --log_dir "$LOG_DIR" \\'
                 )
-                lines.append(f') > "$LOG_DIR/{node_name}_subscriber.log" 2>&1 &')
-                lines.append(f'echo "Started {node_name} subscriber at $(date +%s%3N)"')
+                # lines.append(f') > "$LOG_DIR/{node_name}_subscriber.log" 2>&1 &')
+                lines.append(") & node_pids+=($!)")
+                lines.append(f'echo "Started {node_name} subscriber at $(date +%Y-%m-%dT%H:%M:%S.%3N%z)"')
 
             if node.get("intermediate"):
                 pub_list = node["intermediate"][0]["publisher"]
@@ -155,16 +160,23 @@ def generate_host_scripts(json_content, rmw):
                     f"--topic_names_pub {topic_names_pub} --topic_names_sub {topic_names_sub} "
                     f'-s "$PAYLOAD_SIZE" -p {period_ms} --eval_time {eval_time} --log_dir "$LOG_DIR" \\'
                 )
-                lines.append(f') > "$LOG_DIR/{node_name}_intermediate.log" 2>&1 &')
-                lines.append(f'echo "Started {node_name} at $(date +%s%3N)"')
+                # lines.append(f') > "$LOG_DIR/{node_name}_intermediate.log" 2>&1 &')
+                lines.append(") & node_pids+=($!)")
+                lines.append(f'echo "Started {node_name} at $(date +%Y-%m-%dT%H:%M:%S.%3N%z)"')
 
         # ノードだけを待機（監視とZenohは除外）
-        lines.append("# wait only for node processes (exclude monitor and zenoh)")
-        lines.append("for pid in $(jobs -p); do")
-        lines.append('  if [ "$pid" != "${MON_HOST_PID:-}" ] && [ "$pid" != "${ZENOH_PID:-}" ]; then')
-        lines.append('    wait "$pid"')
-        lines.append("  fi")
+        # lines.append("# wait only for node processes (exclude monitor and zenoh)")
+        # lines.append("for pid in $(jobs -p); do")
+        # lines.append('  if [ "$pid" != "${MON_HOST_PID:-}" ] && [ "$pid" != "${ZENOH_PID:-}" ]; then')
+        # lines.append('    wait "$pid"')
+        # lines.append("  fi")
+        # lines.append("done")
+
+        lines.append("# wait for all node processes")
+        lines.append('for pid in "${node_pids[@]}"; do')
+        lines.append('  wait "$pid"')
         lines.append("done")
+        lines.append("")
 
         # stop monitors if running
         # lines.append("kill ${MON_PUB_PID} 2>/dev/null || true")
