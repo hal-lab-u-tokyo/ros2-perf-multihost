@@ -138,6 +138,88 @@ def aggregate_total_latency(
         writer.writerows(throughput_rows)
     print(f"  Aggregated throughput CSV saved: {throughput_csv_path}")
 
+    # --- ホスト監視値の集計（各runごとに横断平均/最大） ---
+    usage_rows = []  # [run, cpu_mean, cpu_max, mem_mean, mem_max, load1_mean, swap_mean, swap_max, hosts_covered]
+    for run_idx in range(num_trials):
+        run_log_dir = os.path.join(src_log_dir, f"run{run_idx + 1}")
+        host_metrics = []
+        for host in hosts:
+            host_dir = os.path.join(run_log_dir, host)
+            mpath = os.path.join(host_dir, f"{host}_monitor_host.csv")
+            m = read_monitor_metrics(mpath)
+            if m:
+                host_metrics.append(m)
+        if host_metrics:
+            cpu_mean = float(np.mean([m["cpu_mean"] for m in host_metrics if m["cpu_mean"] is not None]))
+            cpu_max = float(np.max([m["cpu_max"] for m in host_metrics if m["cpu_max"] is not None]))
+            mem_mean = float(np.mean([m["mem_mean"] for m in host_metrics if m["mem_mean"] is not None]))
+            mem_max = float(np.max([m["mem_max"] for m in host_metrics if m["mem_max"] is not None]))
+            load1_mean = float(np.mean([m["load1_mean"] for m in host_metrics if m["load1_mean"] is not None]))
+            swap_mean = float(np.mean([m["swap_mean"] for m in host_metrics if m["swap_mean"] is not None]))
+            swap_max = float(np.max([m["swap_max"] for m in host_metrics if m["swap_max"] is not None]))
+            usage_rows.append(
+                [f"run{run_idx + 1}", cpu_mean, cpu_max, mem_mean, mem_max, load1_mean, swap_mean, swap_max, len(host_metrics)]
+            )
+    # 監視値CSVの書き出し
+    if usage_rows:
+        usage_csv_path = os.path.join(result_parent_dir, latest_dir, f"host_usage_{payload_size}B.csv")
+        with open(usage_csv_path, "w", newline="") as f:
+            w = csv.writer(f)
+            w.writerow(
+                [
+                    "run",
+                    "cpu_mean[%]",
+                    "cpu_max[%]",
+                    "mem_mean[%]",
+                    "mem_max[%]",
+                    "load1_mean",
+                    "swap_mean[%]",
+                    "swap_max[%]",
+                    "hosts_covered",
+                ]
+            )
+            w.writerows(usage_rows)
+        print(f"  Aggregated host usage CSV saved: {usage_csv_path}")
+
+
+def read_monitor_metrics(path):
+    # Returns dict: cpu_mean, cpu_max, mem_mean, mem_max, load1_mean, swap_mean, swap_max, samples
+    vals = {"cpu_percent": [], "mem_percent": [], "load1": [], "swap_percent": []}
+    try:
+        with open(path, "r") as f:
+            r = csv.DictReader(f)
+            for row in r:
+                # 数値化（欠損時はスキップ）
+                for k in vals.keys():
+                    try:
+                        vals[k].append(float(row[k]))
+                    except Exception:
+                        pass
+    except FileNotFoundError:
+        return None
+
+    def agg(a):
+        if not a:
+            return None, None
+        arr = np.array(a, dtype=float)
+        return float(np.mean(arr)), float(np.max(arr))
+
+    cpu_mean, cpu_max = agg(vals["cpu_percent"])
+    mem_mean, mem_max = agg(vals["mem_percent"])
+    load1_mean, _ = agg(vals["load1"])
+    swap_mean, swap_max = agg(vals["swap_percent"])
+    samples = len(vals["cpu_percent"])
+    return {
+        "cpu_mean": cpu_mean,
+        "cpu_max": cpu_max,
+        "mem_mean": mem_mean,
+        "mem_max": mem_max,
+        "load1_mean": load1_mean,
+        "swap_mean": swap_mean,
+        "swap_max": swap_max,
+        "samples": samples,
+    }
+
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
@@ -192,3 +274,77 @@ if __name__ == "__main__":
             writer.writerow(header)
         writer.writerows(summary_rows)
     print(f"Summary for all payloads saved: {summary_csv_path}")
+
+    # --- 全ペイロード: ホスト使用率サマリ（host_usage_*.csv の集計） ---
+    usage_summary_rows = []
+    usage_header = [
+        "payload_size",
+        "cpu_mean_mean[%]",
+        "cpu_max_max[%]",
+        "mem_mean_mean[%]",
+        "mem_max_max[%]",
+        "load1_mean_mean",
+        "swap_mean_mean[%]",
+        "swap_max_max[%]",
+    ]
+    for payload_size in payload_sizes:
+        latest_dir = f"{prefix}_{payload_size}B"
+        usage_csv_path = os.path.join(base_result_dir, latest_dir, f"host_usage_{payload_size}B.csv")
+        if not os.path.exists(usage_csv_path):
+            continue
+
+        cpu_means, cpu_maxes = [], []
+        mem_means, mem_maxes = [], []
+        load1_means = []
+        swap_means, swap_maxes = [], []
+
+        with open(usage_csv_path, "r") as f:
+            reader = csv.DictReader(f)
+            for row in reader:
+
+                def to_f(x):
+                    try:
+                        return float(x)
+                    except Exception:
+                        return None
+
+                v = to_f(row.get("cpu_mean[%]"))
+                v is not None and cpu_means.append(v)
+                v = to_f(row.get("cpu_max[%]"))
+                v is not None and cpu_maxes.append(v)
+                v = to_f(row.get("mem_mean[%]"))
+                v is not None and mem_means.append(v)
+                v = to_f(row.get("mem_max[%]"))
+                v is not None and mem_maxes.append(v)
+                v = to_f(row.get("load1_mean"))
+                v is not None and load1_means.append(v)
+                v = to_f(row.get("swap_mean[%]"))
+                v is not None and swap_means.append(v)
+                v = to_f(row.get("swap_max[%]"))
+                v is not None and swap_maxes.append(v)
+
+        def mean(lst):
+            return round(float(np.mean(lst)), 6) if lst else None
+
+        def maxv(lst):
+            return round(float(max(lst)), 6) if lst else None
+
+        usage_summary_rows.append(
+            [
+                str(payload_size),
+                mean(cpu_means),
+                maxv(cpu_maxes),
+                mean(mem_means),
+                maxv(mem_maxes),
+                mean(load1_means),
+                mean(swap_means),
+                maxv(swap_maxes),
+            ]
+        )
+
+    usage_summary_csv = os.path.join(base_result_dir, "all_payloads_host_usage_summary.csv")
+    with open(usage_summary_csv, "w", newline="") as f:
+        w = csv.writer(f)
+        w.writerow(usage_header)
+        w.writerows(usage_summary_rows)
+    print(f"Host usage summary for all payloads saved: {usage_summary_csv}")
