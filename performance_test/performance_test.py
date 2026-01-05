@@ -11,7 +11,7 @@ payload_sizes = [64, 256, 1024, 4096, 16384, 65536, 262144, 1048576]  # 必要�
 
 
 def run_test(payload_size, run_idx, start_scripts_py, num_hosts):
-    print(f"=== Run payload={payload_size}B, trial={run_idx+1} ===")
+    print(f"=== Run payload={payload_size}B, trial={run_idx + 1} ===")
     result = subprocess.run(
         ["python3", start_scripts_py, str(payload_size), str(num_hosts), str(run_idx + 1)], capture_output=True, text=True
     )
@@ -30,11 +30,11 @@ def aggregate_total_latency(
 
     hosts = ["pi0", "pi1", "pi2", "pi3", "pi4"][:num_hosts]
     for run_idx in range(num_trials):
-        run_log_dir = os.path.join(src_log_dir, f"run{run_idx+1}")
+        run_log_dir = os.path.join(src_log_dir, f"run{run_idx + 1}")
         os.makedirs(run_log_dir, exist_ok=True)
-        remote_log_dir = f"/home/ubuntu/ros2-perf-multihost-v2/logs/{prefix}_{payload_size}B/run{run_idx+1}"
+        remote_log_dir = f"/home/ubuntu/ros2-perf-multihost-v2/logs/{prefix}_{payload_size}B/run{run_idx + 1}"
         for host in hosts:
-            print(f"Copying logs from {host} (run{run_idx+1})")
+            print(f"Copying logs from {host} (run{run_idx + 1})")
             subprocess.run(["scp", "-r", f"ubuntu@{host}:{remote_log_dir}/*", run_log_dir + "/"])
 
     run_dir = os.path.join(result_parent_dir, latest_dir)
@@ -49,7 +49,7 @@ def aggregate_total_latency(
     all_throughputs_bps = []
     all_throughputs_mbps = []
     for run_idx in range(num_trials):
-        run_results_dir = os.path.join(run_dir, f"run{run_idx+1}")
+        run_results_dir = os.path.join(run_dir, f"run{run_idx + 1}")
         total_path = os.path.join(run_results_dir, "total_latency.txt")
         if not os.path.exists(total_path):
             continue
@@ -60,27 +60,39 @@ def aggregate_total_latency(
             values = lines[2].strip().split()
             rows.append(
                 [
-                    f"run{run_idx+1}",
+                    f"run{run_idx + 1}",
                     values[0],  # lost
-                    values[2],  # mean
-                    values[3],  # sd
-                    values[4],  # min
-                    values[5],  # q1
-                    values[6],  # mid
-                    values[7],  # q3
-                    values[8],  # max
+                    values[1],  # mean
+                    values[2],  # sd
+                    values[3],  # min
+                    values[4],  # q1
+                    values[5],  # mid
+                    values[6],  # q3
+                    values[7],  # max
                 ]
             )
-            all_values.append([float(values[0])] + [float(v) for v in values[2:]])
-            print(f"  Aggregated run{run_idx+1} from {total_path}")
+            all_values.append([float(values[0])] + [float(v) for v in values[1:]])
+            print(f"  Aggregated run{run_idx + 1} from {total_path}")
             print(f"    Values: {values}")
 
             # --- スループット計算 ---
             total_loss = float(values[0])
-            topics = int(values[1])  # 2列目がトピック数
+            # all_latency.txtからユニークトピック数を算出
+            all_latency_path = os.path.join(run_results_dir, "all_latency.txt")
+            topics = 0
+            if os.path.exists(all_latency_path):
+                with open(all_latency_path, "r") as af:
+                    alines = af.readlines()
+                    # 先頭2行（ヘッダ＋区切り線）を除いた行から2列目（topic名）を抽出
+                    topic_set = set()
+                    for line in alines[2:]:
+                        parts = line.split()
+                        if len(parts) >= 2:
+                            topic_set.add(parts[1])
+                    topics = len(topic_set)
             sent = int(eval_time * 1000 / period_ms) * topics
             bps, mbps = calc_throughput(total_loss, sent, payload_size, eval_time)
-            throughput_rows.append([f"run{run_idx+1}", bps, mbps])
+            throughput_rows.append([f"run{run_idx + 1}", bps, mbps])
             all_throughputs_bps.append(bps)
             all_throughputs_mbps.append(mbps)
 
