@@ -81,7 +81,7 @@ public:
       auto callback = [this, topic_name, eval_time = options.eval_time](const publisher_node::msg::IntMessage::SharedPtr message_) -> void{
         auto sub_time = this->get_clock()->now();
         if((sub_time.seconds() - start_time_[topic_name].seconds()) >= eval_time) {
-          RCLCPP_INFO(this->get_logger(), "Topic %s has reached the evaluation time.", topic_name.c_str());
+          // RCLCPP_INFO(this->get_logger(), "Topic %s has reached the evaluation time.", topic_name.c_str());
           return;
         }
 
@@ -93,7 +93,7 @@ public:
         oss << std::dec <<"Time: " << std::fixed << std::setprecision(9) << static_cast<double>(sub_time.nanoseconds() - start_time_[topic_name].nanoseconds()) / 1e9;
         int current_pub_idx = message_->header.pub_idx;
         std::string pub_node_name = message_->header.node_name;
-        RCLCPP_INFO(this->get_logger(), "Subscribe/ Topic: %s Data: %s Index: %d", topic_name.c_str(), oss.str().c_str(), current_pub_idx);
+        // RCLCPP_INFO(this->get_logger(), "Subscribe/ Topic: %s Data: %s Index: %d", topic_name.c_str(), oss.str().c_str(), current_pub_idx);
 
         record_log(topic_name, pub_node_name, current_pub_idx, sub_time);
       };

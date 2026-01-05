@@ -103,7 +103,7 @@ class Publisher : public rclcpp::Node
 
             auto time_stamp = this->get_clock()->now();
             if((time_stamp.seconds() - start_time_[topic_name].seconds()) >= eval_time) {
-              RCLCPP_INFO(this->get_logger(), "Topic %s has reached the evaluation time.", topic_name.c_str());
+              // RCLCPP_INFO(this->get_logger(), "Topic %s has reached the evaluation time.", topic_name.c_str());
               timers_[topic_name]->cancel();
               return;
             }
@@ -120,7 +120,7 @@ class Publisher : public rclcpp::Node
             }
             oss << std::dec <<"Time: " << std::fixed << std::setprecision(9) << static_cast<double>(time_stamp.nanoseconds() - start_time_[topic_name].nanoseconds()) / 1e9;
 
-            RCLCPP_INFO(this->get_logger(), "Publish/ Topic: %s, Data: %s, Index: %d", topic_name.c_str(), oss.str().c_str(), current_pub_idx);
+            // RCLCPP_INFO(this->get_logger(), "Publish/ Topic: %s, Data: %s, Index: %d", topic_name.c_str(), oss.str().c_str(), current_pub_idx);
 
             publishers_[topic_name]->publish(*message_);
 
@@ -208,7 +208,7 @@ class Publisher : public rclcpp::Node
       file << "\n";
 
       file.close();
-      RCLCPP_INFO(this->get_logger(), "Metadata written to file: %s", metadata_file_path.c_str());
+      // RCLCPP_INFO(this->get_logger(), "Metadata written to file: %s", metadata_file_path.c_str());
     }
 
     std::string node_name;
