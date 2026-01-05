@@ -79,7 +79,9 @@ def generate_host_scripts(json_content, rmw):
 
         # host-level monitor
         lines.append("# host-level monitor (host CPU/memory)")
-        lines.append('python3 ~/ros2-perf-multihost-v2/performance_test/monitor_host.py 0.5 "$LOG_DIR/monitor_host.csv" &')
+        lines.append(
+            f'python3 ~/ros2-perf-multihost-v2/performance_test/monitor_host.py 0.5 "$LOG_DIR/{host_name}_monitor_host.csv" &'
+        )
         lines.append("MON_HOST_PID=$!")
         lines.append("")
 
@@ -112,7 +114,6 @@ def generate_host_scripts(json_content, rmw):
             lines.append("fi")
             lines.append("ros2 run rmw_zenoh_cpp rmw_zenohd &")
             lines.append("ZENOH_PID=$!")
-            lines.append("trap 'kill ${ZENOH_PID} 2>/dev/null || true' EXIT")
             lines.append("sleep 2  # ルーター起動待ち")
             lines.append("")
 
