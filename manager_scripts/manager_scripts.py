@@ -3,6 +3,7 @@ import subprocess
 import socket
 import logging
 import sys
+import os
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s: %(message)s", stream=sys.stdout)
 
@@ -42,6 +43,7 @@ def start_docker():
     hostname = socket.gethostname()
     image_name = f"ros2_perf_{hostname}:latest"
     logs_dir = f"/home/ubuntu/ros2-perf-multihost-v2/logs/docker_{payload_size}B/run{run_idx}"
+    os.makedirs(logs_dir)
     container_name = f"{hostname}_perf_run{run_idx}"
     monitor_csv = f"{logs_dir}/{hostname}_monitor_host.csv"
     try:
