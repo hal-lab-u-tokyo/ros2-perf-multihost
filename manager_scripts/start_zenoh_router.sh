@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-set -euo pipefail
+set -eo pipefail
 
 # 設定
 CONFIG_DEFAULT="$HOME/ros2-perf-multihost-v2/config/DEFAULT_RMW_ZENOH_ROUTER_CONFIG.json5"
