@@ -138,35 +138,55 @@ def aggregate_total_latency(
         writer.writerows(throughput_rows)
     print(f"  Aggregated throughput CSV saved: {throughput_csv_path}")
 
-    # --- ホスト監視値の集計（各runごとに横断平均/最大） ---
-    usage_rows = []  # [run, cpu_mean, cpu_max, mem_mean, mem_max, load1_mean, swap_mean, swap_max, hosts_covered]
+    # --- 既存の横断平均/最大（usage_rows）はそのまま ---
+    usage_rows = []
+    # --- 新規追加: ホスト別・run別の行 ---
+    host_runs_usage_rows = []  # [host, run, cpu_mean, cpu_max, mem_mean, mem_max, load1_mean, swap_mean, swap_max, samples]
+
     for run_idx in range(num_trials):
         run_log_dir = os.path.join(src_log_dir, f"run{run_idx + 1}")
         host_metrics = []
         for host in hosts:
-            host_dir = os.path.join(run_log_dir, host)
-            mpath = os.path.join(host_dir, f"{host}_monitor_host.csv")
+            mpath = os.path.join(run_log_dir, f"{host}_monitor_host.csv")
             m = read_monitor_metrics(mpath)
             if m:
+                # ホスト×runの行を追加
+                host_runs_usage_rows.append(
+                    [
+                        host,
+                        f"run{run_idx + 1}",
+                        m["cpu_mean"],
+                        m["cpu_max"],
+                        m["mem_mean"],
+                        m["mem_max"],
+                        m["load1_mean"],
+                        m["swap_mean"],
+                        m["swap_max"],
+                        m["samples"],
+                    ]
+                )
                 host_metrics.append(m)
+
+        # 既存の横断平均/最大（run単位で全ホスト平均/最大）
         if host_metrics:
-            cpu_mean = float(np.mean([m["cpu_mean"] for m in host_metrics if m["cpu_mean"] is not None]))
-            cpu_max = float(np.max([m["cpu_max"] for m in host_metrics if m["cpu_max"] is not None]))
-            mem_mean = float(np.mean([m["mem_mean"] for m in host_metrics if m["mem_mean"] is not None]))
-            mem_max = float(np.max([m["mem_max"] for m in host_metrics if m["mem_max"] is not None]))
-            load1_mean = float(np.mean([m["load1_mean"] for m in host_metrics if m["load1_mean"] is not None]))
-            swap_mean = float(np.mean([m["swap_mean"] for m in host_metrics if m["swap_mean"] is not None]))
-            swap_max = float(np.max([m["swap_max"] for m in host_metrics if m["swap_max"] is not None]))
+            cpu_mean = float(np.mean([mm["cpu_mean"] for mm in host_metrics if mm["cpu_mean"] is not None]))
+            cpu_max = float(np.max([mm["cpu_max"] for mm in host_metrics if mm["cpu_max"] is not None]))
+            mem_mean = float(np.mean([mm["mem_mean"] for mm in host_metrics if mm["mem_mean"] is not None]))
+            mem_max = float(np.max([mm["mem_max"] for mm in host_metrics if mm["mem_max"] is not None]))
+            load1_mean = float(np.mean([mm["load1_mean"] for mm in host_metrics if mm["load1_mean"] is not None]))
+            swap_mean = float(np.mean([mm["swap_mean"] for mm in host_metrics if mm["swap_mean"] is not None]))
+            swap_max = float(np.max([mm["swap_max"] for mm in host_metrics if mm["swap_max"] is not None]))
             usage_rows.append(
                 [f"run{run_idx + 1}", cpu_mean, cpu_max, mem_mean, mem_max, load1_mean, swap_mean, swap_max, len(host_metrics)]
             )
-    # 監視値CSVの書き出し
-    if usage_rows:
-        usage_csv_path = os.path.join(result_parent_dir, latest_dir, f"host_usage_{payload_size}B.csv")
-        with open(usage_csv_path, "w", newline="") as f:
+
+    if host_runs_usage_rows:
+        host_runs_usage_csv = os.path.join(result_parent_dir, latest_dir, f"host_runs_usage_{payload_size}B.csv")
+        with open(host_runs_usage_csv, "w", newline="") as f:
             w = csv.writer(f)
             w.writerow(
                 [
+                    "host",
                     "run",
                     "cpu_mean[%]",
                     "cpu_max[%]",
@@ -175,11 +195,61 @@ def aggregate_total_latency(
                     "load1_mean",
                     "swap_mean[%]",
                     "swap_max[%]",
-                    "hosts_covered",
+                    "samples",
                 ]
             )
-            w.writerows(usage_rows)
-        print(f"  Aggregated host usage CSV saved: {usage_csv_path}")
+            w.writerows(host_runs_usage_rows)
+        print(f"  Per-host run usage CSV saved: {host_runs_usage_csv}")
+
+    # ホスト単位でrun横断のサマリ
+    host_summary_rows = []
+    for host in hosts:
+        rows_for_host = [r for r in host_runs_usage_rows if r[0] == host]
+        if not rows_for_host:
+            continue
+
+        def col(idx):
+            return [x[idx] for x in rows_for_host if x[idx] is not None]
+
+        def mean(lst):
+            return round(float(np.mean(lst)), 6) if lst else None
+
+        def maxv(lst):
+            return round(float(np.max(lst)), 6) if lst else None
+
+        host_summary_rows.append(
+            [
+                host,
+                mean(col(2)),
+                maxv(col(3)),  # cpu_mean, cpu_max
+                mean(col(4)),
+                maxv(col(5)),  # mem_mean, mem_max
+                mean(col(6)),  # load1_mean
+                mean(col(7)),
+                maxv(col(8)),  # swap_mean, swap_max
+                len(rows_for_host),  # runs_covered
+            ]
+        )
+
+    if host_summary_rows:
+        host_summary_csv = os.path.join(result_parent_dir, latest_dir, f"host_usage_summary_{payload_size}B.csv")
+        with open(host_summary_csv, "w", newline="") as f:
+            w = csv.writer(f)
+            w.writerow(
+                [
+                    "host",
+                    "cpu_mean_mean[%]",
+                    "cpu_max_max[%]",
+                    "mem_mean_mean[%]",
+                    "mem_max_max[%]",
+                    "load1_mean_mean",
+                    "swap_mean_mean[%]",
+                    "swap_max_max[%]",
+                    "runs_covered",
+                ]
+            )
+            w.writerows(host_summary_rows)
+        print(f"  Per-host summary CSV saved: {host_summary_csv}")
 
 
 def read_monitor_metrics(path):
