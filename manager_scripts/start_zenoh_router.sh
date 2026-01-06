@@ -2,9 +2,10 @@
 set -eo pipefail
 
 # 設定
-CONFIG_DEFAULT="$HOME/ros2-perf-multihost-v2/config/DEFAULT_RMW_ZENOH_ROUTER_CONFIG.json5"
+# TODO: 必要に応じて編集
+CONFIG_DEFAULT="$HOME/rmw_test/ros2-perf-multihost-v2/config/DEFAULT_RMW_ZENOH_ROUTER_CONFIG.json5"
 CONFIG="${ZENOH_ROUTER_CONFIG_URI:-$CONFIG_DEFAULT}"
-LOG_DIR="$HOME/ros2-perf-multihost-v2/logs"
+LOG_DIR="$HOME/rmw_test/ros2-perf-multihost-v2/logs"
 PID_FILE="$LOG_DIR/zenoh_router.pid"
 OUT_FILE="$LOG_DIR/zenoh_router.out"
 PORT="${ZENOH_PORT:-7447}"
