@@ -1,5 +1,3 @@
-/* 目的: あるDockerコンテナに対し、このプロジェクトがクローン&ビルドされると、そのコンテナには指定されたトピック名を持つpublisherノードが存在することになる */
-
 #include <chrono>
 #include <cstdio>
 #include <memory>
@@ -11,6 +9,7 @@
 #include <fstream>
 #include <filesystem>
 #include <cstdlib>
+#include <csignal>
 
 #include "node_options/cli_options.hpp"
 #include "publisher_node/msg/performance_header.hpp"
@@ -21,7 +20,6 @@ struct MessageLog {
   rclcpp::Time time_stamp;
 };
 
-// コマンドラインオプション
 static
 node_options::Options
 parse_options(int argc, char ** argv)
@@ -68,7 +66,6 @@ create_result_directory(const node_options::Options & options)
   }
 }
 
-
 class Publisher : public rclcpp::Node
 {
   public:
@@ -76,11 +73,11 @@ class Publisher : public rclcpp::Node
     : Node(options.node_name)
     {
       node_name = options.node_name;
+      log_dir = options.log_dir;
+      RCLCPP_INFO(this->get_logger(), "Publisher log_dir set to: %s", log_dir.c_str());
       create_metadata_file(options);
-      // シャットダウン予告
       RCLCPP_INFO(this->get_logger(), "Shutdown timer created with duration %d seconds", options.eval_time + 10);
 
-      // 複数のトピック名を扱う場合
       for (size_t i = 0; i < options.topic_names.size(); ++i) {
         const std::string & topic_name = options.topic_names[i];
         int payload_size = options.payload_size[i];
@@ -90,20 +87,23 @@ class Publisher : public rclcpp::Node
         start_time_[topic_name] = this->get_clock()->now();
         end_time_[topic_name] = start_time_[topic_name] + rclcpp::Duration::from_seconds(options.eval_time) ;
 
-        // タイマー実行されるイベントハンドラー関数を生成
         auto publish_message =
-          [this, topic_name, payload_size, &options]() -> void
+          [this, topic_name, payload_size, eval_time = options.eval_time, self_node = options.node_name]() -> void
           {
+            // 購読者がいない間は送信しない
+            // if (publishers_[topic_name]->get_subscription_count() == 0) {
+            //   return;
+            // }
+
             int current_pub_idx = pub_idx_[topic_name];
-            
-            // 送信するメッセージの作成
+
             auto message_ = std::make_shared<publisher_node::msg::IntMessage>();
             message_->data.resize(payload_size);
             std::fill(message_->data.begin(), message_->data.end(), 0);
 
             auto time_stamp = this->get_clock()->now();
-            if((time_stamp.seconds() - start_time_[topic_name].seconds()) >= options.eval_time) {
-              RCLCPP_INFO(this->get_logger(), "Topic %s has reached the evaluation time.", topic_name.c_str());
+            if((time_stamp.seconds() - start_time_[topic_name].seconds()) >= eval_time) {
+              // RCLCPP_INFO(this->get_logger(), "Topic %s has reached the evaluation time.", topic_name.c_str());
               timers_[topic_name]->cancel();
               return;
             }
@@ -111,31 +111,28 @@ class Publisher : public rclcpp::Node
             message_->header.stamp.sec = static_cast<int32_t>(time_stamp.seconds() - start_time_[topic_name].seconds());
             message_->header.stamp.nanosec = static_cast<uint32_t>((time_stamp.nanoseconds() - start_time_[topic_name].nanoseconds()) % 1000000000);
             message_->header.pub_idx = current_pub_idx;
-            message_->header.node_name = options.node_name;
+            message_->header.node_name = self_node;
             record_log(topic_name, current_pub_idx, time_stamp);
 
-            // message->dataを16進数形式で表示 (0埋めはしない)
             std::ostringstream oss;
             for (const auto& byte : message_->data) {
               oss << std::hex << (int)byte << " ";
             }
             oss << std::dec <<"Time: " << std::fixed << std::setprecision(9) << static_cast<double>(time_stamp.nanoseconds() - start_time_[topic_name].nanoseconds()) / 1e9;
 
-            RCLCPP_INFO(this->get_logger(), "Publish/ Topic: %s, Data: %s, Index: %d", topic_name.c_str(), oss.str().c_str(), current_pub_idx);
+            // RCLCPP_INFO(this->get_logger(), "Publish/ Topic: %s, Data: %s, Index: %d", topic_name.c_str(), oss.str().c_str(), current_pub_idx);
 
-            // 該当トピックのPublisherでメッセージ送信
             publishers_[topic_name]->publish(*message_);
 
             pub_idx_[topic_name]++;
         };
 
-        // Qos設定
         rclcpp::QoS qos = rclcpp::QoS(rclcpp::KeepLast(1));
 
         if(options.qos_history == "KEEP_LAST") {
           int qos_keep_depth = options.qos_depth;
           qos.keep_last(qos_keep_depth);
-        } 
+        }
         else if (options.qos_history == "KEEP_ALL") {
           qos.keep_all();
         }
@@ -146,17 +143,14 @@ class Publisher : public rclcpp::Node
 
         print_qos_settings(qos);
 
-        // Publisher作成
         auto publisher = create_publisher<publisher_node::msg::IntMessage>(topic_name, qos);
         publishers_.emplace(topic_name, publisher);
 
-        // Timer作成
         auto timer = create_wall_timer(std::chrono::milliseconds(period_ms), publish_message);
         timers_.emplace(topic_name, timer);
 
-        // shutdownタイマー
-        auto shutdown_node = 
-          [this, &options]() -> void
+        auto shutdown_node =
+          [this]() -> void
           {
             RCLCPP_INFO(this->get_logger(), "Shutting down node...");
             rclcpp::shutdown();
@@ -172,15 +166,10 @@ class Publisher : public rclcpp::Node
       write_all_logs(message_logs_);
     }
 
-
   private:
-    // トピックごとのPublisher,Timer,
     std::unordered_map<std::string, rclcpp::Publisher<publisher_node::msg::IntMessage>::SharedPtr> publishers_;
-
-    // タイマーを保持
     std::unordered_map<std::string, rclcpp::TimerBase::SharedPtr> timers_;
     std::unordered_map<std::string, rclcpp::TimerBase::SharedPtr> shutdown_timers_;
-
     std::unordered_map<std::string, uint32_t> pub_idx_;
     std::unordered_map<std::string, rclcpp::Time> start_time_;
     std::unordered_map<std::string, rclcpp::Time> end_time_;
@@ -219,26 +208,9 @@ class Publisher : public rclcpp::Node
       file << "\n";
 
       file.close();
-      RCLCPP_INFO(this->get_logger(), "Metadata written to file: %s", metadata_file_path.c_str());
-
-      // ファイルのコピー
-      // try {
-      //   std::string original_path = metadata_file_path;
-      //   std::string destination_dir = options.log_dir + "/" + options.node_name + "_log";
-      //   if (!std::filesystem::exists(destination_dir)) {
-      //     std::filesystem::create_directories(destination_dir);
-      //     std::cout << "Created directory: " << destination_dir << std::endl;
-      //   }
-
-      //   std::string destination_path = destination_dir + "/metadata.txt";
-      //   std::filesystem::copy_file(original_path, destination_path, std::filesystem::copy_options::overwrite_existing);
-      //   std::cout << "File copied from " << original_path << " to " << destination_path << std::endl;
-      // } catch (const std::filesystem::filesystem_error &e) {
-      //   std::cerr << "Error copying file: " << e.what() << std::endl;
-      // }
+      // RCLCPP_INFO(this->get_logger(), "Metadata written to file: %s", metadata_file_path.c_str());
     }
 
-    // ログ記録用
     std::string node_name;
     std::string log_dir;
     std::map<std::string, std::vector<MessageLog>> message_logs_;
@@ -262,7 +234,6 @@ class Publisher : public rclcpp::Node
             return;
         }
 
-        // StartTimeとEndTimeを書き込む
         file << "StartTime: " << start_time_[topic_name].nanoseconds() << "\n" ;
         file << "EndTime: " << end_time_[topic_name].nanoseconds() << "\n" ;
 
@@ -272,36 +243,17 @@ class Publisher : public rclcpp::Node
 
         file.close();
         RCLCPP_INFO(this->get_logger(), "MessageLogs written to file: %s", log_file_path.c_str());
-
-        // ファイルのコピー (ローカルで実行するとき用)
-        // try {
-        //   std::string original_path = log_file_path;
-        //   ss << log_dir << "/" << node_name << "_log" ;
-        //   std::string destination_dir = ss.str();
-        //   if (!std::filesystem::exists(destination_dir)) {
-        //     std::filesystem::create_directories(destination_dir);
-        //     std::cout << "Created directory: " << destination_dir << std::endl;
-        //   }
-
-        //   ss << log_dir << "/" << node_name << "_log" <<  "/" << topic_name << "_log.txt" ;
-        //   std::string destination_path = ss.str();
-        //   std::filesystem::copy_file(original_path, destination_path, std::filesystem::copy_options::overwrite_existing);
-        //   std::cout << "File copied from " << original_path << " to " << destination_path << std::endl;
-        // } catch (const std::filesystem::filesystem_error &e) {
-        //     std::cerr << "Error copying file: " << e.what() << std::endl;
-        // }
       }
     }
 
     void print_qos_settings(const rclcpp::QoS &qos) {
       auto qos_profile = qos.get_rmw_qos_profile();
 
-      // QoSの列挙型を文字列に変換する関数
       std::string reliability = (qos_profile.reliability == rmw_qos_reliability_policy_t::RMW_QOS_POLICY_RELIABILITY_BEST_EFFORT) ? "Best Effort" : "Reliable";
       std::string durability = (qos_profile.durability == rmw_qos_durability_policy_t::RMW_QOS_POLICY_DURABILITY_TRANSIENT_LOCAL) ? "Transient Local" : "Volatile";
       std::string history = (qos_profile.history == rmw_qos_history_policy_t::RMW_QOS_POLICY_HISTORY_KEEP_LAST) ? "Keep Last" : "Keep All";
       std::string depth = std::to_string(qos_profile.depth);
-      
+
       std::cout << "QoS Settings" << std::endl;
       std::cout << "Reliability: " << reliability << std::endl;
       std::cout << "Durability: " << durability << std::endl;
@@ -310,36 +262,23 @@ class Publisher : public rclcpp::Node
     }
 };
 
-
 void sigint_handler (int signum)
 {
-  // シグナルを受け取ったときにrclcpp::shutdown()を呼ぶ。Dockerコンテナ用
   rclcpp::shutdown();
-  exit(0);
 }
-
 
 int main(int argc, char * argv[])
 {
-  std::string log_dir = "./"; // デフォルト
-  for (int i = 1; i < argc; ++i) {
-    if (std::string(argv[i]) == "--log_dir" && i + 1 < argc) {
-      log_dir = argv[i + 1];
-    }
-  }
-
   auto options = parse_options(argc, argv);
   create_result_directory(options);
   std::cout << options << "\n" << "Start Publisher!" << std::endl;
 
-  // クライアントライブラリの初期化
   setvbuf(stdout, NULL, _IONBF, BUFSIZ);
   rclcpp::init(argc, argv);
 
   std::signal(SIGINT, sigint_handler);
   std::signal(SIGTERM, sigint_handler);
 
-  // Publisherノードの生成とスピン開始
   auto node = std::make_shared<Publisher>(options);
   rclcpp::spin(node);
   rclcpp::shutdown();

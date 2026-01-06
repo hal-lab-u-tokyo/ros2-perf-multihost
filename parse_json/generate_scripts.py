@@ -45,9 +45,16 @@ def generate_host_scripts(json_content, rmw):
         lines.append('PAYLOAD_SIZE="$1"')
         lines.append('RUN_IDX="${2:-1}"')  # 2番目の引数がなければ1
         lines.append("")
-        # ログディレクトリ作成
+        # ログディレクトリ作成（既存なら安全に消去→再作成）
         lines.append("LOG_DIR=~/ros2-perf-multihost-v2/logs/raw_${PAYLOAD_SIZE}B/run${RUN_IDX}")
-        lines.append('mkdir -p "$LOG_DIR"')
+        lines.append("BASE_DIR=~/ros2-perf-multihost-v2/logs")
+        # 安全ガード: BASE_DIR配下のみ削除許可
+        lines.append('case "$LOG_DIR" in "$BASE_DIR"/*) ;; *) echo "Unsafe LOG_DIR: $LOG_DIR"; exit 1 ;; esac')
+        lines.append('[ -n "$LOG_DIR" ] || { echo "LOG_DIR is empty"; exit 1; }')
+        lines.append('[ "$LOG_DIR" != "/" ] || { echo "LOG_DIR cannot be root"; exit 1; }')
+        lines.append('rm -rf "$LOG_DIR" || { echo "Failed to remove $LOG_DIR"; exit 1; }')
+        lines.append('mkdir -p "$LOG_DIR" || { echo "Failed to create $LOG_DIR"; exit 1; }')
+
         lines.append("source /opt/ros/jazzy/setup.bash")
         lines.append("source ~/ros2-perf-multihost-v2/install/setup.bash")
 
@@ -72,7 +79,9 @@ def generate_host_scripts(json_content, rmw):
 
         # host-level monitor
         lines.append("# host-level monitor (host CPU/memory)")
-        lines.append('python3 ~/ros2-perf-multihost-v2/performance_test/monitor_host.py 0.5 "$LOG_DIR/monitor_host.csv" &')
+        lines.append(
+            f'python3 ~/ros2-perf-multihost-v2/performance_test/monitor_host.py 0.5 "$LOG_DIR/{host_name}_monitor_host.csv" &'
+        )
         lines.append("MON_HOST_PID=$!")
         lines.append("")
 
@@ -88,26 +97,38 @@ def generate_host_scripts(json_content, rmw):
         lines.append("")
 
         if rmw_zenoh_flag:
-            # Zenoh用の環境変数設定
+            # # Zenoh用の環境変数設定
+            # lines.append("")
+            # lines.append("# RMW Zenoh設定")
+            # lines.append("export RMW_IMPLEMENTATION=rmw_zenoh_cpp")
+            # lines.append("export RUST_LOG=zenoh=info,zenoh_transport=debug")
+            # zenoh_config_path = "~/ros2-perf-multihost-v2/config/multihost_config.json5"
+            # lines.append(f"export ZENOH_ROUTER_CONFIG_URI={zenoh_config_path}")
+            # lines.append("")
+            # # Zenohルーターをバックグラウンドで起動
+            # lines.append("# Zenohルーターを起動")
+            # lines.append("if pgrep -x rmw_zenohd >/dev/null 2>&1; then")
+            # lines.append('  echo "Existing rmw_zenohd found — killing it"')
+            # lines.append("  pkill -x rmw_zenohd || true")
+            # lines.append("  sleep 1")
+            # lines.append("fi")
+            # lines.append("ros2 run rmw_zenoh_cpp rmw_zenohd &")
+            # lines.append("ZENOH_PID=$!")
+            # lines.append("sleep 2  # ルーター起動待ち")
+            # lines.append("")
+
+            # RMW Zenoh設定（中央ルーター利用）
             lines.append("")
-            lines.append("# RMW Zenoh設定")
+            lines.append("# RMW Zenoh設定（中央ルーター利用）")
             lines.append("export RMW_IMPLEMENTATION=rmw_zenoh_cpp")
-            lines.append("export RUST_LOG=zenoh=info,zenoh_transport=debug")
-            zenoh_config_path = "~/ros2-perf-multihost-v2/config/multihost_config.json5"
-            lines.append(f"export ZENOH_ROUTER_CONFIG_URI={zenoh_config_path}")
+            lines.append("export RUST_LOG=zenoh=warn,zenoh_transport=warn")
+            session_config_path = "~/ros2-perf-multihost-v2/config/DEFAULT_RMW_ZENOH_SESSION_CONFIG.json5"
+            lines.append(f"export ZENOH_CONFIG_URI={session_config_path}")
+            lines.append("# このホストではrmw_zenohdを起動しません（中央ルーターに接続）")
             lines.append("")
-            # Zenohルーターをバックグラウンドで起動
-            lines.append("# Zenohルーターを起動")
-            lines.append("if pgrep -x rmw_zenohd >/dev/null 2>&1; then")
-            lines.append('  echo "Existing rmw_zenohd found — killing it"')
-            lines.append("  pkill -x rmw_zenohd || true")
-            lines.append("  sleep 1")
-            lines.append("fi")
-            lines.append("ros2 run rmw_zenoh_cpp rmw_zenohd &")
-            lines.append("ZENOH_PID=$!")
-            lines.append("trap 'kill ${ZENOH_PID} 2>/dev/null || true' EXIT")
-            lines.append("sleep 2  # ルーター起動待ち")
-            lines.append("")
+
+        lines.append("# start ROS2 nodes")
+        lines.append("node_pids=()")
 
         for node in nodes:
             node_name = node["node_name"]
@@ -115,44 +136,58 @@ def generate_host_scripts(json_content, rmw):
             if node.get("publisher"):
                 pub_list = node["publisher"]
                 topic_names = ",".join(p["topic_name"] for p in pub_list)
-                lines.append("cd ~/ros2-perf-multihost-v2/install/publisher_node/lib/publisher_node")
+                lines.append(f"# {node_name} publisher")
+                lines.append("( cd ~/ros2-perf-multihost-v2/install/publisher_node/lib/publisher_node \\")
                 lines.append(
-                    f"./publisher_node_exe "
-                    f"--node_name {node_name} "
-                    f"--topic_names {topic_names} "
-                    f'-s "$PAYLOAD_SIZE" -p {period_ms} '
-                    f"--eval_time {eval_time} "
-                    f'--log_dir "$LOG_DIR" &'
-                    f'> "$LOG_DIR/{node_name}_publisher.log" 2>&1'
+                    f"  && ./publisher_node_exe --node_name {node_name} --topic_names {topic_names} "
+                    f'-s "$PAYLOAD_SIZE" -p {period_ms} --eval_time {eval_time} --log_dir "$LOG_DIR" \\'
                 )
+                # lines.append(f') > "$LOG_DIR/{node_name}_publisher.log" 2>&1 &')
+                lines.append(") & node_pids+=($!)")
+                lines.append(f'echo "Started {node_name} publisher at $(date +%Y-%m-%dT%H:%M:%S.%3N%z)"')
 
             if node.get("subscriber"):
                 sub_list = node["subscriber"]
                 topic_names = ",".join(s["topic_name"] for s in sub_list)
-                lines.append("cd ~/ros2-perf-multihost-v2/install/subscriber_node/lib/subscriber_node")
+                lines.append(f"# {node_name} subscriber")
+                lines.append("( cd ~/ros2-perf-multihost-v2/install/subscriber_node/lib/subscriber_node \\")
                 lines.append(
-                    f'./subscriber_node --node_name {node_name} --topic_names {topic_names} --eval_time {eval_time} --log_dir "$LOG_DIR" &'
-                    f'> "$LOG_DIR/{node_name}_subscriber.log" 2>&1'
+                    f"  && ./subscriber_node --node_name {node_name} --topic_names {topic_names} "
+                    f'--eval_time {eval_time} --log_dir "$LOG_DIR" \\'
                 )
+                # lines.append(f') > "$LOG_DIR/{node_name}_subscriber.log" 2>&1 &')
+                lines.append(") & node_pids+=($!)")
+                lines.append(f'echo "Started {node_name} subscriber at $(date +%Y-%m-%dT%H:%M:%S.%3N%z)"')
 
             if node.get("intermediate"):
                 pub_list = node["intermediate"][0]["publisher"]
                 sub_list = node["intermediate"][0]["subscriber"]
                 topic_names_pub = ",".join(p["topic_name"] for p in pub_list)
                 topic_names_sub = ",".join(s["topic_name"] for s in sub_list)
-                lines.append("cd ~/ros2-perf-multihost-v2/install/intermediate_node/lib/intermediate_node")
+                lines.append(f"# {node_name} intermediate")
+                lines.append("( cd ~/ros2-perf-multihost-v2/install/intermediate_node/lib/intermediate_node \\")
                 lines.append(
-                    f"./intermediate_node "
-                    f"--node_name {node_name} "
-                    f"--topic_names_pub {topic_names_pub} "
-                    f"--topic_names_sub {topic_names_sub} "
-                    f'-s "$PAYLOAD_SIZE" -p {period_ms} '
-                    f"--eval_time {eval_time} "
-                    f'--log_dir "$LOG_DIR" &'
-                    f'> "$LOG_DIR/{node_name}_intermediate.log" 2>&1'
+                    f"  && ./intermediate_node --node_name {node_name} "
+                    f"--topic_names_pub {topic_names_pub} --topic_names_sub {topic_names_sub} "
+                    f'-s "$PAYLOAD_SIZE" -p {period_ms} --eval_time {eval_time} --log_dir "$LOG_DIR" \\'
                 )
+                # lines.append(f') > "$LOG_DIR/{node_name}_intermediate.log" 2>&1 &')
+                lines.append(") & node_pids+=($!)")
+                lines.append(f'echo "Started {node_name} at $(date +%Y-%m-%dT%H:%M:%S.%3N%z)"')
 
-        # lines.append("wait")
+        # ノードだけを待機（監視とZenohは除外）
+        # lines.append("# wait only for node processes (exclude monitor and zenoh)")
+        # lines.append("for pid in $(jobs -p); do")
+        # lines.append('  if [ "$pid" != "${MON_HOST_PID:-}" ] && [ "$pid" != "${ZENOH_PID:-}" ]; then')
+        # lines.append('    wait "$pid"')
+        # lines.append("  fi")
+        # lines.append("done")
+
+        lines.append("# wait for all node processes")
+        lines.append('for pid in "${node_pids[@]}"; do')
+        lines.append('  wait "$pid"')
+        lines.append("done")
+        lines.append("")
 
         # stop monitors if running
         # lines.append("kill ${MON_PUB_PID} 2>/dev/null || true")
@@ -160,11 +195,11 @@ def generate_host_scripts(json_content, rmw):
         # lines.append("kill ${MON_INT_PID} 2>/dev/null || true")
         lines.append("kill ${MON_HOST_PID} 2>/dev/null || true")
 
-        if rmw_zenoh_flag:
-            # Zenohルーターを終了
-            lines.append("")
-            lines.append("# Zenohルーターを終了")
-            lines.append("kill $ZENOH_PID 2>/dev/null || true")
+        # if rmw_zenoh_flag:
+        #     # Zenohルーターを終了
+        #     lines.append("")
+        #     lines.append("# Zenohルーターを終了")
+        #     lines.append("kill ${ZENOH_PID} 2>/dev/null || true")
 
         lines.append(f'echo "All nodes on host {host_name} finished."')
 
