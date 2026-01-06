@@ -337,7 +337,7 @@ if __name__ == "__main__":
                     summary_rows.append([str(payload_size)] + row)
 
     # 出力
-    summary_csv_path = os.path.join(base_result_dir, "all_payloads_summary.csv")
+    summary_csv_path = os.path.join(base_result_dir, f"{prefix}_all_payloads_summary.csv")
     with open(summary_csv_path, "w", newline="") as f:
         writer = csv.writer(f)
         if header:
@@ -412,7 +412,7 @@ if __name__ == "__main__":
             ]
         )
 
-    usage_summary_csv = os.path.join(base_result_dir, "all_payloads_host_usage_summary.csv")
+    usage_summary_csv = os.path.join(base_result_dir, f"{prefix}_all_payloads_host_usage_summary.csv")
     with open(usage_summary_csv, "w", newline="") as f:
         w = csv.writer(f)
         w.writerow(usage_header)
