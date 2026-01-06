@@ -97,24 +97,34 @@ def generate_host_scripts(json_content, rmw):
         lines.append("")
 
         if rmw_zenoh_flag:
-            # Zenoh用の環境変数設定
+            # # Zenoh用の環境変数設定
+            # lines.append("")
+            # lines.append("# RMW Zenoh設定")
+            # lines.append("export RMW_IMPLEMENTATION=rmw_zenoh_cpp")
+            # lines.append("export RUST_LOG=zenoh=info,zenoh_transport=debug")
+            # zenoh_config_path = "~/ros2-perf-multihost-v2/config/multihost_config.json5"
+            # lines.append(f"export ZENOH_ROUTER_CONFIG_URI={zenoh_config_path}")
+            # lines.append("")
+            # # Zenohルーターをバックグラウンドで起動
+            # lines.append("# Zenohルーターを起動")
+            # lines.append("if pgrep -x rmw_zenohd >/dev/null 2>&1; then")
+            # lines.append('  echo "Existing rmw_zenohd found — killing it"')
+            # lines.append("  pkill -x rmw_zenohd || true")
+            # lines.append("  sleep 1")
+            # lines.append("fi")
+            # lines.append("ros2 run rmw_zenoh_cpp rmw_zenohd &")
+            # lines.append("ZENOH_PID=$!")
+            # lines.append("sleep 2  # ルーター起動待ち")
+            # lines.append("")
+
+            # RMW Zenoh設定（中央ルーター利用）
             lines.append("")
-            lines.append("# RMW Zenoh設定")
+            lines.append("# RMW Zenoh設定（中央ルーター利用）")
             lines.append("export RMW_IMPLEMENTATION=rmw_zenoh_cpp")
-            lines.append("export RUST_LOG=zenoh=info,zenoh_transport=debug")
-            zenoh_config_path = "~/ros2-perf-multihost-v2/config/multihost_config.json5"
-            lines.append(f"export ZENOH_ROUTER_CONFIG_URI={zenoh_config_path}")
-            lines.append("")
-            # Zenohルーターをバックグラウンドで起動
-            lines.append("# Zenohルーターを起動")
-            lines.append("if pgrep -x rmw_zenohd >/dev/null 2>&1; then")
-            lines.append('  echo "Existing rmw_zenohd found — killing it"')
-            lines.append("  pkill -x rmw_zenohd || true")
-            lines.append("  sleep 1")
-            lines.append("fi")
-            lines.append("ros2 run rmw_zenoh_cpp rmw_zenohd &")
-            lines.append("ZENOH_PID=$!")
-            lines.append("sleep 2  # ルーター起動待ち")
+            lines.append("export RUST_LOG=zenoh=warn,zenoh_transport=warn")
+            session_config_path = "~/ros2-perf-multihost-v2/config/DEFAULT_RMW_ZENOH_SESSION_CONFIG.json5"
+            lines.append(f"export ZENOH_CONFIG_URI={session_config_path}")
+            lines.append("# このホストではrmw_zenohdを起動しません（中央ルーターに接続）")
             lines.append("")
 
         lines.append("# start ROS2 nodes")
@@ -185,11 +195,11 @@ def generate_host_scripts(json_content, rmw):
         # lines.append("kill ${MON_INT_PID} 2>/dev/null || true")
         lines.append("kill ${MON_HOST_PID} 2>/dev/null || true")
 
-        if rmw_zenoh_flag:
-            # Zenohルーターを終了
-            lines.append("")
-            lines.append("# Zenohルーターを終了")
-            lines.append("kill ${ZENOH_PID} 2>/dev/null || true")
+        # if rmw_zenoh_flag:
+        #     # Zenohルーターを終了
+        #     lines.append("")
+        #     lines.append("# Zenohルーターを終了")
+        #     lines.append("kill ${ZENOH_PID} 2>/dev/null || true")
 
         lines.append(f'echo "All nodes on host {host_name} finished."')
 
