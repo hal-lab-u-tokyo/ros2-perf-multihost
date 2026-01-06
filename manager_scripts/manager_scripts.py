@@ -41,17 +41,16 @@ def start_docker():
         return jsonify({"error": "payload_size required"}), 400
     hostname = socket.gethostname()
     image_name = f"ros2_perf_{hostname}:latest"
-    logs_dir = "/home/ubuntu/ros2-perf-multihost-v2/logs"
+    logs_dir = f"/home/ubuntu/ros2-perf-multihost-v2/logs/docker_{payload_size}B/run{run_idx}"
     container_name = f"{hostname}_perf_run{run_idx}"
-    monitor_log = f"{logs_dir}/{container_name}_monitor.csv"
+    monitor_csv = f"{logs_dir}/{hostname}_monitor_host.csv"
     try:
         monitor_proc = subprocess.Popen(
             [
                 "python3",
-                "/home/ubuntu/ros2-perf-multihost-v2/performance_test/monitor_docker.py",
-                container_name,
+                "/home/ubuntu/ros2-perf-multihost-v2/performance_test/monitor_host.py",
                 "0.5",
-                monitor_log,
+                monitor_csv,
             ]
         )
         # Docker runコマンドを組み立て
