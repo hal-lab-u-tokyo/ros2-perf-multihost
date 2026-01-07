@@ -21,7 +21,7 @@
     timeout_ms: 0,
 
     endpoints: [
-      "tcp/[::]:7447"
+      "tcp/localhost:7447"
     ],
 
     exit_on_failure: true,
