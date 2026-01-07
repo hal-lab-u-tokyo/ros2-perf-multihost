@@ -37,7 +37,7 @@
     /// ROS setting: By default connect to the Zenoh router on localhost on port 7447.
     endpoints: [
     ///  "tcp/localhost:7447"
-      "tcp/host:7447"
+      "tcp/192.168.199.4:7447"
     ],
 
     /// Global connect configuration,
