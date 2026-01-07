@@ -4,7 +4,6 @@ JSONファイルを受け取ったら、ホストの数のDockerfileと、それ
 """
 
 import json
-import json5
 import os
 import shutil
 import textwrap
@@ -58,44 +57,37 @@ def generate_dockerfiles(json_content, rmw):
         )
         docker_base_content += zenoh_build_command
 
-        endpoints_list = []
-        for host_dict in hosts:
-            host_name = host_dict["host_name"]
-            endpoints_list.append(f"tcp/{host_name}:7447")
+        # endpoints_list = []
+        # for host_dict in hosts:
+        #     host_name = host_dict["host_name"]
+        #     endpoints_list.append(f"tcp/{host_name}:7447")
 
-        with open("../config/DEFAULT_RMW_ZENOH_ROUTER_CONFIG.json5", "r") as config:
-            config_json = json5.load(config)
-        config_json["connect"]["endpoints"] = endpoints_list
+        # with open("../config/DEFAULT_RMW_ZENOH_ROUTER_CONFIG.json5", "r") as config:
+        #     config_json = json5.load(config)
+        # config_json["connect"]["endpoints"] = endpoints_list
 
-        with open("../config/multihost_config.json5", "w") as f:
-            json5.dump(config_json, f, indent=4)
+        # with open("../config/multihost_config.json5", "w") as f:
+        #     json5.dump(config_json, f, indent=4)
 
-        # make_config_file_command = textwrap.dedent(
-        #     """
-        # COPY multihost_config.json5 ~/performance_ws/config/multihost_config.json5
-        # """
-        # )
-        # docker_base_content += make_config_file_command
+        # dockerfile_content = docker_base_content
+        # new_config_path = "~/performance_ws/config/multihost_config.json5"
+        # zenoh_router_bridge_command = f". ~/performance_ws/install/setup.sh &&  export ZENOH_ROUTER_CONFIG_URI={new_config_path} && ros2 run rmw_zenoh_cpp rmw_zenohd"
 
-        dockerfile_content = docker_base_content
-        new_config_path = "~/performance_ws/config/multihost_config.json5"
-        zenoh_router_bridge_command = f". ~/performance_ws/install/setup.sh &&  export ZENOH_ROUTER_CONFIG_URI={new_config_path} && ros2 run rmw_zenoh_cpp rmw_zenohd"
+        # additional_content = textwrap.dedent(f"""
+        # # コンテナを起動するときのコマンド ENVを扱うために、exec形式でありながらシェル形式を用いる(/bin/bash -c)
+        # CMD ["/bin/bash", "-c", "{zenoh_router_bridge_command}"]
+        # """)
+        # dockerfile_content += additional_content
 
-        additional_content = textwrap.dedent(f"""
-        # コンテナを起動するときのコマンド ENVを扱うために、exec形式でありながらシェル形式を用いる(/bin/bash -c)
-        CMD ["/bin/bash", "-c", "{zenoh_router_bridge_command}"]
-        """)
-        dockerfile_content += additional_content
+        # host_dir = os.path.join(output_dir, "router_bridge")
+        # os.makedirs(host_dir, exist_ok=True)
 
-        host_dir = os.path.join(output_dir, "router_bridge")
-        os.makedirs(host_dir, exist_ok=True)
-
-        docker_file_path = os.path.join(host_dir, "Dockerfile")
-        with open(docker_file_path, "w") as dockerfile:
-            dockerfile.write(dockerfile_content)
-        zenoh_router_config_path = os.path.join(host_dir, "multihost_config.json5")
-        with open(zenoh_router_config_path, "w") as f:
-            json5.dump(config_json, f, indent=4)
+        # docker_file_path = os.path.join(host_dir, "Dockerfile")
+        # with open(docker_file_path, "w") as dockerfile:
+        #     dockerfile.write(dockerfile_content)
+        # zenoh_router_config_path = os.path.join(host_dir, "multihost_config.json5")
+        # with open(zenoh_router_config_path, "w") as f:
+        #     json5.dump(config_json, f, indent=4)
 
     # 各ホストに対し、ノード情報を追記したDockerfileを作成し、Dockerfiles/{ホスト名}/Dockerfile に置く
     for host_dict in hosts:
@@ -109,12 +101,12 @@ def generate_dockerfiles(json_content, rmw):
         dockerfile_content += f"ARG HOST_NAME={host_name}\n"
 
         if rmw_zenoh_flag:
-            zenoh_router_command = ". /root/performance_ws/install/setup.sh && ros2 run rmw_zenoh_cpp rmw_zenohd & "
+            # zenoh_router_command = ". /root/performance_ws/install/setup.sh && ros2 run rmw_zenoh_cpp rmw_zenohd & "
             zenoh_config_command = (
                 "&& export RMW_IMPLEMENTATION=rmw_zenoh_cpp && export RUST_LOG=zenoh=info,zenoh_transport=debug"
             )
         else:
-            zenoh_router_command = ""
+            # zenoh_router_command = ""
             zenoh_config_command = ""
 
         for index, node in enumerate(nodes):
@@ -126,14 +118,14 @@ def generate_dockerfiles(json_content, rmw):
                 if node.get("publisher"):
                     publisher_list = node["publisher"]
                     topic_names = ",".join(publisher["topic_name"] for publisher in publisher_list)
-                    additional_command = f"{zenoh_router_command}. /root/performance_ws/install/setup.sh {zenoh_config_command} && cd /root/performance_ws/install/publisher_node/lib/publisher_node && ./publisher_node_exe --node_name {node_name} --topic_names {topic_names} -s $PAYLOAD_SIZE -p {period_ms} --eval_time {eval_time} --log_dir {log_dir}"
+                    additional_command = f". /root/performance_ws/install/setup.sh {zenoh_config_command} && cd /root/performance_ws/install/publisher_node/lib/publisher_node && ./publisher_node_exe --node_name {node_name} --topic_names {topic_names} -s $PAYLOAD_SIZE -p {period_ms} --eval_time {eval_time} --log_dir {log_dir}"
                     base_command += additional_command
 
                 if node.get("subscriber"):
                     subscriber_list = node["subscriber"]
                     topic_names = ",".join(subscriber["topic_name"] for subscriber in subscriber_list)
 
-                    additional_command = f"{zenoh_router_command}. /root/performance_ws/install/setup.sh {zenoh_config_command} && cd /root/performance_ws/install/subscriber_node/lib/subscriber_node && ./subscriber_node --node_name {node_name} --topic_names {topic_names} --eval_time {eval_time} --log_dir {log_dir}"
+                    additional_command = f". /root/performance_ws/install/setup.sh {zenoh_config_command} && cd /root/performance_ws/install/subscriber_node/lib/subscriber_node && ./subscriber_node --node_name {node_name} --topic_names {topic_names} --eval_time {eval_time} --log_dir {log_dir}"
                     base_command += additional_command
 
                 if node.get("intermediate"):
@@ -143,7 +135,7 @@ def generate_dockerfiles(json_content, rmw):
                     topic_names_pub = ",".join(publisher["topic_name"] for publisher in publisher_list)
                     topic_names_sub = ",".join(subscriber["topic_name"] for subscriber in subscriber_list)
 
-                    additional_command = f"{zenoh_router_command}. /root/performance_ws/install/setup.sh {zenoh_config_command} && cd /root/performance_ws/install/intermediate_node/lib/intermediate_node && ./intermediate_node --node_name {node_name} --topic_names_pub {topic_names_pub} --topic_names_sub {topic_names_sub} -s $PAYLOAD_SIZE -p {period_ms} --eval_time {eval_time}  --log_dir {log_dir}"
+                    additional_command = f". /root/performance_ws/install/setup.sh {zenoh_config_command} && cd /root/performance_ws/install/intermediate_node/lib/intermediate_node && ./intermediate_node --node_name {node_name} --topic_names_pub {topic_names_pub} --topic_names_sub {topic_names_sub} -s $PAYLOAD_SIZE -p {period_ms} --eval_time {eval_time}  --log_dir {log_dir}"
                     base_command += additional_command
 
                 continue
@@ -191,10 +183,10 @@ def generate_dockerfiles(json_content, rmw):
         with open(docker_file_path, "w") as dockerfile:
             dockerfile.write(dockerfile_content)
 
-        if rmw_zenoh_flag:
-            zenoh_router_config_path = os.path.join(host_dir, "multihost_config.json5")
-            with open(zenoh_router_config_path, "w") as f:
-                json5.dump(config_json, f, indent=4)
+        # if rmw_zenoh_flag:
+        #     zenoh_router_config_path = os.path.join(host_dir, "multihost_config.json5")
+        #     with open(zenoh_router_config_path, "w") as f:
+        #         json5.dump(config_json, f, indent=4)
 
     return rmw_zenoh_flag
 

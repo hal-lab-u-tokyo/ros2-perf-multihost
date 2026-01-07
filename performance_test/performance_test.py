@@ -7,7 +7,7 @@ import argparse
 from throughput_calc import calc_throughput
 
 # 設定
-payload_sizes = [64, 256, 1024, 4096, 16384, 65536, 262144, 1048576]  # 必要に応じて変更
+payload_sizes = [64, 256, 1024, 4096, 16384, 65536, 262144, 1048576, 4194304]  # 必要に応じて変更
 
 
 def run_test(payload_size, run_idx, start_scripts_py, num_hosts):
@@ -345,7 +345,7 @@ if __name__ == "__main__":
         writer.writerows(summary_rows)
     print(f"Summary for all payloads saved: {summary_csv_path}")
 
-    # --- 全ペイロード: ホスト使用率サマリ（host_usage_*.csv の集計） ---
+    # --- 全ペイロード: ホスト使用率サマリ（host_usage_summary*.csv の集計） ---
     usage_summary_rows = []
     usage_header = [
         "payload_size",
@@ -359,7 +359,7 @@ if __name__ == "__main__":
     ]
     for payload_size in payload_sizes:
         latest_dir = f"{prefix}_{payload_size}B"
-        usage_csv_path = os.path.join(base_result_dir, latest_dir, f"host_usage_{payload_size}B.csv")
+        usage_csv_path = os.path.join(base_result_dir, latest_dir, f"host_usage_summary_{payload_size}B.csv")
         if not os.path.exists(usage_csv_path):
             continue
 
