@@ -47,7 +47,7 @@ def generate_dockerfiles(json_content, rmw):
             && rosdep install --from-paths src --ignore-src --rosdistro jazzy -y || true \
             && apt-get update && apt-get install -y python3-json5 \
             && . /opt/ros/jazzy/setup.sh \
-            && colcon build --merge-install --parallel-workers 1 --cmake-args -DCMAKE_BUILD_TYPE=Release -DBUILD_TESTING=OFF
+            && colcon build --parallel-workers 1 --cmake-args -DCMAKE_BUILD_TYPE=Release -DBUILD_TESTING=OFF
 
         """
         )
