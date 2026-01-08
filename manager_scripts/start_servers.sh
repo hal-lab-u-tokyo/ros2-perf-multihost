@@ -14,7 +14,17 @@ fi
 
 for host in "${HOSTS[@]}"; do
   echo "Starting REST server on $host"
-  if ! ssh $SSH_OPTS "ubuntu@$host" "bash -lc 'source /home/ubuntu/ros2-perf-multihost-v2/.venv/bin/activate && nohup python /home/ubuntu/ros2-perf-multihost-v2/manager_scripts/manager_scripts.py >/home/ubuntu/rest.log 2>&1 </dev/null &'" ; then
+  if ! ssh $SSH_OPTS "ubuntu@$host" '
+    LOG=/home/ubuntu/rest.log
+    PID=/home/ubuntu/rest.pid
+    : > "$LOG"
+    # 仮想環境の Python を直接起動して完全デタッチ
+    setsid nohup /home/ubuntu/ros2-perf-multihost-v2/.venv/bin/python \
+      /home/ubuntu/ros2-perf-multihost-v2/manager_scripts/manager_scripts.py \
+      >>"$LOG" 2>&1 < /dev/null &
+    echo $! > "$PID"
+    echo STARTED
+  ' ; then
     echo "WARN: SSH command failed on $host (skipping wait)."
     continue
   fi
