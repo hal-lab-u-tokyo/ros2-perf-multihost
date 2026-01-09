@@ -314,7 +314,7 @@ if __name__ == "__main__":
         print(f"=== Payload size: {payload_size}B ===")
         for run_idx in range(args.trials):
             run_test(payload_size, run_idx, start_scripts_py, args.hosts)
-            time.sleep(2)
+            time.sleep(10)
         aggregate_total_latency(base_log_dir, base_result_dir, prefix, payload_size, args.trials, args.hosts)
     print("All tests and aggregation complete.")
 
