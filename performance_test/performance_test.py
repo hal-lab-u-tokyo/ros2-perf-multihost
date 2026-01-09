@@ -7,7 +7,7 @@ import argparse
 from throughput_calc import calc_throughput
 
 # 設定
-payload_sizes = [64, 256, 1024, 4096, 16384, 65536, 262144, 1048576, 4194304]  # 必要に応じて変更
+payload_sizes = [64, 256, 1024, 4096, 16384, 65536, 262144, 1048576, 4194304, 16777216]  # 必要に応じて変更
 
 
 def run_test(payload_size, run_idx, start_scripts_py, num_hosts):
