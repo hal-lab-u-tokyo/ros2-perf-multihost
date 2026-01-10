@@ -18,7 +18,6 @@ def start_script():
         return jsonify({"error": "payload_size required"}), 400
     hostname = socket.gethostname()
     script_path = f"/home/ubuntu/ros2-perf-multihost-v2/host_scripts/{hostname}_start.sh"
-    print(f"Starting script {script_path} with payload_size={payload_size}, run_idx={run_idx}")
     try:
         # スクリプトが終了するまで待つ
         result = subprocess.run(["bash", script_path, str(payload_size), str(run_idx)], text=True)
@@ -68,7 +67,7 @@ def start_docker():
             "-e",
             f"RUN_IDX={run_idx}",
             "-v",
-            f"{logs_dir}:/root/performance_test/logs_local",
+            f"{logs_dir}:/root/performance_ws/performance_test/logs_local",
             "--name",
             container_name,
             image_name,
