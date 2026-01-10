@@ -68,7 +68,7 @@ def start_docker():
             "-e",
             f"RUN_IDX={run_idx}",
             "-v",
-            f"{logs_dir}:/root/performance_ws/performance_test/logs_local",
+            f"{logs_dir}:/root/performance_test/logs_local",
             "--name",
             container_name,
             image_name,
