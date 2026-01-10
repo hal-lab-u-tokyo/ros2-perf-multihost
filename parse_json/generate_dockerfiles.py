@@ -34,11 +34,16 @@ def generate_dockerfiles(json_content, rmw):
     eval_time = json_content.get("eval_time", 60)
     period_ms = json_content.get("period_ms", 100)
 
-    rmw_zenoh_flag = rmw == "zenoh"
+    # QoS設定を取得
+    qos_config = json_content.get("qos", {})
+    qos_history = qos_config.get("history", "KEEP_LAST")
+    qos_depth = qos_config.get("depth", 1)
+    qos_reliability = qos_config.get("reliability", "RELIABLE")
+
     hosts = json_content["hosts"]
 
     # rmw_zenoh の依存をビルド（routerは起動しない）
-    if rmw_zenoh_flag:
+    if rmw == "zenoh":
         zenoh_build_command = textwrap.dedent(
             r"""
         RUN cd ~/performance_ws/src \
@@ -65,18 +70,25 @@ def generate_dockerfiles(json_content, rmw):
         dockerfile_content += f"ARG HOST_NAME={host_name}\n"
 
         # rmw_zenoh の環境（CMD 内でも明示。compose側でも設定する）
-        if rmw_zenoh_flag:
-            zenoh_config_command = (
+        if rmw == "zenoh":
+            rmw_config_command = (
                 "&& export RMW_IMPLEMENTATION=rmw_zenoh_cpp "
                 "&& export ZENOH_CONFIG_URI=/root/performance_ws/config/DEFAULT_RMW_ZENOH_SESSION_CONFIG.json5 "
                 "&& export RUST_LOG=warn"
             )
+        elif rmw == "fastdds":
+            rmw_config_command = "&& export RMW_IMPLEMENTATION=rmw_fastrtps_cpp"
+        elif rmw == "cyclonedds":
+            rmw_config_command = "&& export RMW_IMPLEMENTATION=rmw_cyclonedds_cpp"
         else:
-            zenoh_config_command = ""
+            rmw_config_command = ""
 
         for index, node in enumerate(nodes):
             node_name = node["node_name"]
             log_dir = "/root/performance_ws/performance_test/logs_local/docker_${PAYLOAD_SIZE}B/run${RUN_IDX}"
+
+            # QoSオプション文字列
+            qos_options = f"--qos_history {qos_history} --qos_depth {qos_depth} --qos_reliability {qos_reliability}"
 
             # 最初だけはコマンドの先頭に & をつけない
             if index == 0:
@@ -84,10 +96,11 @@ def generate_dockerfiles(json_content, rmw):
                     publisher_list = node["publisher"]
                     topic_names = ",".join(publisher["topic_name"] for publisher in publisher_list)
                     additional_command = (
-                        f". /root/performance_ws/install/setup.sh {zenoh_config_command} "
+                        f". /root/performance_ws/install/setup.sh {rmw_config_command} "
                         f"&& cd /root/performance_ws/install/publisher_node/lib/publisher_node "
                         f"&& ./publisher_node_exe --node_name {node_name} --topic_names {topic_names} "
-                        f"-s $PAYLOAD_SIZE -p {period_ms} --eval_time {eval_time} --log_dir {log_dir}"
+                        f"-s $PAYLOAD_SIZE -p {period_ms} --eval_time {eval_time} "
+                        f"{qos_options} --log_dir {log_dir}"
                     )
                     base_command += additional_command
 
@@ -95,10 +108,10 @@ def generate_dockerfiles(json_content, rmw):
                     subscriber_list = node["subscriber"]
                     topic_names = ",".join(subscriber["topic_name"] for subscriber in subscriber_list)
                     additional_command = (
-                        f". /root/performance_ws/install/setup.sh {zenoh_config_command} "
+                        f". /root/performance_ws/install/setup.sh {rmw_config_command} "
                         f"&& cd /root/performance_ws/install/subscriber_node/lib/subscriber_node "
                         f"&& ./subscriber_node --node_name {node_name} --topic_names {topic_names} "
-                        f"--eval_time {eval_time} --log_dir {log_dir}"
+                        f"--eval_time {eval_time} {qos_options} --log_dir {log_dir}"
                     )
                     base_command += additional_command
 
@@ -108,11 +121,11 @@ def generate_dockerfiles(json_content, rmw):
                     topic_names_pub = ",".join(publisher["topic_name"] for publisher in publisher_list)
                     topic_names_sub = ",".join(subscriber["topic_name"] for subscriber in subscriber_list)
                     additional_command = (
-                        f". /root/performance_ws/install/setup.sh {zenoh_config_command} "
+                        f". /root/performance_ws/install/setup.sh {rmw_config_command} "
                         f"&& cd /root/performance_ws/install/intermediate_node/lib/intermediate_node "
                         f"&& ./intermediate_node --node_name {node_name} --topic_names_pub {topic_names_pub} "
                         f"--topic_names_sub {topic_names_sub} -s $PAYLOAD_SIZE -p {period_ms} "
-                        f"--eval_time {eval_time}  --log_dir {log_dir}"
+                        f"--eval_time {eval_time} {qos_options} --log_dir {log_dir}"
                     )
                     base_command += additional_command
                 continue
@@ -122,10 +135,11 @@ def generate_dockerfiles(json_content, rmw):
                 publisher_list = node["publisher"]
                 topic_names = ",".join(publisher["topic_name"] for publisher in publisher_list)
                 additional_command = (
-                    f" & . /root/performance_ws/install/setup.sh {zenoh_config_command} "
+                    f" & . /root/performance_ws/install/setup.sh {rmw_config_command} "
                     f"&& cd /root/performance_ws/install/publisher_node/lib/publisher_node "
                     f"&& ./publisher_node_exe --node_name {node_name} --topic_names {topic_names} "
-                    f"-s $PAYLOAD_SIZE -p {period_ms} --eval_time {eval_time} --log_dir {log_dir}"
+                    f"-s $PAYLOAD_SIZE -p {period_ms} --eval_time {eval_time} "
+                    f"{qos_options} --log_dir {log_dir}"
                 )
                 base_command += additional_command
 
@@ -133,10 +147,10 @@ def generate_dockerfiles(json_content, rmw):
                 subscriber_list = node["subscriber"]
                 topic_names = ",".join(subscriber["topic_name"] for subscriber in subscriber_list)
                 additional_command = (
-                    f" & . /root/performance_ws/install/setup.sh {zenoh_config_command} "
+                    f" & . /root/performance_ws/install/setup.sh {rmw_config_command} "
                     f"&& cd /root/performance_ws/install/subscriber_node/lib/subscriber_node "
                     f"&& ./subscriber_node --node_name {node_name} --topic_names {topic_names} "
-                    f"--eval_time {eval_time} --log_dir {log_dir}"
+                    f"--eval_time {eval_time} {qos_options} --log_dir {log_dir}"
                 )
                 base_command += additional_command
 
@@ -146,11 +160,11 @@ def generate_dockerfiles(json_content, rmw):
                 topic_names_pub = ",".join(publisher["topic_name"] for publisher in publisher_list)
                 topic_names_sub = ",".join(subscriber["topic_name"] for subscriber in subscriber_list)
                 additional_command = (
-                    f" & . /root/performance_ws/install/setup.sh {zenoh_config_command} "
+                    f" & . /root/performance_ws/install/setup.sh {rmw_config_command} "
                     f"&& cd /root/performance_ws/install/intermediate_node/lib/intermediate_node "
                     f"&& ./intermediate_node --node_name {node_name} --topic_names_pub {topic_names_pub} "
                     f"--topic_names_sub {topic_names_sub} -s $PAYLOAD_SIZE -p {period_ms} "
-                    f"--eval_time {eval_time} --log_dir {log_dir}"
+                    f"--eval_time {eval_time} {qos_options} --log_dir {log_dir}"
                 )
                 base_command += additional_command
 
@@ -171,12 +185,12 @@ def generate_dockerfiles(json_content, rmw):
         with open(docker_file_path, "w") as dockerfile:
             dockerfile.write(dockerfile_content)
 
-    return rmw_zenoh_flag
+    return
 
 
 # JSONファイルを受け取り、ホストの数だけ生成したDockerfileをまとめて起動するdocker-compose.ymlをルートディレクトリに生成する
 #  json -> docker-compose.ymlの生成
-def generate_docker_compose(json_content, rmw_zenoh_flag):
+def generate_docker_compose(json_content, rmw):
     docker_compose_content = textwrap.dedent("services:")
 
     # router_bridge は生成しない（中央ルーターのみ運用）
@@ -198,7 +212,7 @@ def generate_docker_compose(json_content, rmw_zenoh_flag):
             container_name: {host_name}
         """)
         # zenoh利用時は環境変数をcomposeにも付与（CMD側にも付与済みだが二重の保険）
-        if rmw_zenoh_flag:
+        if rmw == "zenoh":
             zenoh_env = textwrap.dedent("""
               environment:
                 - RMW_IMPLEMENTATION=rmw_zenoh_cpp
@@ -226,5 +240,5 @@ if __name__ == "__main__":
     with open(args.json_path, "r") as f:
         json_content = json.load(f)
 
-    rmw_zenoh_flag = generate_dockerfiles(json_content, args.rmw)
-    generate_docker_compose(json_content, rmw_zenoh_flag)
+    generate_dockerfiles(json_content, args.rmw)
+    # generate_docker_compose(json_content, args.rmw)
