@@ -44,15 +44,24 @@ def generate_dockerfiles(json_content, rmw):
 
     # rmw_zenoh の依存をビルド（routerは起動しない）
     if rmw == "zenoh":
+        # zenoh_build_command = textwrap.dedent(
+        #     r"""
+        # RUN cd ~/performance_ws/src \
+        #     && git clone https://github.com/ros2/rmw_zenoh.git -b jazzy \
+        #     && cd ~/performance_ws \
+        #     && rosdep install --from-paths src --ignore-src --rosdistro jazzy -y || true \
+        #     && apt-get update && apt-get install -y python3-json5 \
+        #     && . /opt/ros/jazzy/setup.sh \
+        #     && colcon build --cmake-args -DCMAKE_BUILD_TYPE=Release -DBUILD_TESTING=OFF
+
+        # """
+        # )
         zenoh_build_command = textwrap.dedent(
             r"""
-        RUN cd ~/performance_ws/src \
-            && git clone https://github.com/ros2/rmw_zenoh.git -b jazzy \
-            && cd ~/performance_ws \
-            && rosdep install --from-paths src --ignore-src --rosdistro jazzy -y || true \
-            && apt-get update && apt-get install -y python3-json5 \
-            && . /opt/ros/jazzy/setup.sh \
-            && colcon build --parallel-workers 1 --cmake-args -DCMAKE_BUILD_TYPE=Release -DBUILD_TESTING=OFF
+        RUN apt-get update && apt-get install -y \
+            ros-jazzy-rmw-zenoh-cpp \
+            python3-json5 \
+            && rm -rf /var/lib/apt/lists/*
 
         """
         )
