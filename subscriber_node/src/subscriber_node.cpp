@@ -86,10 +86,10 @@ public:
         }
 
         std::ostringstream oss;
-        for (const auto& byte : message_->data)
-        {
-            oss << std::hex << (int)byte << " ";
-        }
+        // for (const auto& byte : message_->data)
+        // {
+        //     oss << std::hex << (int)byte << " ";
+        // }
         oss << std::dec <<"Time: " << std::fixed << std::setprecision(9) << static_cast<double>(sub_time.nanoseconds() - start_time_[topic_name].nanoseconds()) / 1e9;
         int current_pub_idx = message_->header.pub_idx;
         std::string pub_node_name = message_->header.node_name;

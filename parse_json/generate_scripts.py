@@ -121,9 +121,10 @@ def generate_host_scripts(json_content, rmw):
             lines.append("")
             lines.append("# RMW Zenoh設定（中央ルーター利用）")
             lines.append("export RMW_IMPLEMENTATION=rmw_zenoh_cpp")
+            lines.append("export ZENOH_ROUTER_CHECK_ATTEMPTS=5")
             lines.append("export RUST_LOG=zenoh=warn,zenoh_transport=warn")
             session_config_path = "~/ros2-perf-multihost-v2/config/DEFAULT_RMW_ZENOH_SESSION_CONFIG.json5"
-            lines.append(f"export ZENOH_CONFIG_URI={session_config_path}")
+            lines.append(f"export ZENOH_SESSION_CONFIG_URI={session_config_path}")
             lines.append("# このホストではrmw_zenohdを起動しません（中央ルーターに接続）")
             lines.append("")
 

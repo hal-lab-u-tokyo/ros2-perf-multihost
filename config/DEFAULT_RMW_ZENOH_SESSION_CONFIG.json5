@@ -9,7 +9,7 @@
   // id: "1234567890abcdef",
 
   /// The node's mode (router, peer or client)
-  mode: "peer",
+  mode: "client",
 
   /// Which endpoints to connect to. E.g. tcp/localhost:7447.
   /// By configuring the endpoints, it is possible to tell zenoh which router/peer to connect to at startup.
@@ -37,7 +37,7 @@
     /// ROS setting: By default connect to the Zenoh router on localhost on port 7447.
     endpoints: [
     ///  "tcp/localhost:7447"
-      "tcp/host:7447"
+      "tcp/192.168.199.4:7447"
     ],
 
     /// Global connect configuration,

@@ -3,6 +3,7 @@ import subprocess
 import socket
 import logging
 import sys
+import os
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s: %(message)s", stream=sys.stdout)
 
@@ -42,16 +43,17 @@ def start_docker():
     hostname = socket.gethostname()
     image_name = f"ros2_perf_{hostname}:latest"
     logs_dir = "/home/ubuntu/ros2-perf-multihost-v2/logs"
+    current_log_dir = logs_dir + f"/docker_{payload_size}B/run{run_idx}"
+    os.makedirs(current_log_dir, exist_ok=True)
     container_name = f"{hostname}_perf_run{run_idx}"
-    monitor_log = f"{logs_dir}/{container_name}_monitor.csv"
+    monitor_csv = f"{current_log_dir}/{hostname}_monitor_host.csv"
     try:
         monitor_proc = subprocess.Popen(
             [
                 "python3",
-                "/home/ubuntu/ros2-perf-multihost-v2/performance_test/monitor_docker.py",
-                container_name,
+                "/home/ubuntu/ros2-perf-multihost-v2/performance_test/monitor_host.py",
                 "0.5",
-                monitor_log,
+                monitor_csv,
             ]
         )
         # Docker runコマンドを組み立て

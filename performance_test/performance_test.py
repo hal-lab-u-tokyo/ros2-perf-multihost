@@ -7,7 +7,7 @@ import argparse
 from throughput_calc import calc_throughput
 
 # 設定
-payload_sizes = [64, 256, 1024, 4096, 16384, 65536, 262144, 1048576]  # 必要に応じて変更
+payload_sizes = [64, 256, 1024, 4096, 16384, 65536, 262144, 1048576, 4194304, 16777216]  # 必要に応じて変更
 
 
 def run_test(payload_size, run_idx, start_scripts_py, num_hosts):
@@ -314,7 +314,7 @@ if __name__ == "__main__":
         print(f"=== Payload size: {payload_size}B ===")
         for run_idx in range(args.trials):
             run_test(payload_size, run_idx, start_scripts_py, args.hosts)
-            time.sleep(2)
+            time.sleep(10)
         aggregate_total_latency(base_log_dir, base_result_dir, prefix, payload_size, args.trials, args.hosts)
     print("All tests and aggregation complete.")
 
@@ -337,7 +337,7 @@ if __name__ == "__main__":
                     summary_rows.append([str(payload_size)] + row)
 
     # 出力
-    summary_csv_path = os.path.join(base_result_dir, "all_payloads_summary.csv")
+    summary_csv_path = os.path.join(base_result_dir, f"{prefix}_all_payloads_summary.csv")
     with open(summary_csv_path, "w", newline="") as f:
         writer = csv.writer(f)
         if header:
@@ -345,7 +345,7 @@ if __name__ == "__main__":
         writer.writerows(summary_rows)
     print(f"Summary for all payloads saved: {summary_csv_path}")
 
-    # --- 全ペイロード: ホスト使用率サマリ（host_usage_*.csv の集計） ---
+    # --- 全ペイロード: ホスト使用率サマリ（host_usage_summary*.csv の集計） ---
     usage_summary_rows = []
     usage_header = [
         "payload_size",
@@ -359,7 +359,7 @@ if __name__ == "__main__":
     ]
     for payload_size in payload_sizes:
         latest_dir = f"{prefix}_{payload_size}B"
-        usage_csv_path = os.path.join(base_result_dir, latest_dir, f"host_usage_{payload_size}B.csv")
+        usage_csv_path = os.path.join(base_result_dir, latest_dir, f"host_usage_summary_{payload_size}B.csv")
         if not os.path.exists(usage_csv_path):
             continue
 
@@ -412,7 +412,7 @@ if __name__ == "__main__":
             ]
         )
 
-    usage_summary_csv = os.path.join(base_result_dir, "all_payloads_host_usage_summary.csv")
+    usage_summary_csv = os.path.join(base_result_dir, f"{prefix}_all_payloads_host_usage_summary.csv")
     with open(usage_summary_csv, "w", newline="") as f:
         w = csv.writer(f)
         w.writerow(usage_header)
