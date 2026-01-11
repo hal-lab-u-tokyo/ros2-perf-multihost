@@ -71,7 +71,7 @@ def generate_dockerfiles(json_content, rmw):
             env_vars = textwrap.dedent("""
             # Zenoh環境変数をENVで設定（コンテナ全体で有効）
             ENV RMW_IMPLEMENTATION=rmw_zenoh_cpp
-            ENV ZENOH_CONFIG_URI=/root/performance_ws/config/DEFAULT_RMW_ZENOH_SESSION_CONFIG.json5
+            ENV ZENOH_SESSION_CONFIG_URI=/root/performance_ws/config/DEFAULT_RMW_ZENOH_SESSION_CONFIG.json5
             ENV RUST_LOG=warn
             """)
             dockerfile_content += env_vars
