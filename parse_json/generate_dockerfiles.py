@@ -225,7 +225,7 @@ def generate_docker_compose(json_content, rmw):
             zenoh_env = textwrap.dedent("""
               environment:
                 - RMW_IMPLEMENTATION=rmw_zenoh_cpp
-                - ZENOH_CONFIG_URI=/root/performance_ws/config/DEFAULT_RMW_ZENOH_SESSION_CONFIG.json5
+                - ZENOH_SESSION_CONFIG_URI=/root/performance_ws/config/DEFAULT_RMW_ZENOH_SESSION_CONFIG.json5
                 - RUST_LOG=warn
             """)
             additional_content = additional_content.rstrip() + "\n" + zenoh_env
