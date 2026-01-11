@@ -42,6 +42,7 @@ def start_docker():
     hostname = socket.gethostname()
     image_name = f"ros2_perf_{hostname}:latest"
     logs_dir = "/home/ubuntu/ros2-perf-multihost-v2/logs"
+    config_dir = "/home/ubuntu/ros2-perf-multihost-v2/config"
     current_log_dir = logs_dir + f"/docker_{payload_size}B/run{run_idx}"
     os.makedirs(current_log_dir, exist_ok=True)
     container_name = f"{hostname}_perf_run{run_idx}"
@@ -68,6 +69,8 @@ def start_docker():
             f"RUN_IDX={run_idx}",
             "-v",
             f"{logs_dir}:/root/performance_ws/performance_test/logs_local",
+            "-v",
+            f"{config_dir}:/root/performance_ws/config:ro",
             "--name",
             container_name,
             image_name,

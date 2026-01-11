@@ -2,7 +2,7 @@
 set -euo pipefail
 
 # ホスト名リスト（必要に応じて編集）
-HOSTS=("pi0" "pi1" "pi2")
+HOSTS=("pi0" "pi1" "pi2" "pi3" "pi4")
 
 REPO_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 
