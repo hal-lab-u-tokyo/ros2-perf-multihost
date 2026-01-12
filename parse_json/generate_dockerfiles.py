@@ -54,6 +54,17 @@ def generate_dockerfiles(json_content, rmw):
         """
         )
         docker_base_content += zenoh_build_command
+    # rmw_cyclonedds の依存をビルド
+    elif rmw == "cyclonedds":
+        cyclonedds_build_command = textwrap.dedent(
+            r"""
+        RUN apt-get update && apt-get install -y \
+            ros-jazzy-rmw-cyclonedds-cpp \
+            && rm -rf /var/lib/apt/lists/*
+
+        """
+        )
+        docker_base_content += cyclonedds_build_command
 
     # 各ホストに対し、ノード情報を追記したDockerfileを作成し、Dockerfiles/{ホスト名}/Dockerfile に置く
     for host_dict in hosts:
