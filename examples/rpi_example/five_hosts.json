@@ -86,13 +86,8 @@
 		      	    ]
                         }
                     ]
-	        }
-            ]
-        },
-        {
-            "host_name": "pi3",
-            "nodes": [
-                {
+	        },
+			{
 		    "node_name": "ponce",
 		    "intermediate": [
                         {
@@ -107,8 +102,12 @@
 		      	    ]
                         }
                     ]
-	        },
-
+	        }
+            ]
+        },
+        {
+            "host_name": "pi3",
+            "nodes": [
 	        {
 		    "node_name": "barcelona",
 		    "intermediate": [
