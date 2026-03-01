@@ -1,3 +1,0 @@
-Name: arequipa
-NodeType: Subscriber
-Topics: arkansas,

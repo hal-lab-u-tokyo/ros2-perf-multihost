@@ -1,6 +1,0 @@
-Name: ponce
-NodeType: Intermediate
-Topics(Pub): mekong,congo,
-PayloadSize: 1048576,1048576,
-Period: 100,100,
-Topics(Sub): missouri,danube,volga,

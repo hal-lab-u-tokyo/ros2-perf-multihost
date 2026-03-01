@@ -1,6 +1,0 @@
-Name: lyon
-NodeType: Intermediate
-Topics(Pub): tigris,
-PayloadSize: 4194304,
-Period: 100,
-Topics(Sub): amazon,

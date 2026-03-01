@@ -1,3 +1,0 @@
-StartTime: 1768355515864226994
-EndTime: 1768355575864226994
-Pub Node_Name: barcelona, Index: 595, Timestamp: 1768355575581364653

@@ -1,3 +1,0 @@
-StartTime: 1768353675029597931
-EndTime: 1768353735029597931
-Pub Node_Name: montreal, Index: 0, Timestamp: 1768353675454228511

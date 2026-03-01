@@ -1,6 +1,0 @@
-Name: geneva
-NodeType: Intermediate
-Topics(Pub): arkansas,
-PayloadSize: 262144,
-Period: 100,
-Topics(Sub): congo,danube,parana,
