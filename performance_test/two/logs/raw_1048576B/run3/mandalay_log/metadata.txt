@@ -1,6 +1,0 @@
-Name: mandalay
-NodeType: Intermediate
-Topics(Pub): missouri,
-PayloadSize: 1048576,
-Period: 100,
-Topics(Sub): salween,danube,

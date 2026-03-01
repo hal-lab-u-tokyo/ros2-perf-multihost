@@ -1,6 +1,0 @@
-Name: georgetown
-NodeType: Intermediate
-Topics(Pub): volga,
-PayloadSize: 4194304,
-Period: 100,
-Topics(Sub): lena,

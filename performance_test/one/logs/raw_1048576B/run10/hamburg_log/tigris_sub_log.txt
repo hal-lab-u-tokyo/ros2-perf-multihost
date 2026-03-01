@@ -1,9 +1,0 @@
-StartTime: 1768356012222530287
-EndTime: 1768356072222530287
-Pub Node_Name: lyon, Index: 0, Timestamp: 1768356012460187485
-Pub Node_Name: lyon, Index: 1, Timestamp: 1768356012609448746
-Pub Node_Name: lyon, Index: 2, Timestamp: 1768356012680731818
-Pub Node_Name: lyon, Index: 3, Timestamp: 1768356012881216969
-Pub Node_Name: lyon, Index: 4, Timestamp: 1768356013003584914
-Pub Node_Name: lyon, Index: 5, Timestamp: 1768356013264558462
-Pub Node_Name: lyon, Index: 374, Timestamp: 1768356050305693603

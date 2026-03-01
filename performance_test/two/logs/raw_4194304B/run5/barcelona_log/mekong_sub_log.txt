@@ -1,3 +1,0 @@
-StartTime: 1768353510269089027
-EndTime: 1768353570269089027
-Pub Node_Name: ponce, Index: 0, Timestamp: 1768353510688127290
