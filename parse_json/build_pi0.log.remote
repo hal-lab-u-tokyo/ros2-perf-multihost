@@ -1,0 +1,221 @@
+#0 building with "default" instance using docker driver
+
+#1 [internal] load build definition from Dockerfile
+#1 transferring dockerfile: 2.02kB 0.0s done
+#1 DONE 0.0s
+
+#2 [internal] load metadata for docker.io/library/ros:jazzy-ros-base
+#2 DONE 1.7s
+
+#3 [internal] load .dockerignore
+#3 transferring context: 2B done
+#3 DONE 0.0s
+
+#4 [1/5] FROM docker.io/library/ros:jazzy-ros-base@sha256:c5705f613a6427d07be6f3d0aba40068e16c3dea05604e1c95c63eac79fea658
+#4 resolve docker.io/library/ros:jazzy-ros-base@sha256:c5705f613a6427d07be6f3d0aba40068e16c3dea05604e1c95c63eac79fea658 0.1s done
+#4 CACHED
+
+#5 [2/5] RUN apt update     && mkdir -p ~/performance_ws/src     && cd ~/performance_ws/src     && git clone https://github.com/hal-lab-u-tokyo/ros2-perf-multihost.git
+#5 0.764 
+#5 0.764 WARNING: apt does not have a stable CLI interface. Use with caution in scripts.
+#5 0.764 
+#5 1.384 Get:1 http://packages.ros.org/ros2/ubuntu noble InRelease [4676 B]
+#5 1.651 Get:2 http://ports.ubuntu.com/ubuntu-ports noble InRelease [256 kB]
+#5 1.938 Get:3 http://packages.ros.org/ros2/ubuntu noble/main Sources [1868 kB]
+#5 3.208 Get:4 http://packages.ros.org/ros2/ubuntu noble/main arm64 Packages [1777 kB]
+#5 3.228 Get:5 http://ports.ubuntu.com/ubuntu-ports noble-updates InRelease [126 kB]
+#5 3.633 Get:6 http://ports.ubuntu.com/ubuntu-ports noble-backports InRelease [126 kB]
+#5 4.048 Get:7 http://ports.ubuntu.com/ubuntu-ports noble-security InRelease [126 kB]
+#5 4.460 Get:8 http://ports.ubuntu.com/ubuntu-ports noble/universe arm64 Packages [19.0 MB]
+#5 7.633 Get:9 http://ports.ubuntu.com/ubuntu-ports noble/main arm64 Packages [1776 kB]
+#5 7.738 Get:10 http://ports.ubuntu.com/ubuntu-ports noble/restricted arm64 Packages [113 kB]
+#5 7.749 Get:11 http://ports.ubuntu.com/ubuntu-ports noble/multiverse arm64 Packages [274 kB]
+#5 7.924 Get:12 http://ports.ubuntu.com/ubuntu-ports noble-updates/multiverse arm64 Packages [38.0 kB]
+#5 7.927 Get:13 http://ports.ubuntu.com/ubuntu-ports noble-updates/universe arm64 Packages [1898 kB]
+#5 8.139 Get:14 http://ports.ubuntu.com/ubuntu-ports noble-updates/restricted arm64 Packages [4201 kB]
+#5 8.647 Get:15 http://ports.ubuntu.com/ubuntu-ports noble-updates/main arm64 Packages [2228 kB]
+#5 8.777 Get:16 http://ports.ubuntu.com/ubuntu-ports noble-backports/universe arm64 Packages [34.7 kB]
+#5 8.787 Get:17 http://ports.ubuntu.com/ubuntu-ports noble-backports/main arm64 Packages [49.4 kB]
+#5 8.791 Get:18 http://ports.ubuntu.com/ubuntu-ports noble-security/restricted arm64 Packages [4036 kB]
+#5 9.274 Get:19 http://ports.ubuntu.com/ubuntu-ports noble-security/main arm64 Packages [1875 kB]
+#5 9.393 Get:20 http://ports.ubuntu.com/ubuntu-ports noble-security/multiverse arm64 Packages [38.3 kB]
+#5 9.406 Get:21 http://ports.ubuntu.com/ubuntu-ports noble-security/universe arm64 Packages [1192 kB]
+#5 12.17 Fetched 41.1 MB in 11s (3709 kB/s)
+#5 12.17 Reading package lists...
+#5 15.82 Building dependency tree...
+#5 16.44 Reading state information...
+#5 16.56 110 packages can be upgraded. Run 'apt list --upgradable' to see them.
+#5 16.67 Cloning into 'ros2-perf-multihost'...
+#5 DONE 25.8s
+
+#6 [3/5] RUN git clone https://github.com/jarro2783/cxxopts.git     && . /opt/ros/jazzy/setup.sh     && cd cxxopts     && mkdir build && cd build     && cmake ..     && make && sudo make install     && cd /root/performance_ws     && colcon build
+#6 0.561 Cloning into 'cxxopts'...
+#6 8.698 -- The CXX compiler identification is GNU 13.3.0
+#6 8.813 -- Detecting CXX compiler ABI info
+#6 9.398 -- Detecting CXX compiler ABI info - done
+#6 9.434 -- Check for working CXX compiler: /usr/bin/c++ - skipped
+#6 9.438 -- Detecting CXX compile features
+#6 9.440 -- Detecting CXX compile features - done
+#6 9.504 -- Configuring done (2.1s)
+#6 9.552 -- Generating done (0.0s)
+#6 9.558 -- Build files have been written to: /cxxopts/build
+#6 9.765 [ 12%] Building CXX object src/CMakeFiles/example.dir/example.cpp.o
+#6 26.84 [ 25%] Linking CXX executable example
+#6 27.46 [ 25%] Built target example
+#6 27.57 [ 37%] Building CXX object test/CMakeFiles/options_test.dir/main.cpp.o
+#6 58.18 [ 50%] Building CXX object test/CMakeFiles/options_test.dir/options.cpp.o
+#6 80.29 [ 62%] Linking CXX executable options_test
+#6 81.47 [ 62%] Built target options_test
+#6 81.57 [ 75%] Building CXX object test/CMakeFiles/link_test.dir/link_a.cpp.o
+#6 85.99 [ 87%] Building CXX object test/CMakeFiles/link_test.dir/link_b.cpp.o
+#6 90.43 [100%] Linking CXX executable link_test
+#6 90.77 [100%] Built target link_test
+#6 91.16 [ 25%] Built target example
+#6 91.28 [ 62%] Built target options_test
+#6 91.39 [100%] Built target link_test
+#6 91.48 Install the project...
+#6 91.51 -- Install configuration: ""
+#6 91.54 -- Installing: /usr/local/lib/cmake/cxxopts/cxxopts-config.cmake
+#6 91.54 -- Installing: /usr/local/lib/cmake/cxxopts/cxxopts-config-version.cmake
+#6 91.54 -- Installing: /usr/local/lib/cmake/cxxopts/cxxopts-targets.cmake
+#6 91.55 -- Installing: /usr/local/include/cxxopts.hpp
+#6 91.56 -- Installing: /usr/local/lib/pkgconfig/cxxopts.pc
+#6 93.96 Starting >>> node_options
+#6 94.01 Starting >>> node_options_intermediate
+#6 116.5 --- stderr: node_options
+#6 116.5 CMake Warning:
+#6 116.5   Manually-specified variables were not used by the project:
+#6 116.5 
+#6 116.5     CATKIN_INSTALL_INTO_PREFIX_ROOT
+#6 116.5 
+#6 116.5 
+#6 116.5 ---
+#6 116.5 Finished <<< node_options [22.6s]
+#6 116.5 Starting >>> publisher_node
+#6 116.6 --- stderr: node_options_intermediate
+#6 116.6 CMake Warning:
+#6 116.6   Manually-specified variables were not used by the project:
+#6 116.6 
+#6 116.6     CATKIN_INSTALL_INTO_PREFIX_ROOT
+#6 116.6 
+#6 116.6 
+#6 116.6 ---
+#6 116.6 Finished <<< node_options_intermediate [22.6s]
+#6 168.3 --- stderr: publisher_node
+#6 168.3 CMake Warning:
+#6 168.3   Manually-specified variables were not used by the project:
+#6 168.3 
+#6 168.3     CATKIN_INSTALL_INTO_PREFIX_ROOT
+#6 168.3 
+#6 168.3 
+#6 168.3 ---
+#6 168.3 [Processing: publisher_node]
+#6 168.3 Finished <<< publisher_node [51.7s]
+#6 168.3 Starting >>> intermediate_node
+#6 168.3 Starting >>> subscriber_node
+#6 213.2 --- stderr: subscriber_node
+#6 213.2 CMake Warning:
+#6 213.2   Manually-specified variables were not used by the project:
+#6 213.2 
+#6 213.2     CATKIN_INSTALL_INTO_PREFIX_ROOT
+#6 213.2 
+#6 213.2 
+#6 213.2 ---
+#6 213.2 [Processing: intermediate_node, subscriber_node]
+#6 213.2 Finished <<< subscriber_node [44.9s]
+#6 217.2 --- stderr: intermediate_node
+#6 217.2 CMake Warning:
+#6 217.2   Manually-specified variables were not used by the project:
+#6 217.2 
+#6 217.2     CATKIN_INSTALL_INTO_PREFIX_ROOT
+#6 217.2 
+#6 217.2 
+#6 217.2 ---
+#6 217.2 Finished <<< intermediate_node [48.9s]
+#6 217.3 
+#6 217.3 Summary: 5 packages finished [2min 4s]
+#6 217.3   5 packages had stderr output: intermediate_node node_options node_options_intermediate publisher_node subscriber_node
+#6 DONE 219.2s
+
+#7 [4/5] RUN apt-get update && apt-get install -y     ros-jazzy-rmw-cyclonedds-cpp     && rm -rf /var/lib/apt/lists/*
+#7 1.333 Hit:1 http://packages.ros.org/ros2/ubuntu noble InRelease
+#7 1.691 Hit:2 http://ports.ubuntu.com/ubuntu-ports noble InRelease
+#7 1.947 Hit:3 http://ports.ubuntu.com/ubuntu-ports noble-updates InRelease
+#7 2.225 Hit:4 http://ports.ubuntu.com/ubuntu-ports noble-backports InRelease
+#7 2.502 Hit:5 http://ports.ubuntu.com/ubuntu-ports noble-security InRelease
+#7 2.978 Reading package lists...
+#7 6.651 Reading package lists...
+#7 10.28 Building dependency tree...
+#7 10.91 Reading state information...
+#7 12.28 The following additional packages will be installed:
+#7 12.28   acl libacl1-dev libattr1-dev ros-jazzy-cyclonedds
+#7 12.29   ros-jazzy-iceoryx-binding-c ros-jazzy-iceoryx-hoofs ros-jazzy-iceoryx-posh
+#7 12.47 The following NEW packages will be installed:
+#7 12.47   acl libacl1-dev libattr1-dev ros-jazzy-cyclonedds
+#7 12.47   ros-jazzy-iceoryx-binding-c ros-jazzy-iceoryx-hoofs ros-jazzy-iceoryx-posh
+#7 12.48   ros-jazzy-rmw-cyclonedds-cpp
+#7 13.05 0 upgraded, 8 newly installed, 0 to remove and 110 not upgraded.
+#7 13.05 Need to get 2007 kB of archives.
+#7 13.05 After this operation, 9240 kB of additional disk space will be used.
+#7 13.05 Get:1 http://packages.ros.org/ros2/ubuntu noble/main arm64 ros-jazzy-iceoryx-binding-c arm64 2.0.6-1noble.20250424.121711 [61.8 kB]
+#7 13.17 Get:2 http://ports.ubuntu.com/ubuntu-ports noble-updates/main arm64 acl arm64 2.3.2-1build1.1 [39.0 kB]
+#7 13.65 Get:3 http://packages.ros.org/ros2/ubuntu noble/main arm64 ros-jazzy-iceoryx-hoofs arm64 2.0.6-1noble.20250424.103959 [211 kB]
+#7 13.83 Get:4 http://ports.ubuntu.com/ubuntu-ports noble-updates/main arm64 libattr1-dev arm64 1:2.5.2-1build1.1 [23.3 kB]
+#7 13.94 Get:5 http://ports.ubuntu.com/ubuntu-ports noble-updates/main arm64 libacl1-dev arm64 2.3.2-1build1.1 [78.8 kB]
+#7 14.25 Get:6 http://packages.ros.org/ros2/ubuntu noble/main arm64 ros-jazzy-iceoryx-posh arm64 2.0.6-1noble.20250424.120742 [398 kB]
+#7 14.66 Get:7 http://packages.ros.org/ros2/ubuntu noble/main arm64 ros-jazzy-cyclonedds arm64 0.10.5-1noble.20250424.122341 [1029 kB]
+#7 15.12 Get:8 http://packages.ros.org/ros2/ubuntu noble/main arm64 ros-jazzy-rmw-cyclonedds-cpp arm64 2.2.3-1noble.20251008.230551 [166 kB]
+#7 16.11 debconf: delaying package configuration, since apt-utils is not installed
+#7 16.32 Fetched 2007 kB in 3s (777 kB/s)
+#7 16.52 Selecting previously unselected package acl.
+#7 16.52 (Reading database ... (Reading database ... 5%(Reading database ... 10%(Reading database ... 15%(Reading database ... 20%(Reading database ... 25%(Reading database ... 30%(Reading database ... 35%(Reading database ... 40%(Reading database ... 45%(Reading database ... 50%(Reading database ... 55%(Reading database ... 60%(Reading database ... 65%(Reading database ... 70%(Reading database ... 75%(Reading database ... 80%(Reading database ... 85%(Reading database ... 90%(Reading database ... 95%(Reading database ... 100%(Reading database ... 39468 files and directories currently installed.)
+#7 17.01 Preparing to unpack .../0-acl_2.3.2-1build1.1_arm64.deb ...
+#7 17.02 Unpacking acl (2.3.2-1build1.1) ...
+#7 17.22 Selecting previously unselected package ros-jazzy-iceoryx-binding-c.
+#7 17.23 Preparing to unpack .../1-ros-jazzy-iceoryx-binding-c_2.0.6-1noble.20250424.121711_arm64.deb ...
+#7 17.24 Unpacking ros-jazzy-iceoryx-binding-c (2.0.6-1noble.20250424.121711) ...
+#7 17.48 Selecting previously unselected package libattr1-dev:arm64.
+#7 17.50 Preparing to unpack .../2-libattr1-dev_1%3a2.5.2-1build1.1_arm64.deb ...
+#7 17.51 Unpacking libattr1-dev:arm64 (1:2.5.2-1build1.1) ...
+#7 17.70 Selecting previously unselected package libacl1-dev:arm64.
+#7 17.72 Preparing to unpack .../3-libacl1-dev_2.3.2-1build1.1_arm64.deb ...
+#7 17.73 Unpacking libacl1-dev:arm64 (2.3.2-1build1.1) ...
+#7 17.90 Selecting previously unselected package ros-jazzy-iceoryx-hoofs.
+#7 17.91 Preparing to unpack .../4-ros-jazzy-iceoryx-hoofs_2.0.6-1noble.20250424.103959_arm64.deb ...
+#7 17.93 Unpacking ros-jazzy-iceoryx-hoofs (2.0.6-1noble.20250424.103959) ...
+#7 18.26 Selecting previously unselected package ros-jazzy-iceoryx-posh.
+#7 18.27 Preparing to unpack .../5-ros-jazzy-iceoryx-posh_2.0.6-1noble.20250424.120742_arm64.deb ...
+#7 18.29 Unpacking ros-jazzy-iceoryx-posh (2.0.6-1noble.20250424.120742) ...
+#7 18.68 Selecting previously unselected package ros-jazzy-cyclonedds.
+#7 18.70 Preparing to unpack .../6-ros-jazzy-cyclonedds_0.10.5-1noble.20250424.122341_arm64.deb ...
+#7 18.73 Unpacking ros-jazzy-cyclonedds (0.10.5-1noble.20250424.122341) ...
+#7 19.14 Selecting previously unselected package ros-jazzy-rmw-cyclonedds-cpp.
+#7 19.15 Preparing to unpack .../7-ros-jazzy-rmw-cyclonedds-cpp_2.2.3-1noble.20251008.230551_arm64.deb ...
+#7 19.17 Unpacking ros-jazzy-rmw-cyclonedds-cpp (2.2.3-1noble.20251008.230551) ...
+#7 19.51 Setting up libattr1-dev:arm64 (1:2.5.2-1build1.1) ...
+#7 19.55 Setting up ros-jazzy-iceoryx-binding-c (2.0.6-1noble.20250424.121711) ...
+#7 19.58 Setting up acl (2.3.2-1build1.1) ...
+#7 19.62 Setting up libacl1-dev:arm64 (2.3.2-1build1.1) ...
+#7 19.65 Setting up ros-jazzy-iceoryx-hoofs (2.0.6-1noble.20250424.103959) ...
+#7 19.69 Setting up ros-jazzy-iceoryx-posh (2.0.6-1noble.20250424.120742) ...
+#7 19.72 Setting up ros-jazzy-cyclonedds (0.10.5-1noble.20250424.122341) ...
+#7 19.75 Setting up ros-jazzy-rmw-cyclonedds-cpp (2.2.3-1noble.20251008.230551) ...
+#7 19.78 Processing triggers for libc-bin (2.39-0ubuntu8.6) ...
+#7 DONE 21.7s
+
+#8 [5/5] RUN echo "source /root/performance_ws/install/setup.sh" >> ~/.bashrc
+#8 DONE 0.9s
+
+#9 exporting to image
+#9 exporting layers
+#9 exporting layers 15.7s done
+#9 exporting manifest sha256:288c67439dd86a9b508d27416d2e9d37526691e2de71885b7757656b52b7f2d5 0.0s done
+#9 exporting config sha256:d174116476732e8f791d1f84593d8166c77a9daeaaed9121474fff1ffb7d38c6 0.1s done
+#9 exporting attestation manifest sha256:09d45529c25438ba3720b6eb306029b2b0cfcf778a114492f72125014504d798
+#9 exporting attestation manifest sha256:09d45529c25438ba3720b6eb306029b2b0cfcf778a114492f72125014504d798 0.1s done
+#9 exporting manifest list sha256:b2a549c03b53b220e9c75cec6336930fa0626edffb7483062c7a4f3dc55db2e0 0.0s done
+#9 naming to docker.io/library/ros2_perf_pi0:latest
+#9 naming to docker.io/library/ros2_perf_pi0:latest 0.0s done
+#9 unpacking to docker.io/library/ros2_perf_pi0:latest
+#9 unpacking to docker.io/library/ros2_perf_pi0:latest 7.6s done
+#9 DONE 23.9s

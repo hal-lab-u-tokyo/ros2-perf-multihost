@@ -1,0 +1,6 @@
+Name: hamburg
+NodeType: Intermediate
+Topics(Pub): parana,
+PayloadSize: 262144,
+Period: 100,
+Topics(Sub): nile,tigris,ganges,danube,

@@ -1,0 +1,2 @@
+payload_size,run,lost[#],mean[ms],sd[ms],min[ms],q1[ms],mid[ms],q3[ms],max[ms]
+262144,total,156,5.998661,0.370237,1.182037,1.986875,4.192831,9.847436,44.114606

@@ -1,0 +1,3 @@
+host,cpu_mean_mean[%],cpu_max_max[%],mem_mean_mean[%],mem_max_max[%],load1_mean_mean,swap_mean_mean[%],swap_max_max[%],runs_covered
+pi0,16.121906,100.0,11.84922,12.7,0.482775,0.0,0.0,10
+pi1,13.246879,100.0,11.566596,16.6,0.613913,0.0,0.0,10

@@ -1,0 +1,5 @@
+Name: montreal
+NodeType: Publisher
+Topics: amazon,nile,ganges,danube,
+PayloadSize: 262144,262144,262144,262144,
+Period: 100,100,100,100,
