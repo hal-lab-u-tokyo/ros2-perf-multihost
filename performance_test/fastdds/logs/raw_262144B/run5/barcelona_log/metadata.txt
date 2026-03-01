@@ -1,0 +1,6 @@
+Name: barcelona
+NodeType: Intermediate
+Topics(Pub): lena,
+PayloadSize: 262144,
+Period: 100,
+Topics(Sub): mekong,

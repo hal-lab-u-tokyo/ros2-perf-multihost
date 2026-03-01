@@ -1,0 +1,6 @@
+Name: osaka
+NodeType: Intermediate
+Topics(Pub): salween,
+PayloadSize: 1048576,
+Period: 100,
+Topics(Sub): parana,
