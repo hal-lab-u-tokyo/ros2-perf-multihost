@@ -259,4 +259,3 @@ if __name__ == "__main__":
         json_content = json.load(f)
 
     generate_dockerfiles(json_content, args.rmw)
-    # generate_docker_compose(json_content, args.rmw)
