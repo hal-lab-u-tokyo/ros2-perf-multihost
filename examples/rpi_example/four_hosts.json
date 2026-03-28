@@ -67,12 +67,7 @@
 		      	    ]
                         }
                     ]
-	        }
-            ]
-        },
-        {
-            "host_name": "pi2",
-            "nodes": [
+	        },
                 {
 		    "node_name": "mandalay",
 		    "intermediate": [
@@ -90,7 +85,7 @@
             ]
         },
         {
-            "host_name": "pi3",
+            "host_name": "pi2",
             "nodes": [
                 {
 		    "node_name": "ponce",
@@ -139,7 +134,7 @@
             ]
         },
         {
-            "host_name": "pi4",
+            "host_name": "pi3",
             "nodes": [
                 {
 		    "node_name": "geneva",

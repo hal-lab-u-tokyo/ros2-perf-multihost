@@ -32,8 +32,13 @@
 		      	    ]
                         }
                     ]
-	        },
-			{
+	        }
+            ]
+        },
+        {
+            "host_name": "pi1",
+            "nodes": [
+                {
 		    "node_name": "hamburg",
 		    "intermediate": [
                         {
@@ -48,12 +53,8 @@
 		      	    ]
                         }
                     ]
-	        }
-            ]
-        },
-        {
-            "host_name": "pi1",
-            "nodes": [
+	        },
+
 	        {
 		    "node_name": "osaka",
 		    "intermediate": [
@@ -66,7 +67,12 @@
 		      	    ]
                         }
                     ]
-	        },
+	        }
+            ]
+        },
+        {
+            "host_name": "pi2",
+            "nodes": [
                 {
 		    "node_name": "mandalay",
 		    "intermediate": [
@@ -80,13 +86,8 @@
 		      	    ]
                         }
                     ]
-	        }
-            ]
-        },
-        {
-            "host_name": "pi2",
-            "nodes": [
-                {
+	        },
+			{
 		    "node_name": "ponce",
 		    "intermediate": [
                         {
@@ -101,8 +102,12 @@
 		      	    ]
                         }
                     ]
-	        },
-
+	        }
+            ]
+        },
+        {
+            "host_name": "pi3",
+            "nodes": [
 	        {
 		    "node_name": "barcelona",
 		    "intermediate": [
@@ -129,7 +134,12 @@
 		      	    ]
                         }
                     ]
-	        },
+	        }
+            ]
+        },
+        {
+            "host_name": "pi4",
+            "nodes": [
                 {
 		    "node_name": "geneva",
 		    "intermediate": [

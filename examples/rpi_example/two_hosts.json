@@ -33,7 +33,7 @@
                         }
                     ]
 	        },
-			{
+                {
 		    "node_name": "hamburg",
 		    "intermediate": [
                         {
@@ -48,12 +48,8 @@
 		      	    ]
                         }
                     ]
-	        }
-            ]
-        },
-        {
-            "host_name": "pi1",
-            "nodes": [
+	        },
+
 	        {
 		    "node_name": "osaka",
 		    "intermediate": [
@@ -84,7 +80,7 @@
             ]
         },
         {
-            "host_name": "pi2",
+            "host_name": "pi1",
             "nodes": [
                 {
 		    "node_name": "ponce",
