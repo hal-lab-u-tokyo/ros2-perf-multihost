@@ -42,11 +42,6 @@ for host in "${HOSTS[@]}"; do
       fi
       sleep 2
     done
-
-    # if [ "$ready" -ne 1 ]; then
-    #   echo "[$host] WARN: $host:$PORT not reachable from here. Continuing..."
-    #   exit 1
-    # fi
   ) &
   pids+=($!)
 done
