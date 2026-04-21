@@ -44,26 +44,22 @@ def generate_dockerfiles(json_content, rmw):
 
     # rmw_zenoh の依存をビルド（routerは起動しない）
     if rmw == "zenoh":
-        zenoh_build_command = textwrap.dedent(
-            r"""
+        zenoh_build_command = textwrap.dedent(r"""
         RUN apt-get update && apt-get install -y \
             ros-jazzy-rmw-zenoh-cpp \
             python3-json5 \
             && rm -rf /var/lib/apt/lists/*
 
-        """
-        )
+        """)
         docker_base_content += zenoh_build_command
     # rmw_cyclonedds の依存をビルド
     elif rmw == "cyclonedds":
-        cyclonedds_build_command = textwrap.dedent(
-            r"""
+        cyclonedds_build_command = textwrap.dedent(r"""
         RUN apt-get update && apt-get install -y \
             ros-jazzy-rmw-cyclonedds-cpp \
             && rm -rf /var/lib/apt/lists/*
 
-        """
-        )
+        """)
         docker_base_content += cyclonedds_build_command
 
     # 各ホストに対し、ノード情報を追記したDockerfileを作成し、Dockerfiles/{ホスト名}/Dockerfile に置く
@@ -88,7 +84,9 @@ def generate_dockerfiles(json_content, rmw):
             dockerfile_content += env_vars
 
             # bashrcにROS2セットアップを追加
-            dockerfile_content += "\n# ROS2セットアップをbashrcに追加（docker execで入った時も有効）\n"
+            dockerfile_content += (
+                "\n# ROS2セットアップをbashrcに追加（docker execで入った時も有効）\n"
+            )
             dockerfile_content += 'RUN echo "source /root/performance_ws/install/setup.sh" >> ~/.bashrc\n\n'
 
             # CMDでは環境変数設定不要（ENVで設定済み）
@@ -112,7 +110,9 @@ def generate_dockerfiles(json_content, rmw):
             if index == 0:
                 if node.get("publisher"):
                     publisher_list = node["publisher"]
-                    topic_names = ",".join(publisher["topic_name"] for publisher in publisher_list)
+                    topic_names = ",".join(
+                        publisher["topic_name"] for publisher in publisher_list
+                    )
                     additional_command = (
                         f". /root/performance_ws/install/setup.sh "
                         f"&& cd /root/performance_ws/install/publisher_node/lib/publisher_node "
@@ -124,7 +124,9 @@ def generate_dockerfiles(json_content, rmw):
 
                 if node.get("subscriber"):
                     subscriber_list = node["subscriber"]
-                    topic_names = ",".join(subscriber["topic_name"] for subscriber in subscriber_list)
+                    topic_names = ",".join(
+                        subscriber["topic_name"] for subscriber in subscriber_list
+                    )
                     additional_command = (
                         f". /root/performance_ws/install/setup.sh "
                         f"&& cd /root/performance_ws/install/subscriber_node/lib/subscriber_node "
@@ -136,8 +138,12 @@ def generate_dockerfiles(json_content, rmw):
                 if node.get("intermediate"):
                     publisher_list = node["intermediate"][0]["publisher"]
                     subscriber_list = node["intermediate"][0]["subscriber"]
-                    topic_names_pub = ",".join(publisher["topic_name"] for publisher in publisher_list)
-                    topic_names_sub = ",".join(subscriber["topic_name"] for subscriber in subscriber_list)
+                    topic_names_pub = ",".join(
+                        publisher["topic_name"] for publisher in publisher_list
+                    )
+                    topic_names_sub = ",".join(
+                        subscriber["topic_name"] for subscriber in subscriber_list
+                    )
                     additional_command = (
                         f". /root/performance_ws/install/setup.sh "
                         f"&& cd /root/performance_ws/install/intermediate_node/lib/intermediate_node "
@@ -151,7 +157,9 @@ def generate_dockerfiles(json_content, rmw):
             # 複数のノードをバックグラウンドで同時に起動するため、通常は & で結ぶ
             if node.get("publisher"):
                 publisher_list = node["publisher"]
-                topic_names = ",".join(publisher["topic_name"] for publisher in publisher_list)
+                topic_names = ",".join(
+                    publisher["topic_name"] for publisher in publisher_list
+                )
                 additional_command = (
                     f" & . /root/performance_ws/install/setup.sh "
                     f"&& cd /root/performance_ws/install/publisher_node/lib/publisher_node "
@@ -163,7 +171,9 @@ def generate_dockerfiles(json_content, rmw):
 
             if node.get("subscriber"):
                 subscriber_list = node["subscriber"]
-                topic_names = ",".join(subscriber["topic_name"] for subscriber in subscriber_list)
+                topic_names = ",".join(
+                    subscriber["topic_name"] for subscriber in subscriber_list
+                )
                 additional_command = (
                     f" & . /root/performance_ws/install/setup.sh "
                     f"&& cd /root/performance_ws/install/subscriber_node/lib/subscriber_node "
@@ -175,8 +185,12 @@ def generate_dockerfiles(json_content, rmw):
             if node.get("intermediate"):
                 publisher_list = node["intermediate"][0]["publisher"]
                 subscriber_list = node["intermediate"][0]["subscriber"]
-                topic_names_pub = ",".join(publisher["topic_name"] for publisher in publisher_list)
-                topic_names_sub = ",".join(subscriber["topic_name"] for subscriber in subscriber_list)
+                topic_names_pub = ",".join(
+                    publisher["topic_name"] for publisher in publisher_list
+                )
+                topic_names_sub = ",".join(
+                    subscriber["topic_name"] for subscriber in subscriber_list
+                )
                 additional_command = (
                     f" & . /root/performance_ws/install/setup.sh "
                     f"&& cd /root/performance_ws/install/intermediate_node/lib/intermediate_node "
@@ -252,7 +266,9 @@ def generate_docker_compose(json_content, rmw):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("json_path", help="入力JSONファイルパス")
-    parser.add_argument("--rmw", type=str, default="fastdds", help="RMW実装名 (例: zenoh)")
+    parser.add_argument(
+        "--rmw", type=str, default="fastdds", help="RMW実装名 (例: zenoh)"
+    )
     args = parser.parse_args()
 
     with open(args.json_path, "r") as f:

@@ -5,7 +5,11 @@ import logging
 import sys
 import os
 
-logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s: %(message)s", stream=sys.stdout)
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s %(levelname)s: %(message)s",
+    stream=sys.stdout,
+)
 
 app = Flask(__name__)
 
@@ -17,18 +21,35 @@ def start_script():
     if not payload_size:
         return jsonify({"error": "payload_size required"}), 400
     hostname = socket.gethostname()
-    script_path = f"/home/ubuntu/ros2-perf-multihost-v2/host_scripts/{hostname}_start.sh"
+    script_path = (
+        f"/home/ubuntu/ros2-perf-multihost-v2/host_scripts/{hostname}_start.sh"
+    )
     try:
         # スクリプトが終了するまで待つ
-        result = subprocess.run(["bash", script_path, str(payload_size), str(run_idx)], text=True)
+        result = subprocess.run(
+            ["bash", script_path, str(payload_size), str(run_idx)], text=True
+        )
         if result.returncode == 0:
             app.logger.info("[start] rc=0 stdout:\n%s", result.stdout)
             return jsonify({"status": "finished", "stdout": result.stdout}), 200
         else:
-            app.logger.error("[start] rc=%d stdout:\n%s\nstderr:\n%s", result.returncode, result.stdout, result.stderr)
-            return jsonify(
-                {"error": "script failed", "returncode": result.returncode, "stdout": result.stdout, "stderr": result.stderr}
-            ), 500
+            app.logger.error(
+                "[start] rc=%d stdout:\n%s\nstderr:\n%s",
+                result.returncode,
+                result.stdout,
+                result.stderr,
+            )
+            return (
+                jsonify(
+                    {
+                        "error": "script failed",
+                        "returncode": result.returncode,
+                        "stdout": result.stdout,
+                        "stderr": result.stderr,
+                    }
+                ),
+                500,
+            )
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 

@@ -17,14 +17,18 @@ def find_pid(target):
     if target.isdigit():
         return int(target)
     for p in psutil.process_iter(["pid", "name", "cmdline"]):
-        if target == p.info["name"] or (p.info["cmdline"] and target in " ".join(p.info["cmdline"])):
+        if target == p.info["name"] or (
+            p.info["cmdline"] and target in " ".join(p.info["cmdline"])
+        ):
             return p.info["pid"]
     return None
 
 
 with open(out, "w", newline="") as f:
     w = csv.writer(f)
-    w.writerow(["timestamp_ns", "pid", "cpu_percent", "rss_bytes", "vms_bytes", "num_threads"])
+    w.writerow(
+        ["timestamp_ns", "pid", "cpu_percent", "rss_bytes", "vms_bytes", "num_threads"]
+    )
     while True:
         pid = find_pid(target)
         if not pid:

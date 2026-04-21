@@ -13,7 +13,15 @@ payload_sizes = [64, 256, 1024, 4096, 16384, 65536, 262144]  # 必要に応じ�
 def run_test(payload_size, run_idx, start_scripts_py, num_hosts):
     print(f"=== Run payload={payload_size}B, trial={run_idx + 1} ===")
     result = subprocess.run(
-        ["python3", start_scripts_py, str(payload_size), str(num_hosts), str(run_idx + 1)], capture_output=True, text=True
+        [
+            "python3",
+            start_scripts_py,
+            str(payload_size),
+            str(num_hosts),
+            str(run_idx + 1),
+        ],
+        capture_output=True,
+        text=True,
     )
     print(result)
     print(result.stdout)
@@ -22,7 +30,14 @@ def run_test(payload_size, run_idx, start_scripts_py, num_hosts):
 
 
 def aggregate_total_latency(
-    base_log_dir, result_parent_dir, prefix, payload_size, num_trials, num_hosts, period_ms=100, eval_time=60
+    base_log_dir,
+    result_parent_dir,
+    prefix,
+    payload_size,
+    num_trials,
+    num_hosts,
+    period_ms=100,
+    eval_time=60,
 ):
     latest_dir = f"{prefix}_{payload_size}B"
     log_parent = os.path.abspath(base_log_dir)
@@ -35,11 +50,15 @@ def aggregate_total_latency(
         remote_log_dir = f"/home/ubuntu/ros2-perf-multihost-v2/logs/{prefix}_{payload_size}B/run{run_idx + 1}"
         for host in hosts:
             print(f"Copying logs from {host} (run{run_idx + 1})")
-            subprocess.run(["scp", "-r", f"ubuntu@{host}:{remote_log_dir}/*", run_log_dir + "/"])
+            subprocess.run(
+                ["scp", "-r", f"ubuntu@{host}:{remote_log_dir}/*", run_log_dir + "/"]
+            )
 
     run_dir = os.path.join(result_parent_dir, latest_dir)
     log_dir = os.path.join(base_log_dir, latest_dir)
-    subprocess.run(["python3", "all_latency.py", "--logs", log_dir, "--results", run_dir])
+    subprocess.run(
+        ["python3", "all_latency.py", "--logs", log_dir, "--results", run_dir]
+    )
     print(f"  Saved results to {run_dir}")
 
     # レイテンシ集計（既存）
@@ -120,18 +139,46 @@ def aggregate_total_latency(
         sd_mbps = round(np.std(all_throughputs_mbps), 6)
         min_mbps = round(np.min(all_throughputs_mbps), 6)
         max_mbps = round(np.max(all_throughputs_mbps), 6)
-        throughput_rows.append(["total", mean_bps, mean_mbps, sd_bps, sd_mbps, min_bps, min_mbps, max_bps, max_mbps])
+        throughput_rows.append(
+            [
+                "total",
+                mean_bps,
+                mean_mbps,
+                sd_bps,
+                sd_mbps,
+                min_bps,
+                min_mbps,
+                max_bps,
+                max_mbps,
+            ]
+        )
 
     # レイテンシCSV
-    csv_path = os.path.join(result_parent_dir, latest_dir, f"total_latency_{payload_size}B.csv")
+    csv_path = os.path.join(
+        result_parent_dir, latest_dir, f"total_latency_{payload_size}B.csv"
+    )
     with open(csv_path, "w", newline="") as f:
         writer = csv.writer(f)
-        writer.writerow(["run", "lost[#]", "mean[ms]", "sd[ms]", "min[ms]", "q1[ms]", "mid[ms]", "q3[ms]", "max[ms]"])
+        writer.writerow(
+            [
+                "run",
+                "lost[#]",
+                "mean[ms]",
+                "sd[ms]",
+                "min[ms]",
+                "q1[ms]",
+                "mid[ms]",
+                "q3[ms]",
+                "max[ms]",
+            ]
+        )
         writer.writerows(rows)
     print(f"  Aggregated CSV saved: {csv_path}")
 
     # スループットCSV
-    throughput_csv_path = os.path.join(result_parent_dir, latest_dir, f"throughput_{payload_size}B.csv")
+    throughput_csv_path = os.path.join(
+        result_parent_dir, latest_dir, f"throughput_{payload_size}B.csv"
+    )
     with open(throughput_csv_path, "w", newline="") as f:
         writer = csv.writer(f)
         writer.writerow(["run", "throughput[B/s]", "throughput[MB/s]"])
@@ -141,7 +188,9 @@ def aggregate_total_latency(
     # --- 既存の横断平均/最大（usage_rows）はそのまま ---
     usage_rows = []
     # --- 新規追加: ホスト別・run別の行 ---
-    host_runs_usage_rows = []  # [host, run, cpu_mean, cpu_max, mem_mean, mem_max, load1_mean, swap_mean, swap_max, samples]
+    host_runs_usage_rows = (
+        []
+    )  # [host, run, cpu_mean, cpu_max, mem_mean, mem_max, load1_mean, swap_mean, swap_max, samples]
 
     for run_idx in range(num_trials):
         run_log_dir = os.path.join(src_log_dir, f"run{run_idx + 1}")
@@ -169,19 +218,79 @@ def aggregate_total_latency(
 
         # 既存の横断平均/最大（run単位で全ホスト平均/最大）
         if host_metrics:
-            cpu_mean = float(np.mean([mm["cpu_mean"] for mm in host_metrics if mm["cpu_mean"] is not None]))
-            cpu_max = float(np.max([mm["cpu_max"] for mm in host_metrics if mm["cpu_max"] is not None]))
-            mem_mean = float(np.mean([mm["mem_mean"] for mm in host_metrics if mm["mem_mean"] is not None]))
-            mem_max = float(np.max([mm["mem_max"] for mm in host_metrics if mm["mem_max"] is not None]))
-            load1_mean = float(np.mean([mm["load1_mean"] for mm in host_metrics if mm["load1_mean"] is not None]))
-            swap_mean = float(np.mean([mm["swap_mean"] for mm in host_metrics if mm["swap_mean"] is not None]))
-            swap_max = float(np.max([mm["swap_max"] for mm in host_metrics if mm["swap_max"] is not None]))
+            cpu_mean = float(
+                np.mean(
+                    [
+                        mm["cpu_mean"]
+                        for mm in host_metrics
+                        if mm["cpu_mean"] is not None
+                    ]
+                )
+            )
+            cpu_max = float(
+                np.max(
+                    [mm["cpu_max"] for mm in host_metrics if mm["cpu_max"] is not None]
+                )
+            )
+            mem_mean = float(
+                np.mean(
+                    [
+                        mm["mem_mean"]
+                        for mm in host_metrics
+                        if mm["mem_mean"] is not None
+                    ]
+                )
+            )
+            mem_max = float(
+                np.max(
+                    [mm["mem_max"] for mm in host_metrics if mm["mem_max"] is not None]
+                )
+            )
+            load1_mean = float(
+                np.mean(
+                    [
+                        mm["load1_mean"]
+                        for mm in host_metrics
+                        if mm["load1_mean"] is not None
+                    ]
+                )
+            )
+            swap_mean = float(
+                np.mean(
+                    [
+                        mm["swap_mean"]
+                        for mm in host_metrics
+                        if mm["swap_mean"] is not None
+                    ]
+                )
+            )
+            swap_max = float(
+                np.max(
+                    [
+                        mm["swap_max"]
+                        for mm in host_metrics
+                        if mm["swap_max"] is not None
+                    ]
+                )
+            )
             usage_rows.append(
-                [f"run{run_idx + 1}", cpu_mean, cpu_max, mem_mean, mem_max, load1_mean, swap_mean, swap_max, len(host_metrics)]
+                [
+                    f"run{run_idx + 1}",
+                    cpu_mean,
+                    cpu_max,
+                    mem_mean,
+                    mem_max,
+                    load1_mean,
+                    swap_mean,
+                    swap_max,
+                    len(host_metrics),
+                ]
             )
 
     if host_runs_usage_rows:
-        host_runs_usage_csv = os.path.join(result_parent_dir, latest_dir, f"host_runs_usage_{payload_size}B.csv")
+        host_runs_usage_csv = os.path.join(
+            result_parent_dir, latest_dir, f"host_runs_usage_{payload_size}B.csv"
+        )
         with open(host_runs_usage_csv, "w", newline="") as f:
             w = csv.writer(f)
             w.writerow(
@@ -232,7 +341,9 @@ def aggregate_total_latency(
         )
 
     if host_summary_rows:
-        host_summary_csv = os.path.join(result_parent_dir, latest_dir, f"host_usage_summary_{payload_size}B.csv")
+        host_summary_csv = os.path.join(
+            result_parent_dir, latest_dir, f"host_usage_summary_{payload_size}B.csv"
+        )
         with open(host_summary_csv, "w", newline="") as f:
             w = csv.writer(f)
             w.writerow(
@@ -293,9 +404,18 @@ def read_monitor_metrics(path):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("--hosts", type=int, default=3, help="使用するホスト数 (デフォルト: 3)")
-    parser.add_argument("--trials", type=int, default=10, help="1ペイロードサイズあたりの試行回数 (デフォルト: 10)")
-    parser.add_argument("--docker", action="store_true", help="Dockerを使用する場合は指定")
+    parser.add_argument(
+        "--hosts", type=int, default=3, help="使用するホスト数 (デフォルト: 3)"
+    )
+    parser.add_argument(
+        "--trials",
+        type=int,
+        default=10,
+        help="1ペイロードサイズあたりの試行回数 (デフォルト: 10)",
+    )
+    parser.add_argument(
+        "--docker", action="store_true", help="Dockerを使用する場合は指定"
+    )
     args = parser.parse_args()
 
     base_log_dir = "./logs"
@@ -315,7 +435,9 @@ if __name__ == "__main__":
         for run_idx in range(args.trials):
             run_test(payload_size, run_idx, start_scripts_py, args.hosts)
             time.sleep(10)
-        aggregate_total_latency(base_log_dir, base_result_dir, prefix, payload_size, args.trials, args.hosts)
+        aggregate_total_latency(
+            base_log_dir, base_result_dir, prefix, payload_size, args.trials, args.hosts
+        )
     print("All tests and aggregation complete.")
 
     # --- ここから全ペイロードサイズの集計CSVをまとめる処理 ---
@@ -323,7 +445,9 @@ if __name__ == "__main__":
     header = None
     for payload_size in payload_sizes:
         latest_dir = f"{prefix}_{payload_size}B"
-        csv_path = os.path.join(base_result_dir, latest_dir, f"total_latency_{payload_size}B.csv")
+        csv_path = os.path.join(
+            base_result_dir, latest_dir, f"total_latency_{payload_size}B.csv"
+        )
         if not os.path.exists(csv_path):
             continue
         with open(csv_path, "r") as f:
@@ -337,7 +461,9 @@ if __name__ == "__main__":
                     summary_rows.append([str(payload_size)] + row)
 
     # 出力
-    summary_csv_path = os.path.join(base_result_dir, f"{prefix}_all_payloads_summary.csv")
+    summary_csv_path = os.path.join(
+        base_result_dir, f"{prefix}_all_payloads_summary.csv"
+    )
     with open(summary_csv_path, "w", newline="") as f:
         writer = csv.writer(f)
         if header:
@@ -359,7 +485,9 @@ if __name__ == "__main__":
     ]
     for payload_size in payload_sizes:
         latest_dir = f"{prefix}_{payload_size}B"
-        usage_csv_path = os.path.join(base_result_dir, latest_dir, f"host_usage_summary_{payload_size}B.csv")
+        usage_csv_path = os.path.join(
+            base_result_dir, latest_dir, f"host_usage_summary_{payload_size}B.csv"
+        )
         if not os.path.exists(usage_csv_path):
             continue
 
@@ -412,7 +540,9 @@ if __name__ == "__main__":
             ]
         )
 
-    usage_summary_csv = os.path.join(base_result_dir, f"{prefix}_all_payloads_host_usage_summary.csv")
+    usage_summary_csv = os.path.join(
+        base_result_dir, f"{prefix}_all_payloads_host_usage_summary.csv"
+    )
     with open(usage_summary_csv, "w", newline="") as f:
         w = csv.writer(f)
         w.writerow(usage_header)

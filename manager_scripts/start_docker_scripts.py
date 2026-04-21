@@ -5,7 +5,9 @@ import sys
 
 def main():
     if len(sys.argv) < 4:
-        print("Usage: python start_docker_scripts.py <payload_size> <num_hosts> <run_idx>")
+        print(
+            "Usage: python start_docker_scripts.py <payload_size> <num_hosts> <run_idx>"
+        )
         sys.exit(1)
     payload_size = sys.argv[1]
     num_hosts = int(sys.argv[2])
@@ -23,7 +25,9 @@ def main():
     def start(host):
         try:
             r = requests.post(
-                f"http://{host}:5000/start_docker", json={"payload_size": payload_size, "run_idx": run_idx}, timeout=300
+                f"http://{host}:5000/start_docker",
+                json={"payload_size": payload_size, "run_idx": run_idx},
+                timeout=300,
             )
             print(f"{host}: {r.status_code} {r.text}")
         except Exception as e:
