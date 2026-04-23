@@ -19,7 +19,7 @@ HOST_SCRIPTS_DIR="${REPO_DIR}/host_scripts"
 HOSTS=("host1" "host2" "host3")
 
 # リモート側の受け取り先
-REMOTE_BASE="~/ros2-perf-multihost"
+REMOTE_BASE="/home/ubuntu/ros2-perf-multihost"
 # REMOTE_DOCKERFILES_DIR="${REMOTE_BASE}/Dockerfiles"
 REMOTE_HOST_SCRIPTS_DIR="${REMOTE_BASE}/host_scripts"
 
@@ -50,6 +50,7 @@ for host in "${HOSTS[@]}"; do
     host_start_script="${HOST_SCRIPTS_DIR}/${host}_start.sh"
     if [[ -f "${host_start_script}" ]]; then
         echo " -> host_scripts/${host}_start.sh -> ${host}:${REMOTE_HOST_SCRIPTS_DIR}/"
+        ssh "${host}" "mkdir -p ${REMOTE_HOST_SCRIPTS_DIR}/"
         scp "${host_start_script}" "${host}:${REMOTE_HOST_SCRIPTS_DIR}/"
         ssh "${host}" "chmod +x ${REMOTE_HOST_SCRIPTS_DIR}/${host}_start.sh"
     else
