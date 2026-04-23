@@ -3,6 +3,8 @@ install/
 log/
 venv/
 __pycache__/
+*.log
+*.log.remote
 
 .vscode/
 compose.yml
