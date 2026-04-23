@@ -12,18 +12,19 @@ def main():
     run_idx = int(sys.argv[3])
 
     all_hosts = [
-        "192.168.199.20",  # pi0
-        "192.168.199.21",  # pi1
-        "192.168.199.22",  # pi2
-        "192.168.199.23",  # pi3
-        "192.168.199.24",  # pi4
+        "192.168.11.106",
+        "192.168.11.107",
+        "192.168.11.108",
     ]
     hosts = all_hosts[:num_hosts]
 
     def start(host):
         try:
+            print(f"{host}: sending /start_docker request...", flush=True)
             r = requests.post(
-                f"http://{host}:5000/start_docker", json={"payload_size": payload_size, "run_idx": run_idx}, timeout=300
+                f"http://{host}:5000/start_docker",
+                json={"payload_size": payload_size, "run_idx": run_idx},
+                timeout=(5, 300),
             )
             print(f"{host}: {r.status_code} {r.text}")
         except Exception as e:

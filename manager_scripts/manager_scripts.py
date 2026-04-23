@@ -18,7 +18,7 @@ def start_script():
     if not payload_size:
         return jsonify({"error": "payload_size required"}), 400
     hostname = socket.gethostname()
-    script_path = f"/home/ubuntu/ros2-perf-multihost-v2/host_scripts/{
+    script_path = f"/home/ubuntu/ros2-perf-multihost/host_scripts/{
         hostname}_start.sh"
     try:
         # スクリプトが終了するまで待つ
@@ -46,17 +46,31 @@ def start_docker():
         return jsonify({"error": "payload_size required"}), 400
     hostname = socket.gethostname()
     image_name = f"ros2_perf_{hostname}:latest"
-    logs_dir = "/home/ubuntu/ros2-perf-multihost-v2/logs"
-    config_dir = "/home/ubuntu/ros2-perf-multihost-v2/config"
+    logs_dir = "/home/ubuntu/ros2-perf-multihost/logs"
+    config_dir = "/home/ubuntu/ros2-perf-multihost/config"
     current_log_dir = logs_dir + f"/docker_{payload_size}B/run{run_idx}"
     os.makedirs(current_log_dir, exist_ok=True)
     container_name = f"{hostname}_perf_run{run_idx}"
     monitor_csv = f"{current_log_dir}/{hostname}_monitor_host.csv"
+    docker_timeout_sec = int(os.environ.get("DOCKER_RUN_TIMEOUT_SEC", "180"))
     try:
+        # 前回の同名コンテナが残っている場合は強制削除してからスタート
+        subprocess.run(
+            ["docker", "rm", "-f", container_name],
+            capture_output=True,
+        )
+        app.logger.info(
+            "[start_docker] host=%s payload=%s run=%s image=%s timeout=%ss",
+            hostname,
+            payload_size,
+            run_idx,
+            image_name,
+            docker_timeout_sec,
+        )
         monitor_proc = subprocess.Popen(
             [
                 "python3",
-                "/home/ubuntu/ros2-perf-multihost-v2/performance_test/monitor_host.py",
+                "/home/ubuntu/ros2-perf-multihost/performance_test/monitor_host.py",
                 "0.5",
                 monitor_csv,
             ]
@@ -80,13 +94,42 @@ def start_docker():
             container_name,
             image_name,
         ]
-        result = subprocess.run(cmd, capture_output=True, text=True)
+        # capture_output を使わず、コンテナ標準出力を rest.log に流して進捗を可視化
+        result = subprocess.run(
+            cmd,
+            text=True,
+            timeout=docker_timeout_sec,
+        )
         if result.returncode == 0:
+            app.logger.info("[start_docker] host=%s docker finished", hostname)
             return jsonify({"status": "docker finished"}), 200
         else:
-            print(result)
-            return jsonify({"error": result.stderr}), 500
+            app.logger.error(
+                "[start_docker] host=%s rc=%s",
+                hostname,
+                result.returncode,
+            )
+            return jsonify(
+                {
+                    "error": "docker run failed",
+                    "returncode": result.returncode,
+                }
+            ), 500
+    except subprocess.TimeoutExpired as e:
+        app.logger.error(
+            "[start_docker] host=%s timed out after %ss",
+            hostname,
+            docker_timeout_sec,
+        )
+        subprocess.run(["docker", "rm", "-f", container_name],
+                       capture_output=True)
+        return jsonify(
+            {
+                "error": f"docker run timeout after {docker_timeout_sec}s",
+            }
+        ), 504
     except Exception as e:
+        app.logger.exception("[start_docker] host=%s exception", hostname)
         return jsonify({"error": str(e)}), 500
     finally:
         try:

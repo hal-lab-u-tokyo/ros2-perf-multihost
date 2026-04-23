@@ -1,6 +1,6 @@
 #!/bin/bash
 
-HOSTS=("192.168.199.20" "192.168.199.21" "192.168.199.22" "192.168.199.23" "192.168.199.24")
+HOSTS=("192.168.11.106" "192.168.11.107" "192.168.11.108")
 PORT=5000
 
 SSH_OPTS="-n -o BatchMode=yes -o StrictHostKeyChecking=no -o ConnectTimeout=5"
@@ -9,7 +9,7 @@ for host in "${HOSTS[@]}"; do
     echo "Stopping REST server on $host"
 
     # まず5000番ポートのLISTENプロセスを特定（優先: lsof、フォールバック: pgrep）
-    pids=$(ssh $SSH_OPTS "ubuntu@$host" 'lsof -t -iTCP:5000 -sTCP:LISTEN 2>/dev/null || pgrep -f "/home/ubuntu/ros2-perf-multihost-v2/manager_scripts/manager_scripts.py" || true')
+    pids=$(ssh $SSH_OPTS "ubuntu@$host" 'lsof -t -iTCP:5000 -sTCP:LISTEN 2>/dev/null || pgrep -f "/home/ubuntu/ros2-perf-multihost/manager_scripts/manager_scripts.py" || true')
 
     if [ -z "$pids" ]; then
         echo "$host: no REST server process found."

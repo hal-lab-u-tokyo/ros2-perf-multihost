@@ -1,7 +1,10 @@
 build/
 install/
 log/
-venv/
+__pycache__/
+*.log
+*.log.remote
+logs/
 
 .vscode/
 compose.yml

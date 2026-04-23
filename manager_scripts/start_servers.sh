@@ -1,6 +1,6 @@
 #!/bin/bash
 
-HOSTS=("192.168.199.20" "192.168.199.21" "192.168.199.22" "192.168.199.23" "192.168.199.24")
+HOSTS=("192.168.11.106" "192.168.11.107" "192.168.11.108")
 PORT=5000
 
 SSH_OPTS="-n -o BatchMode=yes -o StrictHostKeyChecking=no -o ConnectTimeout=5"
@@ -18,9 +18,8 @@ for host in "${HOSTS[@]}"; do
     LOG=/home/ubuntu/rest.log
     PID=/home/ubuntu/rest.pid
     : > "$LOG"
-    # 仮想環境の Python を直接起動して完全デタッチ
-    setsid nohup /home/ubuntu/ros2-perf-multihost-v2/.venv/bin/python \
-      /home/ubuntu/ros2-perf-multihost-v2/manager_scripts/manager_scripts.py \
+    # Python を直接起動して完全デタッチ
+    python3 /home/ubuntu/ros2-perf-multihost/manager_scripts/manager_scripts.py \
       >>"$LOG" 2>&1 < /dev/null &
     echo $! > "$PID"
     echo STARTED

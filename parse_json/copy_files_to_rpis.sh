@@ -8,7 +8,7 @@ set -euo pipefail
 #
 # 前提:
 # - 各Raspberry Piにsshでパスワードなし接続可能 (pi0, pi1, pi2, pi3, pi4)
-# - 各Raspberry Piに ~/ros2-perf-multihost-v2 ディレクトリが存在
+# - 各Raspberry Piに ~/ros2-perf-multihost ディレクトリが存在
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_DIR="$(cd "${SCRIPT_DIR}/.." && pwd)"
@@ -16,10 +16,10 @@ REPO_DIR="$(cd "${SCRIPT_DIR}/.." && pwd)"
 HOST_SCRIPTS_DIR="${REPO_DIR}/host_scripts"
 
 # 配布対象ホスト（必要に応じて編集）
-HOSTS=("pi0" "pi1" "pi2" "pi3" "pi4")
+HOSTS=("host1" "host2" "host3")
 
 # リモート側の受け取り先
-REMOTE_BASE="~/ros2-perf-multihost-v2"
+REMOTE_BASE="/home/ubuntu/ros2-perf-multihost"
 # REMOTE_DOCKERFILES_DIR="${REMOTE_BASE}/Dockerfiles"
 REMOTE_HOST_SCRIPTS_DIR="${REMOTE_BASE}/host_scripts"
 
@@ -50,6 +50,7 @@ for host in "${HOSTS[@]}"; do
     host_start_script="${HOST_SCRIPTS_DIR}/${host}_start.sh"
     if [[ -f "${host_start_script}" ]]; then
         echo " -> host_scripts/${host}_start.sh -> ${host}:${REMOTE_HOST_SCRIPTS_DIR}/"
+        ssh "${host}" "mkdir -p ${REMOTE_HOST_SCRIPTS_DIR}/"
         scp "${host_start_script}" "${host}:${REMOTE_HOST_SCRIPTS_DIR}/"
         ssh "${host}" "chmod +x ${REMOTE_HOST_SCRIPTS_DIR}/${host}_start.sh"
     else
