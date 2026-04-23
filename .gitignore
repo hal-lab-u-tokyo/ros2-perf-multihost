@@ -2,6 +2,7 @@ build/
 install/
 log/
 venv/
+__pycache__/
 
 .vscode/
 compose.yml
