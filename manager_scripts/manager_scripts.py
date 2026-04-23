@@ -18,7 +18,7 @@ def start_script():
     if not payload_size:
         return jsonify({"error": "payload_size required"}), 400
     hostname = socket.gethostname()
-    script_path = f"/home/ubuntu/ros2-perf-multihost-v2/host_scripts/{
+    script_path = f"/home/ubuntu/ros2-perf-multihost/host_scripts/{
         hostname}_start.sh"
     try:
         # スクリプトが終了するまで待つ
@@ -46,8 +46,8 @@ def start_docker():
         return jsonify({"error": "payload_size required"}), 400
     hostname = socket.gethostname()
     image_name = f"ros2_perf_{hostname}:latest"
-    logs_dir = "/home/ubuntu/ros2-perf-multihost-v2/logs"
-    config_dir = "/home/ubuntu/ros2-perf-multihost-v2/config"
+    logs_dir = "/home/ubuntu/ros2-perf-multihost/logs"
+    config_dir = "/home/ubuntu/ros2-perf-multihost/config"
     current_log_dir = logs_dir + f"/docker_{payload_size}B/run{run_idx}"
     os.makedirs(current_log_dir, exist_ok=True)
     container_name = f"{hostname}_perf_run{run_idx}"
@@ -56,7 +56,7 @@ def start_docker():
         monitor_proc = subprocess.Popen(
             [
                 "python3",
-                "/home/ubuntu/ros2-perf-multihost-v2/performance_test/monitor_host.py",
+                "/home/ubuntu/ros2-perf-multihost/performance_test/monitor_host.py",
                 "0.5",
                 monitor_csv,
             ]

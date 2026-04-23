@@ -8,7 +8,7 @@ set -euo pipefail
 #
 # 前提:
 # - 各Raspberry Piにsshでパスワードなし接続可能 (pi0, pi1, pi2, pi3, pi4)
-# - 各Raspberry Piに ~/ros2-perf-multihost-v2 ディレクトリが存在
+# - 各Raspberry Piに ~/ros2-perf-multihost ディレクトリが存在
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_DIR="$(cd "${SCRIPT_DIR}/.." && pwd)"
@@ -19,7 +19,7 @@ HOST_SCRIPTS_DIR="${REPO_DIR}/host_scripts"
 HOSTS=("host1" "host2" "host3")
 
 # リモート側の受け取り先
-REMOTE_BASE="~/ros2-perf-multihost-v2"
+REMOTE_BASE="~/ros2-perf-multihost"
 # REMOTE_DOCKERFILES_DIR="${REMOTE_BASE}/Dockerfiles"
 REMOTE_HOST_SCRIPTS_DIR="${REMOTE_BASE}/host_scripts"
 

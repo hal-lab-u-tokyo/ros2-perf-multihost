@@ -32,7 +32,7 @@ def aggregate_total_latency(
     for run_idx in range(num_trials):
         run_log_dir = os.path.join(src_log_dir, f"run{run_idx + 1}")
         os.makedirs(run_log_dir, exist_ok=True)
-        remote_log_dir = f"/home/ubuntu/ros2-perf-multihost-v2/logs/{
+        remote_log_dir = f"/home/ubuntu/ros2-perf-multihost/logs/{
             prefix}_{payload_size}B/run{run_idx + 1}"
         for host in hosts:
             print(f"Copying logs from {host} (run{run_idx + 1})")
