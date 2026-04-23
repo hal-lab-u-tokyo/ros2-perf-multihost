@@ -121,7 +121,8 @@ def start_docker():
             hostname,
             docker_timeout_sec,
         )
-        subprocess.run(["docker", "rm", "-f", container_name], capture_output=True)
+        subprocess.run(["docker", "rm", "-f", container_name],
+                       capture_output=True)
         return jsonify(
             {
                 "error": f"docker run timeout after {docker_timeout_sec}s",
