@@ -29,34 +29,34 @@ echo "=== Checking local artifacts exist ==="
 #   exit 1
 # fi
 if [[ ! -d "${HOST_SCRIPTS_DIR}" ]]; then
-  echo "ERROR: ${HOST_SCRIPTS_DIR} not found. First generate host scripts via parse_json/generate_scripts.py or generate_dockerfiles.py."
-  exit 1
+    echo "ERROR: ${HOST_SCRIPTS_DIR} not found. First generate host scripts via parse_json/generate_scripts.py or generate_dockerfiles.py."
+    exit 1
 fi
 
 for host in "${HOSTS[@]}"; do
-  echo "=== Copying artifacts to ${host} ==="
-  # ssh "${host}" "mkdir -p ${REMOTE_DOCKERFILES_DIR} ${REMOTE_HOST_SCRIPTS_DIR}"
+    echo "=== Copying artifacts to ${host} ==="
+    # ssh "${host}" "mkdir -p ${REMOTE_DOCKERFILES_DIR} ${REMOTE_HOST_SCRIPTS_DIR}"
 
-  # Dockerfiles はホスト名と一致するディレクトリのみコピー
-  # host_dockerfile_dir="${DOCKERFILES_DIR}/${host}"
-  # if [[ -d "${host_dockerfile_dir}" ]]; then
-  #   echo " -> Dockerfiles/${host} -> ${host}:${REMOTE_DOCKERFILES_DIR}/${host}"
-  #   scp -r "${host_dockerfile_dir}" "${host}:${REMOTE_DOCKERFILES_DIR}/"
-  # else
-  #   echo " -> Dockerfiles/${host} not found, skipping."
-  # fi
+    # Dockerfiles はホスト名と一致するディレクトリのみコピー
+    # host_dockerfile_dir="${DOCKERFILES_DIR}/${host}"
+    # if [[ -d "${host_dockerfile_dir}" ]]; then
+    #   echo " -> Dockerfiles/${host} -> ${host}:${REMOTE_DOCKERFILES_DIR}/${host}"
+    #   scp -r "${host_dockerfile_dir}" "${host}:${REMOTE_DOCKERFILES_DIR}/"
+    # else
+    #   echo " -> Dockerfiles/${host} not found, skipping."
+    # fi
 
-  # host_scripts はホスト名と一致する *_start.sh のみコピー
-  host_start_script="${HOST_SCRIPTS_DIR}/${host}_start.sh"
-  if [[ -f "${host_start_script}" ]]; then
-    echo " -> host_scripts/${host}_start.sh -> ${host}:${REMOTE_HOST_SCRIPTS_DIR}/"
-    scp "${host_start_script}" "${host}:${REMOTE_HOST_SCRIPTS_DIR}/"
-    ssh "${host}" "chmod +x ${REMOTE_HOST_SCRIPTS_DIR}/${host}_start.sh"
-  else
-    echo " -> host_scripts/${host}_start.sh not found, skipping."
-  fi
+    # host_scripts はホスト名と一致する *_start.sh のみコピー
+    host_start_script="${HOST_SCRIPTS_DIR}/${host}_start.sh"
+    if [[ -f "${host_start_script}" ]]; then
+        echo " -> host_scripts/${host}_start.sh -> ${host}:${REMOTE_HOST_SCRIPTS_DIR}/"
+        scp "${host_start_script}" "${host}:${REMOTE_HOST_SCRIPTS_DIR}/"
+        ssh "${host}" "chmod +x ${REMOTE_HOST_SCRIPTS_DIR}/${host}_start.sh"
+    else
+        echo " -> host_scripts/${host}_start.sh not found, skipping."
+    fi
 
-  echo "=== Done for ${host} ==="
+    echo "=== Done for ${host} ==="
 done
 
 echo "=== All copies finished ==="

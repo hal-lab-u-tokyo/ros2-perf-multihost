@@ -38,7 +38,8 @@ def parse_mem(mem_str):
 
 def sample(container, out_csv):
     # format: Container,Name,CPUPerc,MemUsage
-    cmd = ["docker", "stats", "--no-stream", "--format", "{{.Container}},{{.Name}},{{.CPUPerc}},{{.MemUsage}}", container]
+    cmd = ["docker", "stats", "--no-stream", "--format",
+           "{{.Container}},{{.Name}},{{.CPUPerc}},{{.MemUsage}}", container]
     proc = subprocess.run(cmd, capture_output=True, text=True)
     if proc.returncode != 0:
         return None
@@ -77,7 +78,8 @@ def main():
 
     with open(out_csv, "w", newline="") as f:
         writer = csv.writer(f)
-        writer.writerow(["timestamp_ns", "cpu_percent", "mem_used_bytes", "mem_total_bytes"])
+        writer.writerow(["timestamp_ns", "cpu_percent",
+                        "mem_used_bytes", "mem_total_bytes"])
         while not stop:
             row = sample(container, out_csv)
             if row:
