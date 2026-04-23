@@ -16,7 +16,7 @@ REPO_DIR="$(cd "${SCRIPT_DIR}/.." && pwd)"
 HOST_SCRIPTS_DIR="${REPO_DIR}/host_scripts"
 
 # 配布対象ホスト（必要に応じて編集）
-HOSTS=("pi0" "pi1" "pi2" "pi3" "pi4")
+HOSTS=("host1" "host2" "host3")
 
 # リモート側の受け取り先
 REMOTE_BASE="~/ros2-perf-multihost-v2"
