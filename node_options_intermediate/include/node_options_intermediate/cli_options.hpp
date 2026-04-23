@@ -5,17 +5,15 @@
 #include <string>
 #include <vector>
 
-namespace node_options
-{
+namespace node_options {
 
-class Options
-{
-public:
+class Options {
+ public:
   Options();
 
-  Options(int argc, char ** argv);
+  Options(int argc, char** argv);
 
-  void parse(int argc, char ** argv);
+  void parse(int argc, char** argv);
 
   std::string node_name;
   std::vector<std::string> topic_names_pub;
@@ -29,8 +27,8 @@ public:
   std::string qos_reliability;
 };
 
-std::ostream & operator<<(std::ostream & os, const Options & options);
+std::ostream& operator<<(std::ostream& os, const Options& options);
 
-} // ここまでnode_optionsの名前空間
+}  // namespace node_options
 
 #endif
