@@ -7,7 +7,33 @@ import argparse
 from throughput_calc import calc_throughput
 
 # 設定
-payload_sizes = [64, 256, 1024, 4096, 16384, 65536, 262144]  # 必要に応じて変更
+# default_payload_sizes = [64, 256, 1024, 4096, 16384, 65536, 262144]
+default_payload_sizes = [64]
+
+
+def parse_payloads(payload_arg):
+    payloads = []
+    for raw in payload_arg.split(","):
+        v = raw.strip()
+        if not v:
+            continue
+        try:
+            size = int(v)
+        except ValueError as e:
+            raise argparse.ArgumentTypeError(
+                f"Invalid payload size: '{v}'. Use comma separated integers, e.g. 64,256"
+            ) from e
+        if size <= 0:
+            raise argparse.ArgumentTypeError(
+                f"Payload size must be a positive integer: {size}"
+            )
+        payloads.append(size)
+
+    if not payloads:
+        raise argparse.ArgumentTypeError(
+            "At least one payload size is required. Example: --payload \"64,256\""
+        )
+    return payloads
 
 
 def run_test(payload_size, run_idx, start_scripts_py, num_hosts):
@@ -318,6 +344,12 @@ if __name__ == "__main__":
                         help="使用するホスト数 (デフォルト: 3)")
     parser.add_argument("--trials", type=int, default=10,
                         help="1ペイロードサイズあたりの試行回数 (デフォルト: 10)")
+    parser.add_argument(
+        "--payload",
+        type=parse_payloads,
+        default=default_payload_sizes,
+        help="ペイロードサイズをカンマ区切りで指定 (例: \"64,256\")",
+    )
     parser.add_argument("--docker", action="store_true",
                         help="Dockerを使用する場合は指定")
     args = parser.parse_args()
@@ -334,6 +366,7 @@ if __name__ == "__main__":
         start_scripts_py = "../manager_scripts/start_scripts.py"
         prefix = "raw"
 
+    payload_sizes = args.payload
     for payload_size in payload_sizes:
         print(f"=== Payload size: {payload_size}B ===")
         for run_idx in range(args.trials):
