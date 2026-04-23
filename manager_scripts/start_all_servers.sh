@@ -1,6 +1,6 @@
 #!/bin/bash
 
-HOSTS=("192.168.199.20" "192.168.199.21" "192.168.199.22" "192.168.199.23" "192.168.199.24")
+HOSTS=("192.168.11.106" "192.168.11.107" "192.168.11.108")
 PORT=5000
 
 SSH_OPTS="-n -o BatchMode=yes -o StrictHostKeyChecking=no -o ConnectTimeout=5"
