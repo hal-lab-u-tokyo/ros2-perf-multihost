@@ -21,9 +21,8 @@ for host in "${HOSTS[@]}"; do
       LOG=/home/ubuntu/rest.log
       PID=/home/ubuntu/rest.pid
       : > "$LOG"
-      # 仮想環境の Python を直接起動して完全デタッチ
-      setsid nohup /home/ubuntu/ros2-perf-multihost/.venv/bin/python \
-        /home/ubuntu/ros2-perf-multihost/manager_scripts/manager_scripts.py \
+      # Python を直接起動して完全デタッチ
+      setsid nohup python3 /home/ubuntu/ros2-perf-multihost/manager_scripts/manager_scripts.py \
         >>"$LOG" 2>&1 < /dev/null &
       echo $! > "$PID"
       echo STARTED
