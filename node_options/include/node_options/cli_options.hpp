@@ -11,21 +11,21 @@ namespace node_options
 class Options
 {
 public:
- Options();
+  Options();
 
- Options(int argc, char ** argv);
+  Options(int argc, char ** argv);
 
- void parse(int argc, char ** argv);
+  void parse(int argc, char ** argv);
 
- std::string node_name;
- std::vector<std::string> topic_names;
- std::vector<int> payload_size;
- std::vector<int> period_ms;
- int eval_time;
- std::string log_dir;
- std::string qos_reliability;
- std::string qos_history;
- int qos_depth;
+  std::string node_name;
+  std::vector<std::string> topic_names;
+  std::vector<int> payload_size;
+  std::vector<int> period_ms;
+  int eval_time;
+  std::string log_dir;
+  std::string qos_reliability;
+  std::string qos_history;
+  int qos_depth;
 };
 
 std::ostream & operator<<(std::ostream & os, const Options & options);

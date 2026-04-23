@@ -49,14 +49,20 @@ def generate_host_scripts(json_content, rmw):
         lines.append('RUN_IDX="${2:-1}"')  # 2番目の引数がなければ1
         lines.append("")
         # ログディレクトリ作成（既存なら安全に消去→再作成）
-        lines.append("LOG_DIR=~/ros2-perf-multihost-v2/logs/raw_${PAYLOAD_SIZE}B/run${RUN_IDX}")
+        lines.append(
+            "LOG_DIR=~/ros2-perf-multihost-v2/logs/raw_${PAYLOAD_SIZE}B/run${RUN_IDX}")
         lines.append("BASE_DIR=~/ros2-perf-multihost-v2/logs")
         # 安全ガード: BASE_DIR配下のみ削除許可
-        lines.append('case "$LOG_DIR" in "$BASE_DIR"/*) ;; *) echo "Unsafe LOG_DIR: $LOG_DIR"; exit 1 ;; esac')
-        lines.append('[ -n "$LOG_DIR" ] || { echo "LOG_DIR is empty"; exit 1; }')
-        lines.append('[ "$LOG_DIR" != "/" ] || { echo "LOG_DIR cannot be root"; exit 1; }')
-        lines.append('rm -rf "$LOG_DIR" || { echo "Failed to remove $LOG_DIR"; exit 1; }')
-        lines.append('mkdir -p "$LOG_DIR" || { echo "Failed to create $LOG_DIR"; exit 1; }')
+        lines.append(
+            'case "$LOG_DIR" in "$BASE_DIR"/*) ;; *) echo "Unsafe LOG_DIR: $LOG_DIR"; exit 1 ;; esac')
+        lines.append(
+            '[ -n "$LOG_DIR" ] || { echo "LOG_DIR is empty"; exit 1; }')
+        lines.append(
+            '[ "$LOG_DIR" != "/" ] || { echo "LOG_DIR cannot be root"; exit 1; }')
+        lines.append(
+            'rm -rf "$LOG_DIR" || { echo "Failed to remove $LOG_DIR"; exit 1; }')
+        lines.append(
+            'mkdir -p "$LOG_DIR" || { echo "Failed to create $LOG_DIR"; exit 1; }')
 
         lines.append("source /opt/ros/jazzy/setup.bash")
         lines.append("source ~/ros2-perf-multihost-v2/install/setup.bash")
@@ -64,7 +70,8 @@ def generate_host_scripts(json_content, rmw):
         # host-level monitor
         lines.append("# host-level monitor (host CPU/memory)")
         lines.append(
-            f'python3 ~/ros2-perf-multihost-v2/performance_test/monitor_host.py 0.5 "$LOG_DIR/{host_name}_monitor_host.csv" &'
+            f'python3 ~/ros2-perf-multihost-v2/performance_test/monitor_host.py 0.5 "$LOG_DIR/{
+                host_name}_monitor_host.csv" &'
         )
         lines.append("MON_HOST_PID=$!")
         lines.append("")
@@ -81,7 +88,8 @@ def generate_host_scripts(json_content, rmw):
             lines.append("export ZENOH_ROUTER_CHECK_ATTEMPTS=5")
             lines.append("export RUST_LOG=zenoh=warn,zenoh_transport=warn")
             session_config_path = "~/ros2-perf-multihost-v2/config/DEFAULT_RMW_ZENOH_SESSION_CONFIG.json5"
-            lines.append(f"export ZENOH_SESSION_CONFIG_URI={session_config_path}")
+            lines.append(f"export ZENOH_SESSION_CONFIG_URI={
+                         session_config_path}")
             lines.append("# このホストではrmw_zenohdを起動しません（中央ルーターに接続）")
             lines.append("")
         elif rmw == "fastdds":
@@ -109,29 +117,37 @@ def generate_host_scripts(json_content, rmw):
                 pub_list = node["publisher"]
                 topic_names = ",".join(p["topic_name"] for p in pub_list)
                 lines.append(f"# {node_name} publisher")
-                lines.append("( cd ~/ros2-perf-multihost-v2/install/publisher_node/lib/publisher_node \\")
                 lines.append(
-                    f"  && ./publisher_node_exe --node_name {node_name} --topic_names {topic_names} "
+                    "( cd ~/ros2-perf-multihost-v2/install/publisher_node/lib/publisher_node \\")
+                lines.append(
+                    f"  && ./publisher_node_exe --node_name {
+                        node_name} --topic_names {topic_names} "
                     f'-s "$PAYLOAD_SIZE" -p {period_ms} --eval_time {eval_time} '
-                    f"--qos_history {qos_history} --qos_depth {qos_depth} --qos_reliability {qos_reliability} "
+                    f"--qos_history {qos_history} --qos_depth {
+                        qos_depth} --qos_reliability {qos_reliability} "
                     f'--log_dir "$LOG_DIR" \\'
                 )
                 lines.append(") & node_pids+=($!)")
-                lines.append(f'echo "Started {node_name} publisher at $(date +%Y-%m-%dT%H:%M:%S.%3N%z)"')
+                lines.append(f'echo "Started {
+                             node_name} publisher at $(date +%Y-%m-%dT%H:%M:%S.%3N%z)"')
 
             if node.get("subscriber"):
                 sub_list = node["subscriber"]
                 topic_names = ",".join(s["topic_name"] for s in sub_list)
                 lines.append(f"# {node_name} subscriber")
-                lines.append("( cd ~/ros2-perf-multihost-v2/install/subscriber_node/lib/subscriber_node \\")
                 lines.append(
-                    f"  && ./subscriber_node --node_name {node_name} --topic_names {topic_names} "
+                    "( cd ~/ros2-perf-multihost-v2/install/subscriber_node/lib/subscriber_node \\")
+                lines.append(
+                    f"  && ./subscriber_node --node_name {
+                        node_name} --topic_names {topic_names} "
                     f"--eval_time {eval_time} "
-                    f"--qos_history {qos_history} --qos_depth {qos_depth} --qos_reliability {qos_reliability} "
+                    f"--qos_history {qos_history} --qos_depth {
+                        qos_depth} --qos_reliability {qos_reliability} "
                     f'--log_dir "$LOG_DIR" \\'
                 )
                 lines.append(") & node_pids+=($!)")
-                lines.append(f'echo "Started {node_name} subscriber at $(date +%Y-%m-%dT%H:%M:%S.%3N%z)"')
+                lines.append(f'echo "Started {
+                             node_name} subscriber at $(date +%Y-%m-%dT%H:%M:%S.%3N%z)"')
 
             if node.get("intermediate"):
                 pub_list = node["intermediate"][0]["publisher"]
@@ -139,16 +155,20 @@ def generate_host_scripts(json_content, rmw):
                 topic_names_pub = ",".join(p["topic_name"] for p in pub_list)
                 topic_names_sub = ",".join(s["topic_name"] for s in sub_list)
                 lines.append(f"# {node_name} intermediate")
-                lines.append("( cd ~/ros2-perf-multihost-v2/install/intermediate_node/lib/intermediate_node \\")
+                lines.append(
+                    "( cd ~/ros2-perf-multihost-v2/install/intermediate_node/lib/intermediate_node \\")
                 lines.append(
                     f"  && ./intermediate_node --node_name {node_name} "
-                    f"--topic_names_pub {topic_names_pub} --topic_names_sub {topic_names_sub} "
+                    f"--topic_names_pub {topic_names_pub} --topic_names_sub {
+                        topic_names_sub} "
                     f'-s "$PAYLOAD_SIZE" -p {period_ms} --eval_time {eval_time} '
-                    f"--qos_history {qos_history} --qos_depth {qos_depth} --qos_reliability {qos_reliability} "
+                    f"--qos_history {qos_history} --qos_depth {
+                        qos_depth} --qos_reliability {qos_reliability} "
                     f'--log_dir "$LOG_DIR" \\'
                 )
                 lines.append(") & node_pids+=($!)")
-                lines.append(f'echo "Started {node_name} at $(date +%Y-%m-%dT%H:%M:%S.%3N%z)"')
+                lines.append(f'echo "Started {
+                             node_name} at $(date +%Y-%m-%dT%H:%M:%S.%3N%z)"')
 
         lines.append("# wait for all node processes")
         lines.append('for pid in "${node_pids[@]}"; do')
@@ -169,7 +189,8 @@ def generate_host_scripts(json_content, rmw):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("json_path", help="入力JSONファイルパス")
-    parser.add_argument("--rmw", type=str, default="fastdds", help="RMW (例: zenoh)")
+    parser.add_argument("--rmw", type=str,
+                        default="fastdds", help="RMW (例: zenoh)")
     args = parser.parse_args()
 
     with open(args.json_path, "r") as f:

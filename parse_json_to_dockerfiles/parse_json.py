@@ -11,9 +11,11 @@ import shutil
 import textwrap
 
 # コマンドラインからJSONファイルのパスを受け取り、そのJSONファイルを取得する
-#  (args) -> json 
+#  (args) -> json
+
+
 def load_json_file(args):
-    file_path = args[1] # args[0]には実行ファイル名、args[1]にコマンドライン引数が来る
+    file_path = args[1]  # args[0]には実行ファイル名、args[1]にコマンドライン引数が来る
     with open(file_path, "r") as f:
         json_content = json.load(f)
 
@@ -21,7 +23,7 @@ def load_json_file(args):
 
 
 # JSONファイルを受けとり、各ホストに対応するDockerfileを生成する.生成したDockerfileの数だけディレクトリを作り、Dockerfileはその下に置く
-#  json -> list[Dockerfile]の生成 
+#  json -> list[Dockerfile]の生成
 def generate_dockerfiles(json_content, file_path):
     output_dir = "../Dockerfiles"
     if os.path.exists(output_dir):
@@ -35,17 +37,17 @@ def generate_dockerfiles(json_content, file_path):
         eval_time = json_content["eval_time"]
     else:
         eval_time = 60
-        
+
     if "payload_size" in json_content:
         payload_size = json_content["payload_size"]
     else:
         payload_size = 32
-        
+
     if "period_ms" in json_content:
         period_ms = json_content["period_ms"]
     else:
         period_ms = 100
-    
+
     if ("rmw" in json_content and json_content["rmw"] == "zenoh"):
         rmw_zenoh_flag = True
     else:
@@ -53,10 +55,10 @@ def generate_dockerfiles(json_content, file_path):
 
     hosts = json_content["hosts"]
 
-    # connect container 
+    # connect container
     if rmw_zenoh_flag:
         zenoh_build_command = textwrap.dedent(
-        r"""
+            r"""
         RUN cd ~/performance_ws/src \
             && git clone https://github.com/ros2/rmw_zenoh.git -b jazzy \
             && cd ~/performance_ws \
@@ -82,7 +84,7 @@ def generate_dockerfiles(json_content, file_path):
             json5.dump(config_json, f, indent=4)
 
         make_config_file_command = textwrap.dedent(
-        """
+            """
         COPY multihost_config.json5 /root/performance_ws/src/graduate_research/config/multihost_config.json5
         """
         )
@@ -90,7 +92,8 @@ def generate_dockerfiles(json_content, file_path):
 
         dockerfile_content = docker_base_content
         new_config_path = "/root/performance_ws/src/graduate_research/config/multihost_config.json5"
-        zenoh_router_bridge_command = f". /root/performance_ws/install/setup.sh &&  export ZENOH_ROUTER_CONFIG_URI={new_config_path} && ros2 run rmw_zenoh_cpp rmw_zenohd"
+        zenoh_router_bridge_command = f". /root/performance_ws/install/setup.sh &&  export ZENOH_ROUTER_CONFIG_URI={
+            new_config_path} && ros2 run rmw_zenoh_cpp rmw_zenohd"
 
         additional_content = textwrap.dedent(f"""
         # コンテナを起動するときのコマンド ENVを扱うために、exec形式でありながらシェル形式を用いる(/bin/bash -c)
@@ -105,10 +108,10 @@ def generate_dockerfiles(json_content, file_path):
         docker_file_path = os.path.join(host_dir, "Dockerfile")
         with open(docker_file_path, "w") as dockerfile:
             dockerfile.write(dockerfile_content)
-        zenoh_router_config_path = os.path.join(host_dir, "multihost_config.json5")
+        zenoh_router_config_path = os.path.join(
+            host_dir, "multihost_config.json5")
         with open(zenoh_router_config_path, "w") as f:
             json5.dump(config_json, f, indent=4)
-
 
     # 各ホストに対し、ノード情報を追記したDockerfileを作成し、Dockerfiles/{ホスト名}/Dockerfile に置く
     for host_dict in hosts:
@@ -131,30 +134,37 @@ def generate_dockerfiles(json_content, file_path):
             if index == 0:
                 if node.get("publisher"):
                     publisher_list = node["publisher"]
-                    topic_names = ",".join(publisher["topic_name"] for publisher in publisher_list)
+                    topic_names = ",".join(
+                        publisher["topic_name"] for publisher in publisher_list)
                     # payload_sizes = ",".join(str(publisher["payload_size"]) for publisher in publisher_list)
                     # period_ms = ",".join(str(publisher["period_ms"]) for publisher in publisher_list)
 
-                    additional_command = f"{zenoh_router_command}. /root/performance_ws/install/setup.sh {zenoh_config_command} && cd /root/performance_ws/install/publisher_node/lib/publisher_node && ./publisher_node_exe --node_name {node_name} --topic_names {topic_names} -s {payload_size} -p {period_ms} --eval_time {eval_time}"
+                    additional_command = f"{zenoh_router_command}. /root/performance_ws/install/setup.sh {zenoh_config_command} && cd /root/performance_ws/install/publisher_node/lib/publisher_node && ./publisher_node_exe --node_name {
+                        node_name} --topic_names {topic_names} -s {payload_size} -p {period_ms} --eval_time {eval_time}"
                     base_command += additional_command
 
                 if node.get("subscriber"):
                     subscriber_list = node["subscriber"]
-                    topic_names = ",".join(subscriber["topic_name"] for subscriber in subscriber_list)
+                    topic_names = ",".join(
+                        subscriber["topic_name"] for subscriber in subscriber_list)
 
-                    additional_command =f"{zenoh_router_command}. /root/performance_ws/install/setup.sh {zenoh_config_command} && cd /root/performance_ws/install/subscriber_node/lib/subscriber_node && ./subscriber_node --node_name {node_name} --topic_names {topic_names} --eval_time {eval_time}"
+                    additional_command = f"{zenoh_router_command}. /root/performance_ws/install/setup.sh {
+                        zenoh_config_command} && cd /root/performance_ws/install/subscriber_node/lib/subscriber_node && ./subscriber_node --node_name {node_name} --topic_names {topic_names} --eval_time {eval_time}"
                     base_command += additional_command
 
                 if node.get("intermediate"):
                     publisher_list = node["intermediate"][0]["publisher"]
                     subscriber_list = node["intermediate"][0]["subscriber"]
 
-                    topic_names_pub = ",".join(publisher["topic_name"] for publisher in publisher_list)
+                    topic_names_pub = ",".join(
+                        publisher["topic_name"] for publisher in publisher_list)
                     # payload_sizes = ",".join(str(publisher["payload_size"]) for publisher in publisher_list)
                     # period_ms = ",".join(str(publisher["period_ms"]) for publisher in publisher_list)
-                    topic_names_sub = ",".join(subscriber["topic_name"] for subscriber in subscriber_list)
+                    topic_names_sub = ",".join(
+                        subscriber["topic_name"] for subscriber in subscriber_list)
 
-                    additional_command =f"{zenoh_router_command}. /root/performance_ws/install/setup.sh {zenoh_config_command} && cd /root/performance_ws/install/intermediate_node/lib/intermediate_node && ./intermediate_node --node_name {node_name} --topic_names_pub {topic_names_pub} --topic_names_sub {topic_names_sub} -s {payload_size} -p {period_ms} --eval_time {eval_time}"
+                    additional_command = f"{zenoh_router_command}. /root/performance_ws/install/setup.sh {zenoh_config_command} && cd /root/performance_ws/install/intermediate_node/lib/intermediate_node && ./intermediate_node --node_name {
+                        node_name} --topic_names_pub {topic_names_pub} --topic_names_sub {topic_names_sub} -s {payload_size} -p {period_ms} --eval_time {eval_time}"
                     base_command += additional_command
 
                 continue
@@ -162,37 +172,43 @@ def generate_dockerfiles(json_content, file_path):
             # 複数のノードをバックグラウンドで同時に起動するため、通常は & で結ぶ
             if node.get("publisher"):
                 publisher_list = node["publisher"]
-                topic_names = ",".join(publisher["topic_name"] for publisher in publisher_list)
+                topic_names = ",".join(
+                    publisher["topic_name"] for publisher in publisher_list)
                 # payload_sizes = ",".join(str(publisher["payload_size"]) for publisher in publisher_list)
                 # period_ms = ",".join(str(publisher["period_ms"]) for publisher in publisher_list)
 
-                additional_command = f" & . /root/performance_ws/install/setup.sh {zenoh_config_command} && cd /root/performance_ws/install/publisher_node/lib/publisher_node && ./publisher_node_exe --node_name {node_name} --topic_names {topic_names} -s {payload_size} -p {period_ms} --eval_time {eval_time}"
+                additional_command = f" & . /root/performance_ws/install/setup.sh {zenoh_config_command} && cd /root/performance_ws/install/publisher_node/lib/publisher_node && ./publisher_node_exe --node_name {
+                    node_name} --topic_names {topic_names} -s {payload_size} -p {period_ms} --eval_time {eval_time}"
                 base_command += additional_command
 
             if node.get("subscriber"):
                 subscriber_list = node["subscriber"]
-                topic_names = ",".join(subscriber["topic_name"] for subscriber in subscriber_list)
+                topic_names = ",".join(
+                    subscriber["topic_name"] for subscriber in subscriber_list)
 
-                additional_command =f" & . /root/performance_ws/install/setup.sh {zenoh_config_command} && cd /root/performance_ws/install/subscriber_node/lib/subscriber_node && ./subscriber_node --node_name {node_name} --topic_names {topic_names} --eval_time {eval_time}"
+                additional_command = f" & . /root/performance_ws/install/setup.sh {
+                    zenoh_config_command} && cd /root/performance_ws/install/subscriber_node/lib/subscriber_node && ./subscriber_node --node_name {node_name} --topic_names {topic_names} --eval_time {eval_time}"
                 base_command += additional_command
 
             if node.get("intermediate"):
                 publisher_list = node["intermediate"][0]["publisher"]
                 subscriber_list = node["intermediate"][0]["subscriber"]
 
-                topic_names_pub = ",".join(publisher["topic_name"] for publisher in publisher_list)
+                topic_names_pub = ",".join(
+                    publisher["topic_name"] for publisher in publisher_list)
                 # payload_sizes = ",".join(str(publisher["payload_size"]) for publisher in publisher_list)
                 # period_ms = ",".join(str(publisher["period_ms"]) for publisher in publisher_list)
-                topic_names_sub = ",".join(subscriber["topic_name"] for subscriber in subscriber_list)
+                topic_names_sub = ",".join(
+                    subscriber["topic_name"] for subscriber in subscriber_list)
 
-                additional_command =f" & . /root/performance_ws/install/setup.sh {zenoh_config_command} && cd /root/performance_ws/install/intermediate_node/lib/intermediate_node && ./intermediate_node --node_name {node_name} --topic_names_pub {topic_names_pub} --topic_names_sub {topic_names_sub} -s {payload_size} -p {period_ms} --eval_time {eval_time}"
+                additional_command = f" & . /root/performance_ws/install/setup.sh {zenoh_config_command} && cd /root/performance_ws/install/intermediate_node/lib/intermediate_node && ./intermediate_node --node_name {
+                    node_name} --topic_names_pub {topic_names_pub} --topic_names_sub {topic_names_sub} -s {payload_size} -p {period_ms} --eval_time {eval_time}"
                 base_command += additional_command
 
             # コマンドの最後には wait 命令をつける
             if index == len(nodes) - 1:
                 additional_command = " & wait"
                 base_command += additional_command
-
 
         additional_content = textwrap.dedent(f"""
         # コンテナを起動するときのコマンド ENVを扱うために、exec形式でありながらシェル形式を用いる(/bin/bash -c)
@@ -209,14 +225,17 @@ def generate_dockerfiles(json_content, file_path):
             dockerfile.write(dockerfile_content)
 
         if rmw_zenoh_flag:
-            zenoh_router_config_path = os.path.join(host_dir, "multihost_config.json5")
+            zenoh_router_config_path = os.path.join(
+                host_dir, "multihost_config.json5")
             with open(zenoh_router_config_path, "w") as f:
                 json5.dump(config_json, f, indent=4)
 
     return rmw_zenoh_flag
 
 # JSONファイルを受け取り、ホストの数だけ生成したDockerfileをまとめて起動するdocker-compose.ymlをルートディレクトリに生成する
-#  json -> docker-compose.ymlの生成 
+#  json -> docker-compose.ymlの生成
+
+
 def generate_docker_compose(json_content, rmw_zenoh_flag):
     docker_compose_content = textwrap.dedent("services:")
 
@@ -229,7 +248,7 @@ def generate_docker_compose(json_content, rmw_zenoh_flag):
                 dockerfile: Dockerfile
               container_name: router_bridge
         """
-        )
+                                             )
         additional_content = "  " + additional_content.replace("\n", "\n  ")
         docker_compose_content += additional_content
 
@@ -249,7 +268,6 @@ def generate_docker_compose(json_content, rmw_zenoh_flag):
         """
         )
         additional_content = "  " + additional_content.replace("\n", "\n  ")
-
 
         docker_compose_content += additional_content
 
