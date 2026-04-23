@@ -39,10 +39,12 @@ def parse_payloads(payload_arg):
 def run_test(payload_size, run_idx, start_scripts_py, num_hosts):
     print(f"=== Run payload={payload_size}B, trial={run_idx + 1} ===")
     result = subprocess.run(
-        ["python3", start_scripts_py, str(payload_size), str(num_hosts), str(run_idx + 1)], capture_output=True, text=True
+        ["python3", start_scripts_py, str(payload_size), str(num_hosts), str(run_idx + 1)],
+        text=True,
     )
     print(result)
-    print(result.stdout)
+    if result.returncode != 0:
+        print(f"run_test failed: rc={result.returncode}")
     # 通信テストのみ。ログコピー・解析はしない
     return
 

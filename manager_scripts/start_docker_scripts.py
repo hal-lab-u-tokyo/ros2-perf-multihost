@@ -1,6 +1,7 @@
 import requests
 import threading
 import sys
+import time
 
 
 def main():
@@ -20,12 +21,18 @@ def main():
 
     def start(host):
         try:
+            started_at = time.time()
+            print(f"{host}: sending /start_docker request...", flush=True)
             r = requests.post(
-                f"http://{host}:5000/start_docker", json={"payload_size": payload_size, "run_idx": run_idx}, timeout=300
+                f"http://{host}:5000/start_docker",
+                json={"payload_size": payload_size, "run_idx": run_idx},
+                timeout=(5, 300),
             )
-            print(f"{host}: {r.status_code} {r.text}")
+            elapsed = time.time() - started_at
+            print(f"{host}: {r.status_code} ({elapsed:.1f}s) {r.text}")
         except Exception as e:
-            print(f"{host}: error {e}")
+            elapsed = time.time() - started_at
+            print(f"{host}: error ({elapsed:.1f}s) {e}")
 
     threads = []
     for host in hosts:
