@@ -53,6 +53,11 @@ def start_docker():
     container_name = f"{hostname}_perf_run{run_idx}"
     monitor_csv = f"{current_log_dir}/{hostname}_monitor_host.csv"
     try:
+        # 前回の同名コンテナが残っている場合は強制削除してからスタート
+        subprocess.run(
+            ["docker", "rm", "-f", container_name],
+            capture_output=True,
+        )
         monitor_proc = subprocess.Popen(
             [
                 "python3",
