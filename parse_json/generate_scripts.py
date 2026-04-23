@@ -50,8 +50,8 @@ def generate_host_scripts(json_content, rmw):
         lines.append("")
         # ログディレクトリ作成（既存なら安全に消去→再作成）
         lines.append(
-            "LOG_DIR=~/ros2-perf-multihost-v2/logs/raw_${PAYLOAD_SIZE}B/run${RUN_IDX}")
-        lines.append("BASE_DIR=~/ros2-perf-multihost-v2/logs")
+            "LOG_DIR=~/ros2-perf-multihost/logs/raw_${PAYLOAD_SIZE}B/run${RUN_IDX}")
+        lines.append("BASE_DIR=~/ros2-perf-multihost/logs")
         # 安全ガード: BASE_DIR配下のみ削除許可
         lines.append(
             'case "$LOG_DIR" in "$BASE_DIR"/*) ;; *) echo "Unsafe LOG_DIR: $LOG_DIR"; exit 1 ;; esac')
@@ -65,12 +65,12 @@ def generate_host_scripts(json_content, rmw):
             'mkdir -p "$LOG_DIR" || { echo "Failed to create $LOG_DIR"; exit 1; }')
 
         lines.append("source /opt/ros/jazzy/setup.bash")
-        lines.append("source ~/ros2-perf-multihost-v2/install/setup.bash")
+        lines.append("source ~/ros2-perf-multihost/install/setup.bash")
 
         # host-level monitor
         lines.append("# host-level monitor (host CPU/memory)")
         lines.append(
-            f'python3 ~/ros2-perf-multihost-v2/performance_test/monitor_host.py 0.5 "$LOG_DIR/{
+            f'python3 ~/ros2-perf-multihost/performance_test/monitor_host.py 0.5 "$LOG_DIR/{
                 host_name}_monitor_host.csv" &'
         )
         lines.append("MON_HOST_PID=$!")
@@ -87,7 +87,7 @@ def generate_host_scripts(json_content, rmw):
             lines.append("export RMW_IMPLEMENTATION=rmw_zenoh_cpp")
             lines.append("export ZENOH_ROUTER_CHECK_ATTEMPTS=5")
             lines.append("export RUST_LOG=zenoh=warn,zenoh_transport=warn")
-            session_config_path = "~/ros2-perf-multihost-v2/config/DEFAULT_RMW_ZENOH_SESSION_CONFIG.json5"
+            session_config_path = "~/ros2-perf-multihost/config/DEFAULT_RMW_ZENOH_SESSION_CONFIG.json5"
             lines.append(f"export ZENOH_SESSION_CONFIG_URI={
                          session_config_path}")
             lines.append("# このホストではrmw_zenohdを起動しません（中央ルーターに接続）")
@@ -118,7 +118,7 @@ def generate_host_scripts(json_content, rmw):
                 topic_names = ",".join(p["topic_name"] for p in pub_list)
                 lines.append(f"# {node_name} publisher")
                 lines.append(
-                    "( cd ~/ros2-perf-multihost-v2/install/publisher_node/lib/publisher_node \\")
+                    "( cd ~/ros2-perf-multihost/install/publisher_node/lib/publisher_node \\")
                 lines.append(
                     f"  && ./publisher_node_exe --node_name {
                         node_name} --topic_names {topic_names} "
@@ -136,7 +136,7 @@ def generate_host_scripts(json_content, rmw):
                 topic_names = ",".join(s["topic_name"] for s in sub_list)
                 lines.append(f"# {node_name} subscriber")
                 lines.append(
-                    "( cd ~/ros2-perf-multihost-v2/install/subscriber_node/lib/subscriber_node \\")
+                    "( cd ~/ros2-perf-multihost/install/subscriber_node/lib/subscriber_node \\")
                 lines.append(
                     f"  && ./subscriber_node --node_name {
                         node_name} --topic_names {topic_names} "
@@ -156,7 +156,7 @@ def generate_host_scripts(json_content, rmw):
                 topic_names_sub = ",".join(s["topic_name"] for s in sub_list)
                 lines.append(f"# {node_name} intermediate")
                 lines.append(
-                    "( cd ~/ros2-perf-multihost-v2/install/intermediate_node/lib/intermediate_node \\")
+                    "( cd ~/ros2-perf-multihost/install/intermediate_node/lib/intermediate_node \\")
                 lines.append(
                     f"  && ./intermediate_node --node_name {node_name} "
                     f"--topic_names_pub {topic_names_pub} --topic_names_sub {
