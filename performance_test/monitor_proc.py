@@ -24,7 +24,8 @@ def find_pid(target):
 
 with open(out, "w", newline="") as f:
     w = csv.writer(f)
-    w.writerow(["timestamp_ns", "pid", "cpu_percent", "rss_bytes", "vms_bytes", "num_threads"])
+    w.writerow(["timestamp_ns", "pid", "cpu_percent",
+               "rss_bytes", "vms_bytes", "num_threads"])
     while True:
         pid = find_pid(target)
         if not pid:

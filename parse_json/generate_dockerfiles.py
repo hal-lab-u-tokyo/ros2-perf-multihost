@@ -106,17 +106,20 @@ def generate_dockerfiles(json_content, rmw):
             log_dir = "/root/performance_ws/performance_test/logs_local/docker_${PAYLOAD_SIZE}B/run${RUN_IDX}"
 
             # QoSオプション文字列
-            qos_options = f"--qos_history {qos_history} --qos_depth {qos_depth} --qos_reliability {qos_reliability}"
+            qos_options = f"--qos_history {qos_history} --qos_depth {
+                qos_depth} --qos_reliability {qos_reliability}"
 
             # 最初だけはコマンドの先頭に & をつけない
             if index == 0:
                 if node.get("publisher"):
                     publisher_list = node["publisher"]
-                    topic_names = ",".join(publisher["topic_name"] for publisher in publisher_list)
+                    topic_names = ",".join(
+                        publisher["topic_name"] for publisher in publisher_list)
                     additional_command = (
                         f". /root/performance_ws/install/setup.sh "
                         f"&& cd /root/performance_ws/install/publisher_node/lib/publisher_node "
-                        f"&& ./publisher_node_exe --node_name {node_name} --topic_names {topic_names} "
+                        f"&& ./publisher_node_exe --node_name {
+                            node_name} --topic_names {topic_names} "
                         f"-s $PAYLOAD_SIZE -p {period_ms} --eval_time {eval_time} "
                         f"{qos_options} --log_dir {log_dir}"
                     )
@@ -124,11 +127,13 @@ def generate_dockerfiles(json_content, rmw):
 
                 if node.get("subscriber"):
                     subscriber_list = node["subscriber"]
-                    topic_names = ",".join(subscriber["topic_name"] for subscriber in subscriber_list)
+                    topic_names = ",".join(
+                        subscriber["topic_name"] for subscriber in subscriber_list)
                     additional_command = (
                         f". /root/performance_ws/install/setup.sh "
                         f"&& cd /root/performance_ws/install/subscriber_node/lib/subscriber_node "
-                        f"&& ./subscriber_node --node_name {node_name} --topic_names {topic_names} "
+                        f"&& ./subscriber_node --node_name {
+                            node_name} --topic_names {topic_names} "
                         f"--eval_time {eval_time} {qos_options} --log_dir {log_dir}"
                     )
                     base_command += additional_command
@@ -136,13 +141,17 @@ def generate_dockerfiles(json_content, rmw):
                 if node.get("intermediate"):
                     publisher_list = node["intermediate"][0]["publisher"]
                     subscriber_list = node["intermediate"][0]["subscriber"]
-                    topic_names_pub = ",".join(publisher["topic_name"] for publisher in publisher_list)
-                    topic_names_sub = ",".join(subscriber["topic_name"] for subscriber in subscriber_list)
+                    topic_names_pub = ",".join(
+                        publisher["topic_name"] for publisher in publisher_list)
+                    topic_names_sub = ",".join(
+                        subscriber["topic_name"] for subscriber in subscriber_list)
                     additional_command = (
                         f". /root/performance_ws/install/setup.sh "
                         f"&& cd /root/performance_ws/install/intermediate_node/lib/intermediate_node "
-                        f"&& ./intermediate_node --node_name {node_name} --topic_names_pub {topic_names_pub} "
-                        f"--topic_names_sub {topic_names_sub} -s $PAYLOAD_SIZE -p {period_ms} "
+                        f"&& ./intermediate_node --node_name {
+                            node_name} --topic_names_pub {topic_names_pub} "
+                        f"--topic_names_sub {
+                            topic_names_sub} -s $PAYLOAD_SIZE -p {period_ms} "
                         f"--eval_time {eval_time} {qos_options} --log_dir {log_dir}"
                     )
                     base_command += additional_command
@@ -151,11 +160,13 @@ def generate_dockerfiles(json_content, rmw):
             # 複数のノードをバックグラウンドで同時に起動するため、通常は & で結ぶ
             if node.get("publisher"):
                 publisher_list = node["publisher"]
-                topic_names = ",".join(publisher["topic_name"] for publisher in publisher_list)
+                topic_names = ",".join(
+                    publisher["topic_name"] for publisher in publisher_list)
                 additional_command = (
                     f" & . /root/performance_ws/install/setup.sh "
                     f"&& cd /root/performance_ws/install/publisher_node/lib/publisher_node "
-                    f"&& ./publisher_node_exe --node_name {node_name} --topic_names {topic_names} "
+                    f"&& ./publisher_node_exe --node_name {
+                        node_name} --topic_names {topic_names} "
                     f"-s $PAYLOAD_SIZE -p {period_ms} --eval_time {eval_time} "
                     f"{qos_options} --log_dir {log_dir}"
                 )
@@ -163,11 +174,13 @@ def generate_dockerfiles(json_content, rmw):
 
             if node.get("subscriber"):
                 subscriber_list = node["subscriber"]
-                topic_names = ",".join(subscriber["topic_name"] for subscriber in subscriber_list)
+                topic_names = ",".join(
+                    subscriber["topic_name"] for subscriber in subscriber_list)
                 additional_command = (
                     f" & . /root/performance_ws/install/setup.sh "
                     f"&& cd /root/performance_ws/install/subscriber_node/lib/subscriber_node "
-                    f"&& ./subscriber_node --node_name {node_name} --topic_names {topic_names} "
+                    f"&& ./subscriber_node --node_name {
+                        node_name} --topic_names {topic_names} "
                     f"--eval_time {eval_time} {qos_options} --log_dir {log_dir}"
                 )
                 base_command += additional_command
@@ -175,12 +188,15 @@ def generate_dockerfiles(json_content, rmw):
             if node.get("intermediate"):
                 publisher_list = node["intermediate"][0]["publisher"]
                 subscriber_list = node["intermediate"][0]["subscriber"]
-                topic_names_pub = ",".join(publisher["topic_name"] for publisher in publisher_list)
-                topic_names_sub = ",".join(subscriber["topic_name"] for subscriber in subscriber_list)
+                topic_names_pub = ",".join(
+                    publisher["topic_name"] for publisher in publisher_list)
+                topic_names_sub = ",".join(
+                    subscriber["topic_name"] for subscriber in subscriber_list)
                 additional_command = (
                     f" & . /root/performance_ws/install/setup.sh "
                     f"&& cd /root/performance_ws/install/intermediate_node/lib/intermediate_node "
-                    f"&& ./intermediate_node --node_name {node_name} --topic_names_pub {topic_names_pub} "
+                    f"&& ./intermediate_node --node_name {
+                        node_name} --topic_names_pub {topic_names_pub} "
                     f"--topic_names_sub {topic_names_sub} -s $PAYLOAD_SIZE -p {period_ms} "
                     f"--eval_time {eval_time} {qos_options} --log_dir {log_dir}"
                 )
@@ -252,7 +268,8 @@ def generate_docker_compose(json_content, rmw):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("json_path", help="入力JSONファイルパス")
-    parser.add_argument("--rmw", type=str, default="fastdds", help="RMW実装名 (例: zenoh)")
+    parser.add_argument("--rmw", type=str, default="fastdds",
+                        help="RMW実装名 (例: zenoh)")
     args = parser.parse_args()
 
     with open(args.json_path, "r") as f:
