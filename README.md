@@ -12,7 +12,7 @@
 
 ```bash
 cd parse_json
-python3 generate_dockerfiles.py ../examples/topology_example/topology_example.json --rmw zenoh
+python3 generate_dockerfiles.py ../topology_example/simple.json --rmw zenoh
 ```
 
 2. Raspberry Pi 向けにビルド／配布（`parse_json/distribute_docker_images.sh` を使用）
@@ -114,7 +114,7 @@ python3 parse_json/generate_exec_scripts.py <topology.json> --rmw <rmw> [--label
 
 ```bash
 # 例: zenoh で topology_example を使う場合
-python3 parse_json/generate_exec_scripts.py examples/topology_example/topology_example.json --rmw zenoh --label myrun
+python3 parse_json/generate_exec_scripts.py topology_example/simple.json --rmw zenoh --label myrun
 ```
 
 生成されるファイル:
