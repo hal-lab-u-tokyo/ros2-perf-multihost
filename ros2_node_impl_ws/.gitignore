@@ -1,0 +1,4 @@
+# Generated artifacts for the canonical nested ROS 2 colcon workspace.
+build/
+install/
+log/
