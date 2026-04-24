@@ -34,6 +34,10 @@ static node_options::Options parse_options(int argc, char **argv) {
 }
 
 static void create_result_directory(const node_options::Options &options) {
+  if (options.log_dir.empty()) {
+    return;
+  }
+
   std::stringstream ss;
   ss << options.log_dir << "/" << options.node_name << "_log";
   const std::string result_dir_name = ss.str();
@@ -67,6 +71,12 @@ class Subscriber : public rclcpp::Node {
       : Node(options.node_name) {
     node_name = options.node_name;
     log_dir = options.log_dir;
+    if (log_dir.empty()) {
+      RCLCPP_INFO(this->get_logger(), "Subscriber log output disabled.");
+    } else {
+      RCLCPP_INFO(this->get_logger(), "Subscriber log_dir set to: %s",
+                  log_dir.c_str());
+    }
     create_metadata_file(options);
 
     for (size_t i = 0; i < options.topic_names.size(); ++i) {
@@ -150,6 +160,10 @@ class Subscriber : public rclcpp::Node {
       shutdown_timers_;
 
   void create_metadata_file(const node_options::Options &options) {
+    if (options.log_dir.empty()) {
+      return;
+    }
+
     std::stringstream ss;
     ss << options.log_dir << "/" << options.node_name << "_log" << "/"
        << "metadata.txt";
@@ -189,6 +203,10 @@ class Subscriber : public rclcpp::Node {
 
   void write_all_logs(
       const std::map<std::string, std::vector<MessageLog>> &message_logs_) {
+    if (log_dir.empty()) {
+      return;
+    }
+
     for (const auto &[topic_name, topic_logs] : message_logs_) {
       std::cout << "topic: " << topic_name << ", logs: " << topic_logs.size()
                 << std::endl;

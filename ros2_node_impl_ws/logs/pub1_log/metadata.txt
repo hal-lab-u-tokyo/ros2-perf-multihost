@@ -1,0 +1,5 @@
+Name: pub1
+NodeType: Publisher
+Topics: topic1,
+PayloadSize: 64,
+Period: 100,

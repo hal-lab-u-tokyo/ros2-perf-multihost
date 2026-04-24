@@ -14,7 +14,7 @@ namespace node_options {
 // デフォルト値
 Options::Options() {
   eval_time = 60;
-  log_dir = "./logs";
+  log_dir = "";
   qos_history = "KEEP_LAST";
   qos_depth = 1;
   qos_reliability = "RELIABLE";
@@ -54,8 +54,10 @@ void Options::parse(int argc, char** argv) {
       cxxopts::value<std::vector<int>>(period_ms),
       "ms")("eval_time", "Evaluation duration in seconds",
             cxxopts::value<int>(eval_time)->default_value("60"), "sec")(
-      "log_dir", "Directory to write logs",
-      cxxopts::value<std::string>(log_dir)->default_value("./logs"))(
+      "log_dir",
+      "Directory to write logs and metadata. If omitted, no log files are "
+      "created.",
+      cxxopts::value<std::string>(log_dir))(
       "qos_history", "QoS history policy: KEEP_LAST or KEEP_ALL",
       cxxopts::value<std::string>(qos_history)->default_value("KEEP_LAST"))(
       "qos_depth", "QoS depth when qos_history=KEEP_LAST",
@@ -67,7 +69,8 @@ void Options::parse(int argc, char** argv) {
     std::cout
         << "Node role:\n"
         << "  Intermediate: can subscribe on --topic_names_sub, publish on "
-           "--topic_names_pub, and relay when topic names overlap.\n\n"
+            "--topic_names_pub, and relay when topic names overlap. Logs are "
+            "written only when --log_dir is set.\n\n"
         << options.help() << "\n"
         << "Examples:\n"
         << "  ros2 run ros2_perf_multihost_nodes intermediate_node \\\n"
@@ -141,6 +144,8 @@ void Options::parse(int argc, char** argv) {
 std::ostream& operator<<(std::ostream& os, const Options& options) {
   os << "Node Name: " << options.node_name << std::endl;
   os << "Evaluation time: " << options.eval_time << "s" << std::endl;
+    os << "Log output: "
+      << (options.log_dir.empty() ? "disabled" : options.log_dir) << std::endl;
 
   if (!options.topic_names_pub.empty()) {
     for (size_t i = 0; i < options.topic_names_pub.size(); ++i) {
