@@ -37,6 +37,10 @@ static node_options::Options parse_options(int argc, char** argv) {
 }
 
 static void create_result_directory(const node_options::Options& options) {
+  if (options.log_dir.empty()) {
+    return;
+  }
+
   std::stringstream ss;
   ss << options.log_dir << "/" << options.node_name << "_log";
   const std::string result_dir_name = ss.str();
@@ -70,8 +74,12 @@ class Publisher : public rclcpp::Node {
       : Node(options.node_name) {
     node_name = options.node_name;
     log_dir = options.log_dir;
-    RCLCPP_INFO(this->get_logger(), "Publisher log_dir set to: %s",
-                log_dir.c_str());
+    if (log_dir.empty()) {
+      RCLCPP_INFO(this->get_logger(), "Publisher log output disabled.");
+    } else {
+      RCLCPP_INFO(this->get_logger(), "Publisher log_dir set to: %s",
+                  log_dir.c_str());
+    }
     create_metadata_file(options);
     RCLCPP_INFO(this->get_logger(),
                 "Shutdown timer created with duration %d seconds",
@@ -190,6 +198,10 @@ class Publisher : public rclcpp::Node {
   std::unordered_map<std::string, rclcpp::Time> end_time_;
 
   void create_metadata_file(const node_options::Options& options) {
+    if (options.log_dir.empty()) {
+      return;
+    }
+
     std::stringstream ss;
     ss << options.log_dir << "/" << options.node_name << "_log" << "/"
        << "metadata.txt";
@@ -239,6 +251,10 @@ class Publisher : public rclcpp::Node {
 
   void write_all_logs(
       const std::map<std::string, std::vector<MessageLog>>& message_logs_) {
+    if (log_dir.empty()) {
+      return;
+    }
+
     for (const auto& [topic_name, topic_logs] : message_logs_) {
       std::stringstream ss;
       ss << log_dir << "/" << node_name << "_log" << "/" << topic_name

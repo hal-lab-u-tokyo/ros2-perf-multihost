@@ -41,6 +41,10 @@ static node_options::Options parse_options(int argc, char **argv) {
 }
 
 static void create_result_directory(const node_options::Options &options) {
+  if (options.log_dir.empty()) {
+    return;
+  }
+
   std::stringstream ss;
   ss << options.log_dir << "/" << options.node_name << "_log";
   const std::string result_dir_name = ss.str();
@@ -82,9 +86,14 @@ class Intermediate : public rclcpp::Node {
   explicit Intermediate(const node_options::Options &options)
       : Node(options.node_name) {
     node_name = options.node_name;
-    log_dir = std::filesystem::absolute(options.log_dir).string();
-    RCLCPP_INFO(this->get_logger(), "Intermediate log_dir set to: %s",
-                log_dir.c_str());
+    if (options.log_dir.empty()) {
+      log_dir = "";
+      RCLCPP_INFO(this->get_logger(), "Intermediate log output disabled.");
+    } else {
+      log_dir = std::filesystem::absolute(options.log_dir).string();
+      RCLCPP_INFO(this->get_logger(), "Intermediate log_dir set to: %s",
+                  log_dir.c_str());
+    }
     create_metadata_file(options);
 
     // Qos設定
@@ -488,6 +497,10 @@ class Intermediate : public rclcpp::Node {
   std::unordered_map<std::string, rclcpp::Time> end_time_sub_;
 
   void create_metadata_file(const node_options::Options &options) {
+    if (log_dir.empty()) {
+      return;
+    }
+
     std::filesystem::path p = std::filesystem::path(log_dir) /
                               (options.node_name + "_log") / "metadata.txt";
 
@@ -557,6 +570,10 @@ class Intermediate : public rclcpp::Node {
 
   void write_all_logs_pub_(
       const std::map<std::string, std::vector<MessageLog>> &message_logs_pub_) {
+    if (log_dir.empty()) {
+      return;
+    }
+
     for (const auto &[topic_name, topic_logs] : message_logs_pub_) {
       std::filesystem::path p = std::filesystem::path(log_dir) /
                                 (node_name + "_log") /
@@ -597,6 +614,10 @@ class Intermediate : public rclcpp::Node {
 
   void write_all_logs_sub_(
       const std::map<std::string, std::vector<MessageLog>> &message_logs_sub_) {
+    if (log_dir.empty()) {
+      return;
+    }
+
     for (const auto &[topic_name, topic_logs] : message_logs_sub_) {
       std::filesystem::path p = std::filesystem::path(log_dir) /
                                 (node_name + "_log") /
