@@ -18,7 +18,7 @@ from datetime import datetime
 
 # コンテナ内のワークスペースルート
 WS = "/ros2_perf_ws"
-IMAGE_NAME = "ros2-perf-multihost"
+IMAGE_NAME = "ghcr.io/hal-lab-u-tokyo/ros2-perf-multihost:latest"
 
 
 def resolve_output_paths(label):
