@@ -16,7 +16,7 @@ docker login ghcr.io -u <YOUR_GITHUB_USERNAME>
 ## ビルド
 
 このディレクトリの `compose.yaml` は `linux/amd64` と `linux/arm64` を対象にしています。
-build context はリポジトリルート（`..`）です。
+`Dockerfile` は build context の中身を `/workdir/ros2-perf-multihost/` にコピーする前提なので、build context はリポジトリルート（`..`）です。
 
 ```bash
 cd docker

@@ -16,8 +16,9 @@ import shutil
 from datetime import datetime
 
 
-# コンテナ内のワークスペースルート
-WS = "/ros2_perf_ws"
+# コンテナ内のプロジェクトルートと ROS 2 ワークスペース
+PROJECT_ROOT_IN_CONTAINER = "/workdir/ros2-perf-multihost"
+ROS_WS_IN_CONTAINER = f"{PROJECT_ROOT_IN_CONTAINER}/ros2_node_impl_ws"
 IMAGE_NAME = "ghcr.io/hal-lab-u-tokyo/ros2-perf-multihost:latest"
 PERF_WS_DIR = "performance_ws"
 
@@ -68,7 +69,7 @@ def _rmw_env_lines(rmw):
             "export RMW_IMPLEMENTATION=rmw_zenoh_cpp",
             "export ZENOH_ROUTER_CHECK_ATTEMPTS=5",
             "export RUST_LOG=zenoh=warn,zenoh_transport=warn",
-            'export ZENOH_SESSION_CONFIG_URI="$WS/config/DEFAULT_RMW_ZENOH_SESSION_CONFIG.json5"',
+            'export ZENOH_SESSION_CONFIG_URI="$PROJECT_ROOT/config/DEFAULT_RMW_ZENOH_SESSION_CONFIG.json5"',
         ]
     if rmw == "fastdds":
         return [
@@ -111,19 +112,21 @@ def _append_host_script_prelude(lines, host_name, rmw):
             "#!/usr/bin/env bash",
             "set -euo pipefail",
             "",
-            '# ROS 2 ワークスペースルート: Docker では /ros2_perf_ws、ネイティブではプロジェクトルートを指定',
-            'WS="${ROS2_PERF_WS:-/ros2_perf_ws}"',
+            '# プロジェクトルート: Docker では /workdir/ros2-perf-multihost、ネイティブではリポジトリルートを指定',
+            f'PROJECT_ROOT="${{ROS2_PERF_WS:-{PROJECT_ROOT_IN_CONTAINER}}}"',
+            '# 集約した ROS 2 ノード実装ワークスペース',
+            'ROS_WS="${ROS2_NODE_IMPL_WS:-$PROJECT_ROOT/ros2_node_impl_ws}"',
             "",
             'PAYLOAD_SIZE="${PAYLOAD_SIZE:-64}"',
             'RUN_IDX="${RUN_IDX:-1}"',
             "",
-            'LOG_DIR="$WS/performance_ws/raw_${PAYLOAD_SIZE}B/run${RUN_IDX}"',
+            'LOG_DIR="$PROJECT_ROOT/performance_ws/raw_${PAYLOAD_SIZE}B/run${RUN_IDX}"',
             'mkdir -p "$LOG_DIR"',
             "",
             "# colcon の setup.sh は COLCON_CURRENT_PREFIX を事前定義なしで参照するため",
             "# source の前後だけ -u を無効化する",
             "set +u",
-            '. "$WS/install/setup.sh"',
+            '. "$ROS_WS/install/setup.sh"',
             "set -u",
             "",
         ]
@@ -134,12 +137,12 @@ def _append_host_script_prelude(lines, host_name, rmw):
         [
             "",
             "# host-level monitor (CPU/memory)",
-            'MONITOR_HOST_PY="$WS/performance_test/monitor_host.py"',
+            'MONITOR_HOST_PY="$PROJECT_ROOT/performance_test/monitor_host.py"',
             'if [ ! -f "$MONITOR_HOST_PY" ]; then',
-            '  MONITOR_HOST_PY="$WS/src/ros2-perf-multihost/performance_test/monitor_host.py"',
+            '  MONITOR_HOST_PY="$ROS_WS/../performance_test/monitor_host.py"',
             "fi",
             'if [ ! -f "$MONITOR_HOST_PY" ]; then',
-            '  echo "ERROR: monitor_host.py not found under $WS/performance_test or $WS/src/ros2-perf-multihost/performance_test" >&2',
+            '  echo "ERROR: monitor_host.py not found under $PROJECT_ROOT/performance_test" >&2',
             "  exit 1",
             "fi",
             f'python3 "$MONITOR_HOST_PY" 0.5 "$LOG_DIR/{host_name}_monitor_host.csv" &',
@@ -298,13 +301,16 @@ def _append_common_service(
     lines.append("    volumes:")
     lines.append('      - ".:/exec_scripts:ro"')
     lines.append(
-        f'      - "{rel_project_root}/{PERF_WS_DIR}:{WS}/{PERF_WS_DIR}"')
-    lines.append(f'      - "{rel_project_root}/config:{WS}/config:ro"')
+        f'      - "{rel_project_root}/{PERF_WS_DIR}:{PROJECT_ROOT_IN_CONTAINER}/{PERF_WS_DIR}"')
+    lines.append(
+        f'      - "{rel_project_root}/config:{PROJECT_ROOT_IN_CONTAINER}/config:ro"')
     lines.append("    environment:")
+    lines.append(f"      - ROS2_PERF_WS={PROJECT_ROOT_IN_CONTAINER}")
+    lines.append(f"      - ROS2_NODE_IMPL_WS={ROS_WS_IN_CONTAINER}")
     if rmw == "zenoh":
         lines.append("      - RMW_IMPLEMENTATION=rmw_zenoh_cpp")
         lines.append(
-            f"      - ZENOH_SESSION_CONFIG_URI={WS}/config/DEFAULT_RMW_ZENOH_SESSION_CONFIG.json5"
+            f"      - ZENOH_SESSION_CONFIG_URI={PROJECT_ROOT_IN_CONTAINER}/config/DEFAULT_RMW_ZENOH_SESSION_CONFIG.json5"
         )
         lines.append("      - RUST_LOG=zenoh=warn,zenoh_transport=warn")
     elif rmw == "fastdds":
@@ -330,12 +336,15 @@ def _append_zenohd_service(lines, project_root, output_dir):
     lines.append('    user: "${LOCAL_UID:-1000}:${LOCAL_GID:-1000}"')
     lines.append("    volumes:")
     lines.append(
-        f'      - "{rel_project_root}/{PERF_WS_DIR}:{WS}/{PERF_WS_DIR}"')
-    lines.append(f'      - "{rel_project_root}/config:{WS}/config:ro"')
+        f'      - "{rel_project_root}/{PERF_WS_DIR}:{PROJECT_ROOT_IN_CONTAINER}/{PERF_WS_DIR}"')
+    lines.append(
+        f'      - "{rel_project_root}/config:{PROJECT_ROOT_IN_CONTAINER}/config:ro"')
     lines.append("    environment:")
+    lines.append(f"      - ROS2_PERF_WS={PROJECT_ROOT_IN_CONTAINER}")
+    lines.append(f"      - ROS2_NODE_IMPL_WS={ROS_WS_IN_CONTAINER}")
     lines.append("      - RMW_IMPLEMENTATION=rmw_zenoh_cpp")
     lines.append(
-        f"      - ZENOH_ROUTER_CONFIG_URI={WS}/config/DEFAULT_RMW_ZENOH_ROUTER_CONFIG.json5"
+        f"      - ZENOH_ROUTER_CONFIG_URI={PROJECT_ROOT_IN_CONTAINER}/config/DEFAULT_RMW_ZENOH_ROUTER_CONFIG.json5"
     )
     lines.append("      - RUST_LOG=zenoh=warn,zenoh_transport=warn")
     lines.append("    healthcheck:")
@@ -346,7 +355,7 @@ def _append_zenohd_service(lines, project_root, output_dir):
     lines.append("      timeout: 1s")
     lines.append("      retries: 30")
     lines.append(
-        "    command: [ \"/bin/bash\", \"/ros2_perf_ws/src/ros2-perf-multihost/manager_scripts/start_zenoh_router.sh\", \"foreground\" ]"
+        f"    command: [ \"/bin/bash\", \"{PROJECT_ROOT_IN_CONTAINER}/manager_scripts/start_zenoh_router.sh\", \"foreground\" ]"
     )
 
 
