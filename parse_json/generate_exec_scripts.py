@@ -111,7 +111,7 @@ def _append_host_script_prelude(lines, host_name, rmw):
             '# ROS 2 ワークスペースルート: Docker では /ros2_perf_ws、ネイティブではプロジェクトルートを指定',
             'WS="${ROS2_PERF_WS:-/ros2_perf_ws}"',
             "",
-            'PAYLOAD_SIZE="${PAYLOAD_SIZE:-1024}"',
+            'PAYLOAD_SIZE="${PAYLOAD_SIZE:-64}"',
             'RUN_IDX="${RUN_IDX:-1}"',
             "",
             'LOG_DIR="$WS/logs/raw_${PAYLOAD_SIZE}B/run${RUN_IDX}"',
@@ -131,7 +131,15 @@ def _append_host_script_prelude(lines, host_name, rmw):
         [
             "",
             "# host-level monitor (CPU/memory)",
-            f'python3 "$WS/src/ros2-perf-multihost/performance_test/monitor_host.py" 0.5 "$LOG_DIR/{host_name}_monitor_host.csv" &',
+            'MONITOR_HOST_PY="$WS/performance_test/monitor_host.py"',
+            'if [ ! -f "$MONITOR_HOST_PY" ]; then',
+            '  MONITOR_HOST_PY="$WS/src/ros2-perf-multihost/performance_test/monitor_host.py"',
+            "fi",
+            'if [ ! -f "$MONITOR_HOST_PY" ]; then',
+            '  echo "ERROR: monitor_host.py not found under $WS/performance_test or $WS/src/ros2-perf-multihost/performance_test" >&2',
+            "  exit 1",
+            "fi",
+            f'python3 "$MONITOR_HOST_PY" 0.5 "$LOG_DIR/{host_name}_monitor_host.csv" &',
             "MON_HOST_PID=$!",
             "",
             (
@@ -282,11 +290,11 @@ def _append_common_service(
     lines.append(f"  {service_name}:")
     lines.append(f"    image: {IMAGE_NAME}")
     lines.append("    network_mode: host")
-    rel_exec = os.path.relpath(output_dir, project_root)
+    rel_project_root = os.path.relpath(project_root, output_dir)
     lines.append("    volumes:")
-    lines.append(f'      - "${{PWD}}/{rel_exec}:/exec_scripts:ro"')
-    lines.append(f'      - "${{PWD}}/logs:{WS}/logs"')
-    lines.append(f'      - "${{PWD}}/config:{WS}/config:ro"')
+    lines.append('      - ".:/exec_scripts:ro"')
+    lines.append(f'      - "{rel_project_root}/logs:{WS}/logs"')
+    lines.append(f'      - "{rel_project_root}/config:{WS}/config:ro"')
     lines.append("    environment:")
     if rmw == "zenoh":
         lines.append("      - RMW_IMPLEMENTATION=rmw_zenoh_cpp")
@@ -308,14 +316,15 @@ def _append_common_service(
         f'    command: [ "/bin/bash", "/exec_scripts/{host_name}_exec.sh" ]')
 
 
-def _append_zenohd_service(lines):
+def _append_zenohd_service(lines, project_root, output_dir):
     """zenoh利用時のみ追加する中央ルーターサービス"""
+    rel_project_root = os.path.relpath(project_root, output_dir)
     lines.append("  service_zenohd:")
     lines.append(f"    image: {IMAGE_NAME}")
     lines.append("    network_mode: host")
     lines.append("    volumes:")
-    lines.append(f'      - "${{PWD}}/logs:{WS}/logs"')
-    lines.append(f'      - "${{PWD}}/config:{WS}/config:ro"')
+    lines.append(f'      - "{rel_project_root}/logs:{WS}/logs"')
+    lines.append(f'      - "{rel_project_root}/config:{WS}/config:ro"')
     lines.append("    environment:")
     lines.append("      - RMW_IMPLEMENTATION=rmw_zenoh_cpp")
     lines.append(
@@ -352,7 +361,7 @@ def generate_compose(json_content, rmw, output_dir, project_root):
         )
 
     if rmw == "zenoh":
-        _append_zenohd_service(lines)
+        _append_zenohd_service(lines, project_root, output_dir)
 
     compose_path = os.path.join(output_dir, "local_compose.yaml")
     with open(compose_path, "w") as f:
@@ -384,7 +393,6 @@ def generate_local_exec_script(json_content, rmw, output_dir, project_root):
     host_services = " ".join(f"service_{h['host_name']}" for h in hosts)
 
     script_path = os.path.join(output_dir, "local_exec.sh")
-    compose_path = os.path.join(output_dir, "local_compose.yaml")
     lines = [
         "#!/usr/bin/env bash",
         "set -euo pipefail",
