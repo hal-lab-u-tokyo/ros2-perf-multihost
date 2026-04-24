@@ -4,7 +4,9 @@
   <name>ros2_perf_multihost_nodes</name>
   <version>0.0.0</version>
   <description>Template implementations of configurable ROS 2 publisher, subscriber, and intermediate nodes used in the ros2-perf-multihost evaluation framework.</description>
-  <maintainer email="takasehideki@hal.ipc.i.u-tokyo.ac.jp">takasehideki, tropical-summer, ts5-25</maintainer>
+  <maintainer email="takasehideki@hal.ipc.i.u-tokyo.ac.jp">takasehideki</maintainer>
+  <author>tropical-summer</author>
+  <author>ts5-25</author>
   <license>Apache-2.0</license>
 
   <buildtool_depend>ament_cmake</buildtool_depend>
