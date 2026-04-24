@@ -74,7 +74,7 @@ python3 performance_test.py --hosts 3 --trials 10 --docker --payload "64,256"
 
 `performance_test.py` は各試行ごとに REST 経由でノード群を起動し、終了後に各ホストからログを `scp` で収集します。ログは `performance_test/logs` 以下に、集計結果（レイテンシ・スループット・ホスト使用率）は `performance_test/results` 以下に CSV 形式で保存されます。
 
-In case of Zenoh, operate the below on the Manager.
+RMWにZenohを利用する場合は，マネージャで下記を実行する必要があります．
 
 ```
 ./manager_scripts/start_zenoh_router.sh foreground 
