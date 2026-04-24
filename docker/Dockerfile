@@ -10,9 +10,9 @@ RUN apt update && apt install -y \
   && rm -rf /var/lib/apt/lists/*
 
 # ワークスペースを作成し、build context から本プロジェクトをコピーしてビルド
-RUN mkdir -p /ros2_perf_ws/src
-COPY . /ros2_perf_ws/src/ros2-perf-multihost
-RUN cd /ros2_perf_ws \
+RUN mkdir -p /workdir/ros2-perf-multihost
+COPY . /workdir/ros2-perf-multihost
+RUN cd /workdir/ros2-perf-multihost/ros2_node_impl_ws \
   && . /opt/ros/jazzy/setup.sh \
   && colcon build
 
