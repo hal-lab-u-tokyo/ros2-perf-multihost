@@ -1,14 +1,11 @@
+.vscode/
+__pycache__/
+
 build/
 install/
 log/
-__pycache__/
-*.log
-*.log.remote
+
 logs/
 
-.vscode/
-compose.yml
-Dockerfiles/
-host_scripts/
 performance_test/logs/
 performance_test/results/
