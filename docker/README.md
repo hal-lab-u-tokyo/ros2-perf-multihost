@@ -16,10 +16,10 @@ docker login ghcr.io -u <YOUR_GITHUB_USERNAME>
 ## ビルド
 
 このディレクトリの `compose.yaml` は `linux/amd64` と `linux/arm64` を対象にしています。
+build context はリポジトリルート（`..`）です。
 
 ```bash
 cd docker
-docker buildx create --name mybuilder --use
 docker buildx bake --load
 ```
 

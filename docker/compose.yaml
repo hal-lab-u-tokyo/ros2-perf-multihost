@@ -2,8 +2,8 @@ services:
   ros2-perf-multihost-builder:
     image: ghcr.io/hal-lab-u-tokyo/ros2-perf-multihost:latest
     build:
-      context: .
-      dockerfile: Dockerfile
+      context: ..
+      dockerfile: docker/Dockerfile
       platforms:
         - "linux/amd64"
         - "linux/arm64"
