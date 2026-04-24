@@ -12,7 +12,7 @@
 
 ```bash
 cd parse_json
-python3 generate_dockerfiles.py ../examples/topology_example/topology_example.json --rmw zenoh
+python3 generate_dockerfiles.py ../topology_example/simple.json --rmw zenoh
 ```
 
 2. Raspberry Pi 向けにビルド／配布（`parse_json/distribute_docker_images.sh` を使用）
@@ -78,5 +78,88 @@ RMWにZenohを利用する場合は，マネージャで下記を実行する必
 
 ```
 ./manager_scripts/start_zenoh_router.sh foreground 
+```
+
+---
+
+## 共通Dockerイメージを使った実行スクリプト生成
+
+トポロジーごとにDockerfileを生成・ビルドする代わりに、共通の1つのDockerイメージを使い回し、トポロジーに応じた実行スクリプトとcompose定義だけを生成するアプローチです。
+
+### 共通Dockerイメージの取得（利用者向け）
+
+```bash
+docker pull ghcr.io/hal-lab-u-tokyo/ros2-perf-multihost:latest
+```
+
+公開済みの GitHub Packages イメージ [`ghcr.io/hal-lab-u-tokyo/ros2-perf-multihost:latest`](https://github.com/hal-lab-u-tokyo/ros2-perf-multihost/pkgs/container/ros2-perf-multihost) を利用します。
+自動生成される `local_compose.yaml` / `host{N}_compose.yaml` も同じイメージを参照します。
+イメージのビルド・push手順（開発者向け）は `docker/README.md` を参照してください。
+
+### 実行スクリプトの生成
+
+プロジェクトルートから実行します。
+
+```bash
+python3 parse_json/generate_exec_scripts.py <topology.json> --rmw <rmw> [--label <label>]
+```
+
+引数:
+
+- `<topology.json>`: トポロジー定義JSONファイルのパス
+- `--rmw`: RMW実装（`fastdds` / `zenoh` / `cyclonedds`、デフォルト: `fastdds`）
+- `--label`: 実行ラベル（省略可）。同名ラベルが既に存在する場合は警告を表示します
+
+出力先は `performance_ws/<YYYY-DD-MM_HH-mm-ss>/exec_scripts/`（`--label` 指定時は `performance_ws/<label>-<YYYY-DD-MM_HH-mm-ss>/exec_scripts/`）です。`performance_ws/latest` は常に最新の実行ディレクトリへのシンボリックリンクになります。
+
+```bash
+# 例: zenoh で topology_example を使う場合
+python3 parse_json/generate_exec_scripts.py topology_example/simple.json --rmw zenoh --label myrun
+```
+
+生成されるファイル:
+
+| ファイル | 用途 |
+|---|---|
+| `host{N}_exec.sh` | 各ホストのコンテナ内（またはネイティブ）で実行するROSノード起動スクリプト |
+| `host{N}_run.sh` | 各ホスト向け compose を起動するラッパースクリプト（UID/GID 自動設定） |
+| `host{N}_compose.yaml` | 実機デプロイ用の各ホスト向けcompose定義 |
+| `local_run.sh` | `local_compose.yaml` を使って全サービスを起動するラッパースクリプト（検証用） |
+| `local_compose.yaml` | 作業PC上で全サービスをまとめて起動するcompose定義（検証用） |
+
+### 作業PC上での検証実行（Docker）
+
+```bash
+bash performance_ws/latest/exec_scripts/local_run.sh
+```
+
+`local_run.sh` は自動的に `LOCAL_UID=$(id -u)` と `LOCAL_GID=$(id -g)` を設定して `docker compose` を実行するため、bind mount 先に root 所有ファイルが作られにくくなります。
+
+zenohの場合は先にzenoh routerを起動してからホストサービスを立ち上げ、完了後にrouterを自動停止します。
+
+### ネイティブ環境での実行
+
+Dockerを使わずネイティブのROS 2環境で実行する場合は、`ROS2_PERF_WS` にプロジェクトルートを設定します。
+
+```bash
+export ROS2_PERF_WS=$(pwd)
+bash performance_ws/latest/exec_scripts/host1_exec.sh
+```
+
+未設定の場合はコンテナ内のデフォルトパス `/ros2_perf_ws` が使用されます。
+
+### 実機デプロイ時（各ホスト上）
+
+各ホストに `exec_scripts/` ディレクトリを配布し、ホスト対応のcompose定義で起動します。
+
+```bash
+# host1 上で実行
+bash performance_ws/latest/exec_scripts/host1_run.sh
+```
+
+必要に応じて、各ホストで事前に以下を実行してイメージを取得してください。
+
+```bash
+docker pull ghcr.io/hal-lab-u-tokyo/ros2-perf-multihost:latest
 ```
 
