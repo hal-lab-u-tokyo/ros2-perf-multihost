@@ -110,7 +110,7 @@ python3 parse_json/generate_exec_scripts.py <topology.json> --rmw <rmw> [--label
 - `--rmw`: RMW実装（`fastdds` / `zenoh` / `cyclonedds`、デフォルト: `fastdds`）
 - `--label`: 実行ラベル（省略可）。同名ラベルが既に存在する場合は警告を表示します
 
-出力先は `logs/<YYYY-DD-MM_HH-mm-ss>/exec_scripts/`（`--label` 指定時は `logs/<label>-<YYYY-DD-MM_HH-mm-ss>/exec_scripts/`）です。`logs/latest` は常に最新の実行ディレクトリへのシンボリックリンクになります。
+出力先は `performance_ws/<YYYY-DD-MM_HH-mm-ss>/exec_scripts/`（`--label` 指定時は `performance_ws/<label>-<YYYY-DD-MM_HH-mm-ss>/exec_scripts/`）です。`performance_ws/latest` は常に最新の実行ディレクトリへのシンボリックリンクになります。
 
 ```bash
 # 例: zenoh で topology_example を使う場合
@@ -130,7 +130,7 @@ python3 parse_json/generate_exec_scripts.py topology_example/simple.json --rmw z
 ### 作業PC上での検証実行（Docker）
 
 ```bash
-bash logs/latest/exec_scripts/local_run.sh
+bash performance_ws/latest/exec_scripts/local_run.sh
 ```
 
 `local_run.sh` は自動的に `LOCAL_UID=$(id -u)` と `LOCAL_GID=$(id -g)` を設定して `docker compose` を実行するため、bind mount 先に root 所有ファイルが作られにくくなります。
@@ -143,7 +143,7 @@ Dockerを使わずネイティブのROS 2環境で実行する場合は、`ROS2_
 
 ```bash
 export ROS2_PERF_WS=$(pwd)
-bash logs/latest/exec_scripts/host1_exec.sh
+bash performance_ws/latest/exec_scripts/host1_exec.sh
 ```
 
 未設定の場合はコンテナ内のデフォルトパス `/ros2_perf_ws` が使用されます。
@@ -154,7 +154,7 @@ bash logs/latest/exec_scripts/host1_exec.sh
 
 ```bash
 # host1 上で実行
-bash logs/latest/exec_scripts/host1_run.sh
+bash performance_ws/latest/exec_scripts/host1_run.sh
 ```
 
 必要に応じて、各ホストで事前に以下を実行してイメージを取得してください。

@@ -5,7 +5,7 @@ build/
 install/
 log/
 
-logs/
+performance_ws/
 
 performance_test/logs/
 performance_test/results/
