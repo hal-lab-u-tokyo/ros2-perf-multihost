@@ -111,6 +111,7 @@ python3 parse_json/generate_exec_scripts.py <topology.json> --rmw <rmw> [--label
 - `--label`: 実行ラベル（省略可）。同名ラベルが既に存在する場合は警告を表示します
 
 出力先は `performance_ws/<YYYY-DD-MM_HH-mm-ss>/exec_scripts/`（`--label` 指定時は `performance_ws/<label>-<YYYY-DD-MM_HH-mm-ss>/exec_scripts/`）です。`performance_ws/latest` は常に最新の実行ディレクトリへのシンボリックリンクになります。
+`performance_ws/` ディレクトリ自体は `performance_ws/.gitkeep` でリポジトリ管理し、実行時に生成される中身は `.gitignore` で除外しています。
 
 ```bash
 # 例: zenoh で topology_example を使う場合

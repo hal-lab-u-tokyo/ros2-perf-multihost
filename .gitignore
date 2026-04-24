@@ -5,7 +5,8 @@ build/
 install/
 log/
 
-performance_ws/
+performance_ws/*
+!performance_ws/.gitkeep
 
 performance_test/logs/
 performance_test/results/
