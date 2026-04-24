@@ -80,3 +80,76 @@ RMWにZenohを利用する場合は，マネージャで下記を実行する必
 ./manager_scripts/start_zenoh_router.sh foreground 
 ```
 
+---
+
+## 共通Dockerイメージを使った実行スクリプト生成
+
+トポロジーごとにDockerfileを生成・ビルドする代わりに、共通の1つのDockerイメージを使い回し、トポロジーに応じた実行スクリプトとcompose定義だけを生成するアプローチです。
+
+### 共通Dockerイメージのビルド
+
+```bash
+cd docker
+docker compose build
+```
+
+`docker/Dockerfile` をもとに `ros2-perf-multihost` というイメージがビルドされます。
+
+### 実行スクリプトの生成
+
+プロジェクトルートから実行します。
+
+```bash
+python3 parse_json/generate_exec_scripts.py <topology.json> --rmw <rmw> [--label <label>]
+```
+
+引数:
+
+- `<topology.json>`: トポロジー定義JSONファイルのパス
+- `--rmw`: RMW実装（`fastdds` / `zenoh` / `cyclonedds`、デフォルト: `fastdds`）
+- `--label`: 実行ラベル（省略可）。同名ラベルが既に存在する場合は警告を表示します
+
+出力先は `logs/<YYYY-DD-MM_HH-mm-ss>/exec_scripts/`（`--label` 指定時は `logs/<label>-<YYYY-DD-MM_HH-mm-ss>/exec_scripts/`）です。`logs/latest` は常に最新の実行ディレクトリへのシンボリックリンクになります。
+
+```bash
+# 例: zenoh で topology_example を使う場合
+python3 parse_json/generate_exec_scripts.py examples/topology_example/topology_example.json --rmw zenoh --label myrun
+```
+
+生成されるファイル:
+
+| ファイル | 用途 |
+|---|---|
+| `host{N}_exec.sh` | 各ホストのコンテナ内（またはネイティブ）で実行するROSノード起動スクリプト |
+| `local_compose.yaml` | 作業PC上で全サービスをまとめて起動するcompose定義（検証用） |
+| `host{N}_compose.yaml` | 実機デプロイ用の各ホスト向けcompose定義 |
+| `local_exec.sh` | `local_compose.yaml` を使って全サービスを起動するラッパースクリプト |
+
+### 作業PC上での検証実行（Docker）
+
+```bash
+bash logs/latest/exec_scripts/local_exec.sh
+```
+
+zenohの場合は先にzenoh routerを起動してからホストサービスを立ち上げ、完了後にrouterを自動停止します。
+
+### ネイティブ環境での実行
+
+Dockerを使わずネイティブのROS 2環境で実行する場合は、`ROS2_PERF_WS` にプロジェクトルートを設定します。
+
+```bash
+export ROS2_PERF_WS=$(pwd)
+bash logs/latest/exec_scripts/host1_exec.sh
+```
+
+未設定の場合はコンテナ内のデフォルトパス `/ros2_perf_ws` が使用されます。
+
+### 実機デプロイ時（各ホスト上）
+
+各ホストに `exec_scripts/` ディレクトリを配布し、ホスト対応のcompose定義で起動します。
+
+```bash
+# host1 上で実行
+docker compose -f host1_compose.yaml up
+```
+

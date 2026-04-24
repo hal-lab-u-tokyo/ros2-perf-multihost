@@ -1,0 +1,6 @@
+services:
+  ros2-perf-multihost-builder:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: ros2-perf-multihost
