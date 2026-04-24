@@ -19,22 +19,23 @@ from datetime import datetime
 # コンテナ内のワークスペースルート
 WS = "/ros2_perf_ws"
 IMAGE_NAME = "ghcr.io/hal-lab-u-tokyo/ros2-perf-multihost:latest"
+PERF_WS_DIR = "performance_ws"
 
 
 def resolve_output_paths(label):
-    """出力先ディレクトリと logs/latest エイリアスを解決・更新する"""
+    """出力先ディレクトリと performance_ws/latest エイリアスを解決・更新する"""
     project_root = os.getcwd()
-    logs_dir = os.path.join(project_root, "logs")
+    perf_ws_dir = os.path.join(project_root, PERF_WS_DIR)
 
-    if label and os.path.isdir(logs_dir):
+    if label and os.path.isdir(perf_ws_dir):
         same_label_runs = sorted(
             name
-            for name in os.listdir(logs_dir)
-            if name.startswith(f"{label}-") and os.path.isdir(os.path.join(logs_dir, name))
+            for name in os.listdir(perf_ws_dir)
+            if name.startswith(f"{label}-") and os.path.isdir(os.path.join(perf_ws_dir, name))
         )
         if same_label_runs:
             print(
-                f"[WARN] label '{label}' already has {len(same_label_runs)} existing run(s) under logs/. "
+                f"[WARN] label '{label}' already has {len(same_label_runs)} existing run(s) under {PERF_WS_DIR}/. "
                 "Consider using a different --label name for clearer distinction."
             )
 
@@ -44,11 +45,11 @@ def resolve_output_paths(label):
     else:
         run_dir_name = date_str
 
-    run_dir = os.path.join(logs_dir, run_dir_name)
+    run_dir = os.path.join(perf_ws_dir, run_dir_name)
     output_dir = os.path.join(run_dir, "exec_scripts")
     os.makedirs(output_dir, exist_ok=True)
 
-    latest_link = os.path.join(logs_dir, "latest")
+    latest_link = os.path.join(perf_ws_dir, "latest")
     if os.path.lexists(latest_link):
         if os.path.islink(latest_link) or os.path.isfile(latest_link):
             os.remove(latest_link)
@@ -116,7 +117,7 @@ def _append_host_script_prelude(lines, host_name, rmw):
             'PAYLOAD_SIZE="${PAYLOAD_SIZE:-64}"',
             'RUN_IDX="${RUN_IDX:-1}"',
             "",
-            'LOG_DIR="$WS/logs/raw_${PAYLOAD_SIZE}B/run${RUN_IDX}"',
+            'LOG_DIR="$WS/performance_ws/raw_${PAYLOAD_SIZE}B/run${RUN_IDX}"',
             'mkdir -p "$LOG_DIR"',
             "",
             "# colcon の setup.sh は COLCON_CURRENT_PREFIX を事前定義なしで参照するため",
@@ -296,7 +297,8 @@ def _append_common_service(
     rel_project_root = os.path.relpath(project_root, output_dir)
     lines.append("    volumes:")
     lines.append('      - ".:/exec_scripts:ro"')
-    lines.append(f'      - "{rel_project_root}/logs:{WS}/logs"')
+    lines.append(
+        f'      - "{rel_project_root}/{PERF_WS_DIR}:{WS}/{PERF_WS_DIR}"')
     lines.append(f'      - "{rel_project_root}/config:{WS}/config:ro"')
     lines.append("    environment:")
     if rmw == "zenoh":
@@ -327,7 +329,8 @@ def _append_zenohd_service(lines, project_root, output_dir):
     lines.append("    network_mode: host")
     lines.append('    user: "${LOCAL_UID:-1000}:${LOCAL_GID:-1000}"')
     lines.append("    volumes:")
-    lines.append(f'      - "{rel_project_root}/logs:{WS}/logs"')
+    lines.append(
+        f'      - "{rel_project_root}/{PERF_WS_DIR}:{WS}/{PERF_WS_DIR}"')
     lines.append(f'      - "{rel_project_root}/config:{WS}/config:ro"')
     lines.append("    environment:")
     lines.append("      - RMW_IMPLEMENTATION=rmw_zenoh_cpp")
@@ -399,7 +402,7 @@ def _run_script_common_prefix(lines):
             "set -euo pipefail",
             "",
             'SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"',
-            '# プロジェクトルート: このスクリプトは logs/<run>/exec_scripts/ 以下に生成される',
+            '# プロジェクトルート: このスクリプトは performance_ws/<run>/exec_scripts/ 以下に生成される',
             'PROJECT_ROOT="$(cd "$SCRIPT_DIR/../../.." && pwd)"',
             'LOCAL_UID="${LOCAL_UID:-$(id -u)}"',
             'LOCAL_GID="${LOCAL_GID:-$(id -g)}"',
@@ -501,7 +504,7 @@ if __name__ == "__main__":
         "--label",
         type=str,
         default=None,
-        help="出力ディレクトリ名のラベル (logs/<label>-YYYY-DD-MM_HH-mm-ss/exec_scripts)",
+        help="出力ディレクトリ名のラベル (performance_ws/<label>-YYYY-DD-MM_HH-mm-ss/exec_scripts)",
     )
     args = parser.parse_args()
 
@@ -522,6 +525,6 @@ if __name__ == "__main__":
 
     print(
         f"Generated host*_exec.sh, host*_run.sh, local_compose.yaml, host*_compose.yaml, local_run.sh "
-        f"in logs/{run_dir_name}/exec_scripts (latest: logs/latest) "
+        f"in {PERF_WS_DIR}/{run_dir_name}/exec_scripts (latest: {PERF_WS_DIR}/latest) "
         f"for {len(json_content['hosts'])} host(s) with RMW={args.rmw}"
     )
