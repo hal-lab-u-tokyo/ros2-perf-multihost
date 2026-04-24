@@ -122,15 +122,18 @@ python3 parse_json/generate_exec_scripts.py topology_example/simple.json --rmw z
 | ファイル | 用途 |
 |---|---|
 | `host{N}_exec.sh` | 各ホストのコンテナ内（またはネイティブ）で実行するROSノード起動スクリプト |
-| `local_compose.yaml` | 作業PC上で全サービスをまとめて起動するcompose定義（検証用） |
+| `host{N}_run.sh` | 各ホスト向け compose を起動するラッパースクリプト（UID/GID 自動設定） |
 | `host{N}_compose.yaml` | 実機デプロイ用の各ホスト向けcompose定義 |
-| `local_exec.sh` | `local_compose.yaml` を使って全サービスを起動するラッパースクリプト |
+| `local_run.sh` | `local_compose.yaml` を使って全サービスを起動するラッパースクリプト（検証用） |
+| `local_compose.yaml` | 作業PC上で全サービスをまとめて起動するcompose定義（検証用） |
 
 ### 作業PC上での検証実行（Docker）
 
 ```bash
-bash logs/latest/exec_scripts/local_exec.sh
+bash logs/latest/exec_scripts/local_run.sh
 ```
+
+`local_run.sh` は自動的に `LOCAL_UID=$(id -u)` と `LOCAL_GID=$(id -g)` を設定して `docker compose` を実行するため、bind mount 先に root 所有ファイルが作られにくくなります。
 
 zenohの場合は先にzenoh routerを起動してからホストサービスを立ち上げ、完了後にrouterを自動停止します。
 
@@ -151,7 +154,7 @@ bash logs/latest/exec_scripts/host1_exec.sh
 
 ```bash
 # host1 上で実行
-docker compose -f host1_compose.yaml up
+bash logs/latest/exec_scripts/host1_run.sh
 ```
 
 必要に応じて、各ホストで事前に以下を実行してイメージを取得してください。

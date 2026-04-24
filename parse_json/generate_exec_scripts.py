@@ -87,6 +87,8 @@ def _cleanup_generated_files(output_dir):
     for filename in os.listdir(output_dir):
         if filename.endswith("_exec.sh"):
             os.remove(os.path.join(output_dir, filename))
+        elif filename.endswith("_run.sh"):
+            os.remove(os.path.join(output_dir, filename))
         elif filename.startswith("exec_") and filename.endswith(".sh"):
             os.remove(os.path.join(output_dir, filename))
         elif filename.endswith("_compose.yaml"):
@@ -290,6 +292,7 @@ def _append_common_service(
     lines.append(f"  {service_name}:")
     lines.append(f"    image: {IMAGE_NAME}")
     lines.append("    network_mode: host")
+    lines.append('    user: "${LOCAL_UID:-1000}:${LOCAL_GID:-1000}"')
     rel_project_root = os.path.relpath(project_root, output_dir)
     lines.append("    volumes:")
     lines.append('      - ".:/exec_scripts:ro"')
@@ -322,6 +325,7 @@ def _append_zenohd_service(lines, project_root, output_dir):
     lines.append("  service_zenohd:")
     lines.append(f"    image: {IMAGE_NAME}")
     lines.append("    network_mode: host")
+    lines.append('    user: "${LOCAL_UID:-1000}:${LOCAL_GID:-1000}"')
     lines.append("    volumes:")
     lines.append(f'      - "{rel_project_root}/logs:{WS}/logs"')
     lines.append(f'      - "{rel_project_root}/config:{WS}/config:ro"')
@@ -387,42 +391,80 @@ def generate_compose_per_host(json_content, rmw, output_dir, project_root):
             f.write("\n".join(lines) + "\n")
 
 
-def generate_local_exec_script(json_content, rmw, output_dir, project_root):
-    """local_exec.sh: 作業PC検証用のlocal_compose.yamlを使って全サービスを起動するスクリプト"""
+def _run_script_common_prefix(lines):
+    """runスクリプト共通の前半を追加する"""
+    lines.extend(
+        [
+            "#!/usr/bin/env bash",
+            "set -euo pipefail",
+            "",
+            'SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"',
+            '# プロジェクトルート: このスクリプトは logs/<run>/exec_scripts/ 以下に生成される',
+            'PROJECT_ROOT="$(cd "$SCRIPT_DIR/../../.." && pwd)"',
+            'LOCAL_UID="${LOCAL_UID:-$(id -u)}"',
+            'LOCAL_GID="${LOCAL_GID:-$(id -g)}"',
+            "",
+            'cd "$PROJECT_ROOT"',
+            "",
+            'echo "Running containers as uid:gid $LOCAL_UID:$LOCAL_GID"',
+            "",
+        ]
+    )
+
+
+def generate_host_run_scripts(json_content, output_dir):
+    """host*_run.sh: 各ホスト用composeを起動するラッパースクリプトを生成する"""
+    for host_dict in json_content["hosts"]:
+        host_name = host_dict["host_name"]
+        script_path = os.path.join(output_dir, f"{host_name}_run.sh")
+        compose_file = f"$SCRIPT_DIR/{host_name}_compose.yaml"
+        lines = []
+        _run_script_common_prefix(lines)
+        lines.extend(
+            [
+                f'COMPOSE_FILE="{compose_file}"',
+                'echo "Using compose file: $COMPOSE_FILE"',
+                f'LOCAL_UID="$LOCAL_UID" LOCAL_GID="$LOCAL_GID" docker compose -f "$COMPOSE_FILE" up service_{host_name}',
+            ]
+        )
+
+        with open(script_path, "w") as f:
+            f.write("\n".join(lines) + "\n")
+
+        os.chmod(script_path, 0o755)
+
+
+def generate_local_run_script(json_content, rmw, output_dir):
+    """local_run.sh: 作業PC検証用のlocal_compose.yamlを使って全サービスを起動するスクリプト"""
     hosts = json_content["hosts"]
     host_services = " ".join(f"service_{h['host_name']}" for h in hosts)
 
-    script_path = os.path.join(output_dir, "local_exec.sh")
-    lines = [
-        "#!/usr/bin/env bash",
-        "set -euo pipefail",
-        "",
-        'SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"',
-        '# プロジェクトルート: このスクリプトは logs/<run>/exec_scripts/ 以下に生成される',
-        'PROJECT_ROOT="$(cd "$SCRIPT_DIR/../../.." && pwd)"',
-        'COMPOSE_FILE="$SCRIPT_DIR/local_compose.yaml"',
-        "",
-        'cd "$PROJECT_ROOT"',
-        "",
-        'echo "Using compose file: $COMPOSE_FILE"',
-        "",
-    ]
+    script_path = os.path.join(output_dir, "local_run.sh")
+    lines = []
+    _run_script_common_prefix(lines)
+    lines.extend(
+        [
+            'COMPOSE_FILE="$SCRIPT_DIR/local_compose.yaml"',
+            'echo "Using compose file: $COMPOSE_FILE"',
+            "",
+        ]
+    )
 
     if rmw == "zenoh":
         lines.extend(
             [
                 'echo "[1/3] Starting service_zenohd..."',
-                'docker compose -f "$COMPOSE_FILE" up -d service_zenohd',
+                'LOCAL_UID="$LOCAL_UID" LOCAL_GID="$LOCAL_GID" docker compose -f "$COMPOSE_FILE" up -d service_zenohd',
                 "",
                 'echo "[2/3] Waiting 5 seconds for zenoh router startup..."',
                 "sleep 5",
                 "",
                 f'echo "[3/3] Starting host services: {host_services}"',
                 "status=0",
-                f'docker compose -f "$COMPOSE_FILE" up {host_services} || status=$?',
+                f'LOCAL_UID="$LOCAL_UID" LOCAL_GID="$LOCAL_GID" docker compose -f "$COMPOSE_FILE" up {host_services} || status=$?',
                 "",
                 'echo "Stopping service_zenohd..."',
-                'docker compose -f "$COMPOSE_FILE" stop service_zenohd >/dev/null 2>&1 || true',
+                'LOCAL_UID="$LOCAL_UID" LOCAL_GID="$LOCAL_GID" docker compose -f "$COMPOSE_FILE" stop service_zenohd >/dev/null 2>&1 || true',
                 "",
                 'echo "Finished. service_zenohd stopped."',
                 "",
@@ -433,7 +475,7 @@ def generate_local_exec_script(json_content, rmw, output_dir, project_root):
         lines.extend(
             [
                 f'echo "Starting all services: {host_services}"',
-                f'docker compose -f "$COMPOSE_FILE" up {host_services}',
+                f'LOCAL_UID="$LOCAL_UID" LOCAL_GID="$LOCAL_GID" docker compose -f "$COMPOSE_FILE" up {host_services}',
             ]
         )
 
@@ -475,11 +517,11 @@ if __name__ == "__main__":
     generate_exec_scripts(json_content, args.rmw, output_dir)
     generate_compose(json_content, args.rmw, output_dir, project_root)
     generate_compose_per_host(json_content, args.rmw, output_dir, project_root)
-    generate_local_exec_script(
-        json_content, args.rmw, output_dir, project_root)
+    generate_host_run_scripts(json_content, output_dir)
+    generate_local_run_script(json_content, args.rmw, output_dir)
 
     print(
-        f"Generated host*_exec.sh, local_compose.yaml, host*_compose.yaml, local_exec.sh "
+        f"Generated host*_exec.sh, host*_run.sh, local_compose.yaml, host*_compose.yaml, local_run.sh "
         f"in logs/{run_dir_name}/exec_scripts (latest: logs/latest) "
         f"for {len(json_content['hosts'])} host(s) with RMW={args.rmw}"
     )
