@@ -69,8 +69,8 @@ void Options::parse(int argc, char** argv) {
     std::cout
         << "Node role:\n"
         << "  Intermediate: can subscribe on --topic_names_sub, publish on "
-            "--topic_names_pub, and relay when topic names overlap. Logs are "
-            "written only when --log_dir is set.\n\n"
+           "--topic_names_pub, and relay when topic names overlap. Logs are "
+           "written only when --log_dir is set.\n\n"
         << options.help() << "\n"
         << "Examples:\n"
         << "  ros2 run ros2_perf_multihost_nodes intermediate_node \\\n"
@@ -144,8 +144,8 @@ void Options::parse(int argc, char** argv) {
 std::ostream& operator<<(std::ostream& os, const Options& options) {
   os << "Node Name: " << options.node_name << std::endl;
   os << "Evaluation time: " << options.eval_time << "s" << std::endl;
-    os << "Log output: "
-      << (options.log_dir.empty() ? "disabled" : options.log_dir) << std::endl;
+  os << "Log output: "
+     << (options.log_dir.empty() ? "disabled" : options.log_dir) << std::endl;
 
   if (!options.topic_names_pub.empty()) {
     for (size_t i = 0; i < options.topic_names_pub.size(); ++i) {

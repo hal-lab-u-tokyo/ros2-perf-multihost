@@ -50,8 +50,7 @@ void Options::parse(int argc, char** argv) {
                "broadcast to all topics, or provide one value per topic.",
                cxxopts::value<std::vector<int>>(period_ms), "ms")(
       "eval_time", "Evaluation duration in seconds",
-      cxxopts::value<int>(eval_time)->default_value("60"),
-      "sec")(
+      cxxopts::value<int>(eval_time)->default_value("60"), "sec")(
       "log_dir",
       "Directory to write logs and metadata. If omitted, no log files are "
       "created.",
@@ -78,7 +77,7 @@ void Options::parse(int argc, char** argv) {
 
     std::cout
         << "  Publisher: periodically publishes payloads to --topic_names and "
-            "records publish timestamps and metadata when --log_dir is set.\n\n"
+           "records publish timestamps and metadata when --log_dir is set.\n\n"
         << options.help() << "\n"
         << "Example:\n"
         << "  ros2 run ros2_perf_multihost_nodes " << executable_name << " \\\n"
@@ -137,8 +136,8 @@ void Options::parse(int argc, char** argv) {
 std::ostream& operator<<(std::ostream& os, const Options& options) {
   os << "Node Name: " << options.node_name << std::endl;
   os << "Evaluation time: " << options.eval_time << "s" << std::endl;
-    os << "Log output: "
-      << (options.log_dir.empty() ? "disabled" : options.log_dir) << std::endl;
+  os << "Log output: "
+     << (options.log_dir.empty() ? "disabled" : options.log_dir) << std::endl;
 
   for (size_t i = 0; i < options.topic_names.size(); ++i) {
     os << "Topic: " << options.topic_names[i] << std::endl;
