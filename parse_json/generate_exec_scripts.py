@@ -162,8 +162,8 @@ def _append_publisher_block(lines, node_name, pub_list, period_ms, eval_time, qo
     lines.extend(
         [
             f"# {node_name} publisher",
-            '( cd "$WS/install/publisher_node/lib/publisher_node" \\',
-            f"  && ./publisher_node_exe --node_name {node_name} --topic_names {topic_names} \\",
+            "( ros2 run ros2_perf_multihost_nodes publisher_node \\",
+            f"  --node_name {node_name} --topic_names {topic_names} \\",
             f"  -s \"$PAYLOAD_SIZE\" -p {period_ms} --eval_time {eval_time} \\",
             f"  {qos_opts} --log_dir \"$LOG_DIR\" \\",
             ") & node_pids+=($!)",
@@ -177,8 +177,8 @@ def _append_subscriber_block(lines, node_name, sub_list, eval_time, qos_opts):
     lines.extend(
         [
             f"# {node_name} subscriber",
-            '( cd "$WS/install/subscriber_node/lib/subscriber_node" \\',
-            f"  && ./subscriber_node --node_name {node_name} --topic_names {topic_names} \\",
+            "( ros2 run ros2_perf_multihost_nodes subscriber_node \\",
+            f"  --node_name {node_name} --topic_names {topic_names} \\",
             f"  --eval_time {eval_time} \\",
             f"  {qos_opts} --log_dir \"$LOG_DIR\" \\",
             ") & node_pids+=($!)",
@@ -195,8 +195,8 @@ def _append_intermediate_block(lines, node_name, intermediate_list, period_ms, e
     lines.extend(
         [
             f"# {node_name} intermediate",
-            '( cd "$WS/install/intermediate_node/lib/intermediate_node" \\',
-            f"  && ./intermediate_node --node_name {node_name} --topic_names_pub {topic_names_pub} --topic_names_sub {topic_names_sub} \\",
+            "( ros2 run ros2_perf_multihost_nodes intermediate_node \\",
+            f"  --node_name {node_name} --topic_names_pub {topic_names_pub} --topic_names_sub {topic_names_sub} \\",
             f"  -s \"$PAYLOAD_SIZE\" -p {period_ms} --eval_time {eval_time} \\",
             f"  {qos_opts} --log_dir \"$LOG_DIR\" \\",
             ") & node_pids+=($!)",
