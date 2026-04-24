@@ -86,14 +86,15 @@ RMWにZenohを利用する場合は，マネージャで下記を実行する必
 
 トポロジーごとにDockerfileを生成・ビルドする代わりに、共通の1つのDockerイメージを使い回し、トポロジーに応じた実行スクリプトとcompose定義だけを生成するアプローチです。
 
-### 共通Dockerイメージのビルド
+### 共通Dockerイメージの取得（利用者向け）
 
 ```bash
-cd docker
-docker compose build
+docker pull ghcr.io/hal-lab-u-tokyo/ros2-perf-multihost:latest
 ```
 
-`docker/Dockerfile` をもとに `ros2-perf-multihost` というイメージがビルドされます。
+公開済みの GitHub Packages イメージ [`ghcr.io/hal-lab-u-tokyo/ros2-perf-multihost:latest`](https://github.com/hal-lab-u-tokyo/ros2-perf-multihost/pkgs/container/ros2-perf-multihost) を利用します。
+自動生成される `local_compose.yaml` / `host{N}_compose.yaml` も同じイメージを参照します。
+イメージのビルド・push手順（開発者向け）は `docker/README.md` を参照してください。
 
 ### 実行スクリプトの生成
 
@@ -151,5 +152,11 @@ bash logs/latest/exec_scripts/host1_exec.sh
 ```bash
 # host1 上で実行
 docker compose -f host1_compose.yaml up
+```
+
+必要に応じて、各ホストで事前に以下を実行してイメージを取得してください。
+
+```bash
+docker pull ghcr.io/hal-lab-u-tokyo/ros2-perf-multihost:latest
 ```
 
