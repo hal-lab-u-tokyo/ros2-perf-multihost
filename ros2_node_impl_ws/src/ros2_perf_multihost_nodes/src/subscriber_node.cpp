@@ -1,15 +1,18 @@
 #include <cstdio>
 #include <filesystem>
 #include <fstream>
+#include <iomanip>
+#include <map>
 #include <memory>
 #include <rclcpp/rclcpp.hpp>
 #include <sstream>
 #include <std_msgs/msg/string.hpp>
 #include <string>
+#include <vector>
 
 #include "node_options/cli_options.hpp"
-#include "publisher_node/msg/int_message.hpp"
-#include "publisher_node/msg/performance_header.hpp"
+#include "ros2_perf_multihost_nodes/msg/int_message.hpp"
+#include "ros2_perf_multihost_nodes/msg/performance_header.hpp"
 
 struct MessageLog {
   std::string pub_node_name;
@@ -74,8 +77,8 @@ class Subscriber : public rclcpp::Node {
 
       auto callback =
           [this, topic_name, eval_time = options.eval_time](
-              const publisher_node::msg::IntMessage::SharedPtr message_)
-          -> void {
+              const ros2_perf_multihost_nodes::msg::IntMessage::SharedPtr
+                  message_) -> void {
         auto sub_time = this->get_clock()->now();
         if ((sub_time.seconds() - start_time_[topic_name].seconds()) >=
             eval_time) {
@@ -114,8 +117,9 @@ class Subscriber : public rclcpp::Node {
         qos.best_effort();
       }
 
-      auto subscriber = create_subscription<publisher_node::msg::IntMessage>(
-          topic_name, qos, callback);
+      auto subscriber =
+          create_subscription<ros2_perf_multihost_nodes::msg::IntMessage>(
+              topic_name, qos, callback);
       subscribers_.emplace(topic_name, subscriber);
 
       auto shutdown_node = [this]() -> void {
@@ -135,9 +139,9 @@ class Subscriber : public rclcpp::Node {
   }
 
  private:
-  std::unordered_map<
-      std::string,
-      rclcpp::Subscription<publisher_node::msg::IntMessage>::SharedPtr>
+  std::unordered_map<std::string,
+                     rclcpp::Subscription<
+                         ros2_perf_multihost_nodes::msg::IntMessage>::SharedPtr>
       subscribers_;
   std::unordered_map<std::string, rclcpp::Time> start_time_;
   std::unordered_map<std::string, rclcpp::Time> end_time_;

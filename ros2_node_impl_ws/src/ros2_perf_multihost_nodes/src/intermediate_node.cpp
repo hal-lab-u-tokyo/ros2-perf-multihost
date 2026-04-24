@@ -1,17 +1,24 @@
+#include <algorithm>
+#include <cerrno>
 #include <chrono>
 #include <cstdio>
+#include <cstring>
 #include <filesystem>
 #include <fstream>
+#include <functional>
+#include <iomanip>
+#include <map>
 #include <memory>
 #include <rclcpp/rclcpp.hpp>
 #include <sstream>
 #include <std_msgs/msg/string.hpp>
 #include <string>
 #include <unordered_map>
+#include <vector>
 
 #include "node_options_intermediate/cli_options.hpp"
-#include "publisher_node/msg/int_message.hpp"
-#include "publisher_node/msg/performance_header.hpp"
+#include "ros2_perf_multihost_nodes/msg/int_message.hpp"
+#include "ros2_perf_multihost_nodes/msg/performance_header.hpp"
 
 struct MessageLog {
   std::string pub_node_name;
@@ -184,7 +191,8 @@ class Intermediate : public rclcpp::Node {
 
           int current_pub_idx = pub_idx_[topic_name];
 
-          auto message_ = std::make_shared<publisher_node::msg::IntMessage>();
+          auto message_ =
+              std::make_shared<ros2_perf_multihost_nodes::msg::IntMessage>();
           message_->data.resize(payload_size);
           std::fill(message_->data.begin(), message_->data.end(), 0);
 
@@ -227,7 +235,8 @@ class Intermediate : public rclcpp::Node {
         };
 
         auto publisher =
-            create_publisher<publisher_node::msg::IntMessage>(topic_name, qos);
+            create_publisher<ros2_perf_multihost_nodes::msg::IntMessage>(
+                topic_name, qos);
         publishers_.emplace(topic_name, publisher);
 
         auto timer = create_wall_timer(std::chrono::milliseconds(period_ms),
@@ -246,7 +255,8 @@ class Intermediate : public rclcpp::Node {
       // 兼任なら、timerでのpubはせずsubからのcallbackを待つ
       else {
         auto publisher =
-            create_publisher<publisher_node::msg::IntMessage>(topic_name, qos);
+            create_publisher<ros2_perf_multihost_nodes::msg::IntMessage>(
+                topic_name, qos);
         publishers_.emplace(topic_name, publisher);
 
         auto shutdown_node = [this]() -> void {
@@ -314,7 +324,8 @@ class Intermediate : public rclcpp::Node {
       //   shutdown_node); shutdown_timers_.emplace(topic_name, shutdown_timer);
       // }
       // `callback`を事前に宣言
-      std::function<void(const publisher_node::msg::IntMessage::SharedPtr)>
+      std::function<void(
+          const ros2_perf_multihost_nodes::msg::IntMessage::SharedPtr)>
           callback;
 
       // 単独なら
@@ -323,8 +334,8 @@ class Intermediate : public rclcpp::Node {
                     topic_name) == options.topic_names_pub.end()) {
         auto callback =
             [this, topic_name, eval_time = options.eval_time](
-                const publisher_node::msg::IntMessage::SharedPtr message_)
-            -> void {
+                const ros2_perf_multihost_nodes::msg::IntMessage::SharedPtr
+                    message_) -> void {
           auto sub_time = this->get_clock()->now();
           if ((sub_time.seconds() - start_time_sub_[topic_name].seconds()) >=
               eval_time) {
@@ -351,8 +362,9 @@ class Intermediate : public rclcpp::Node {
           record_log_sub_(topic_name, pub_node_name, current_pub_idx, sub_time);
         };
 
-        auto subscriber = create_subscription<publisher_node::msg::IntMessage>(
-            topic_name, qos, callback);
+        auto subscriber =
+            create_subscription<ros2_perf_multihost_nodes::msg::IntMessage>(
+                topic_name, qos, callback);
         subscribers_.emplace(topic_name, subscriber);
 
         auto shutdown_node = [this]() -> void {
@@ -369,8 +381,8 @@ class Intermediate : public rclcpp::Node {
         auto callback =
             [this, topic_name, self_node = node_name,
              eval_time = options.eval_time](
-                const publisher_node::msg::IntMessage::SharedPtr message_)
-            -> void {
+                const ros2_perf_multihost_nodes::msg::IntMessage::SharedPtr
+                    message_) -> void {
           auto publisher_name = message_->header.node_name;
           if (publisher_name == self_node) {
             return;
@@ -433,8 +445,9 @@ class Intermediate : public rclcpp::Node {
           publishers_[topic_name]->publish(*message_);
         };
 
-        auto subscriber = create_subscription<publisher_node::msg::IntMessage>(
-            topic_name, qos, callback);
+        auto subscriber =
+            create_subscription<ros2_perf_multihost_nodes::msg::IntMessage>(
+                topic_name, qos, callback);
         subscribers_.emplace(topic_name, subscriber);
 
         auto shutdown_node = [this]() -> void {
@@ -458,11 +471,11 @@ class Intermediate : public rclcpp::Node {
  private:
   std::unordered_map<
       std::string,
-      rclcpp::Publisher<publisher_node::msg::IntMessage>::SharedPtr>
+      rclcpp::Publisher<ros2_perf_multihost_nodes::msg::IntMessage>::SharedPtr>
       publishers_;
-  std::unordered_map<
-      std::string,
-      rclcpp::Subscription<publisher_node::msg::IntMessage>::SharedPtr>
+  std::unordered_map<std::string,
+                     rclcpp::Subscription<
+                         ros2_perf_multihost_nodes::msg::IntMessage>::SharedPtr>
       subscribers_;
 
   std::unordered_map<std::string, uint32_t> pub_idx_;

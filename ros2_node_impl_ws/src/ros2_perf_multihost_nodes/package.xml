@@ -3,11 +3,20 @@
 <package format="3">
   <name>ros2_perf_multihost_nodes</name>
   <version>0.0.0</version>
-  <description>TODO: Package description</description>
+  <description>Template implementations of configurable ROS 2 publisher, subscriber, and intermediate nodes used in the ros2-perf-multihost evaluation framework.</description>
   <maintainer email="takasehideki@hal.ipc.i.u-tokyo.ac.jp">takasehideki, tropical-summer, ts5-25</maintainer>
   <license>Apache-2.0</license>
 
   <buildtool_depend>ament_cmake</buildtool_depend>
+  <build_depend>rosidl_default_generators</build_depend>
+
+  <depend>builtin_interfaces</depend>
+  <depend>cxxopts</depend>
+  <depend>rclcpp</depend>
+  <depend>std_msgs</depend>
+
+  <exec_depend>rosidl_default_runtime</exec_depend>
+  <member_of_group>rosidl_interface_packages</member_of_group>
 
   <test_depend>ament_lint_auto</test_depend>
   <test_depend>ament_lint_common</test_depend>

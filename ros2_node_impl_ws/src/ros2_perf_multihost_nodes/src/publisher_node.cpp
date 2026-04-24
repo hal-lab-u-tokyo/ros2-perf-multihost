@@ -4,16 +4,19 @@
 #include <cstdlib>
 #include <filesystem>
 #include <fstream>
+#include <iomanip>
+#include <map>
 #include <memory>
 #include <rclcpp/rclcpp.hpp>
 #include <sstream>
 #include <std_msgs/msg/string.hpp>
 #include <string>
 #include <unordered_map>
+#include <vector>
 
 #include "node_options/cli_options.hpp"
-#include "publisher_node/msg/int_message.hpp"
-#include "publisher_node/msg/performance_header.hpp"
+#include "ros2_perf_multihost_nodes/msg/int_message.hpp"
+#include "ros2_perf_multihost_nodes/msg/performance_header.hpp"
 
 struct MessageLog {
   uint32_t message_idx;
@@ -94,7 +97,8 @@ class Publisher : public rclcpp::Node {
 
         int current_pub_idx = pub_idx_[topic_name];
 
-        auto message_ = std::make_shared<publisher_node::msg::IntMessage>();
+        auto message_ =
+            std::make_shared<ros2_perf_multihost_nodes::msg::IntMessage>();
         message_->data.resize(payload_size);
         std::fill(message_->data.begin(), message_->data.end(), 0);
 
@@ -149,7 +153,8 @@ class Publisher : public rclcpp::Node {
       print_qos_settings(qos);
 
       auto publisher =
-          create_publisher<publisher_node::msg::IntMessage>(topic_name, qos);
+          create_publisher<ros2_perf_multihost_nodes::msg::IntMessage>(
+              topic_name, qos);
       publishers_.emplace(topic_name, publisher);
 
       auto timer = create_wall_timer(std::chrono::milliseconds(period_ms),
@@ -175,7 +180,7 @@ class Publisher : public rclcpp::Node {
  private:
   std::unordered_map<
       std::string,
-      rclcpp::Publisher<publisher_node::msg::IntMessage>::SharedPtr>
+      rclcpp::Publisher<ros2_perf_multihost_nodes::msg::IntMessage>::SharedPtr>
       publishers_;
   std::unordered_map<std::string, rclcpp::TimerBase::SharedPtr> timers_;
   std::unordered_map<std::string, rclcpp::TimerBase::SharedPtr>
@@ -291,7 +296,10 @@ class Publisher : public rclcpp::Node {
   }
 };
 
-void sigint_handler(int signum) { rclcpp::shutdown(); }
+void sigint_handler(int signum) {
+  (void)signum;
+  rclcpp::shutdown();
+}
 
 int main(int argc, char* argv[]) {
   auto options = parse_options(argc, argv);
