@@ -17,7 +17,6 @@ log/
 ros2_node_impl_ws/build/
 ros2_node_impl_ws/install/
 ros2_node_impl_ws/log/
-ros2_node_impl_ws/logs/
 
 # Generated performance outputs
 performance_test/logs/
