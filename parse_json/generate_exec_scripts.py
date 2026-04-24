@@ -118,9 +118,8 @@ def _append_host_script_prelude(lines, host_name, rmw):
             'ROS_WS="${ROS2_NODE_IMPL_WS:-$PROJECT_ROOT/ros2_node_impl_ws}"',
             "",
             'PAYLOAD_SIZE="${PAYLOAD_SIZE:-64}"',
-            'RUN_IDX="${RUN_IDX:-1}"',
             "",
-            'LOG_DIR="$PROJECT_ROOT/performance_ws/raw_${PAYLOAD_SIZE}B/run${RUN_IDX}"',
+            'LOG_DIR="${LOG_DIR:?LOG_DIR is required. Use host*_run.sh or local_run.sh}"',
             'mkdir -p "$LOG_DIR"',
             "",
             "# colcon の setup.sh は COLCON_CURRENT_PREFIX を事前定義なしで参照するため",
@@ -318,7 +317,7 @@ def _append_common_service(
     elif rmw == "cyclonedds":
         lines.append("      - RMW_IMPLEMENTATION=rmw_cyclonedds_cpp")
     lines.append("      - PAYLOAD_SIZE=${PAYLOAD_SIZE:-64}")
-    lines.append("      - RUN_IDX=${RUN_IDX:-1}")
+    lines.append("      - LOG_DIR=${LOG_DIR:-}")
     if depends_on_zenohd and rmw == "zenoh":
         lines.append("    depends_on:")
         lines.append("      service_zenohd:")
@@ -411,14 +410,22 @@ def _run_script_common_prefix(lines):
             "set -euo pipefail",
             "",
             'SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"',
+            'RUN_ROOT_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"',
+            'RUN_DIR_NAME="$(basename "$RUN_ROOT_DIR")"',
             '# プロジェクトルート: このスクリプトは performance_ws/<run>/exec_scripts/ 以下に生成される',
             'PROJECT_ROOT="$(cd "$SCRIPT_DIR/../../.." && pwd)"',
             'LOCAL_UID="${LOCAL_UID:-$(id -u)}"',
             'LOCAL_GID="${LOCAL_GID:-$(id -g)}"',
+            'PAYLOAD_SIZE="${PAYLOAD_SIZE:-64}"',
+            'RUN_IDX="${RUN_IDX:-1}"',
+            (
+                f'LOG_DIR="${{LOG_DIR:-{PROJECT_ROOT_IN_CONTAINER}/{PERF_WS_DIR}/${{RUN_DIR_NAME}}/node_log/raw_${{PAYLOAD_SIZE}}B/run${{RUN_IDX}}}}"'
+            ),
             "",
             'cd "$PROJECT_ROOT"',
             "",
             'echo "Running containers as uid:gid $LOCAL_UID:$LOCAL_GID"',
+            'echo "LOG_DIR (in container): $LOG_DIR"',
             "",
         ]
     )
@@ -436,7 +443,17 @@ def generate_host_run_scripts(json_content, output_dir):
             [
                 f'COMPOSE_FILE="{compose_file}"',
                 'echo "Using compose file: $COMPOSE_FILE"',
-                f'LOCAL_UID="$LOCAL_UID" LOCAL_GID="$LOCAL_GID" docker compose -f "$COMPOSE_FILE" up service_{host_name}',
+                'echo "Cleaning up previous containers (including orphans)..."',
+                (
+                    f'LOCAL_UID="$LOCAL_UID" LOCAL_GID="$LOCAL_GID" '
+                    'LOG_DIR="$LOG_DIR" '
+                    'docker compose -f "$COMPOSE_FILE" down --remove-orphans >/dev/null 2>&1 || true'
+                ),
+                (
+                    f'LOCAL_UID="$LOCAL_UID" LOCAL_GID="$LOCAL_GID" '
+                    'LOG_DIR="$LOG_DIR" '
+                    f'docker compose -f "$COMPOSE_FILE" up service_{host_name}'
+                ),
             ]
         )
 
@@ -458,6 +475,12 @@ def generate_local_run_script(json_content, rmw, output_dir):
         [
             'COMPOSE_FILE="$SCRIPT_DIR/local_compose.yaml"',
             'echo "Using compose file: $COMPOSE_FILE"',
+            'echo "Cleaning up previous containers (including orphans)..."',
+            (
+                'LOCAL_UID="$LOCAL_UID" LOCAL_GID="$LOCAL_GID" '
+                'LOG_DIR="$LOG_DIR" '
+                'docker compose -f "$COMPOSE_FILE" down --remove-orphans >/dev/null 2>&1 || true'
+            ),
             "",
         ]
     )
@@ -466,17 +489,29 @@ def generate_local_run_script(json_content, rmw, output_dir):
         lines.extend(
             [
                 'echo "[1/3] Starting service_zenohd..."',
-                'LOCAL_UID="$LOCAL_UID" LOCAL_GID="$LOCAL_GID" docker compose -f "$COMPOSE_FILE" up -d service_zenohd',
+                (
+                    'LOCAL_UID="$LOCAL_UID" LOCAL_GID="$LOCAL_GID" '
+                    'LOG_DIR="$LOG_DIR" '
+                    'docker compose -f "$COMPOSE_FILE" up -d service_zenohd'
+                ),
                 "",
                 'echo "[2/3] Waiting 5 seconds for zenoh router startup..."',
                 "sleep 5",
                 "",
                 f'echo "[3/3] Starting host services: {host_services}"',
                 "status=0",
-                f'LOCAL_UID="$LOCAL_UID" LOCAL_GID="$LOCAL_GID" docker compose -f "$COMPOSE_FILE" up {host_services} || status=$?',
+                (
+                    'LOCAL_UID="$LOCAL_UID" LOCAL_GID="$LOCAL_GID" '
+                    'LOG_DIR="$LOG_DIR" '
+                    f'docker compose -f "$COMPOSE_FILE" up {host_services} || status=$?'
+                ),
                 "",
                 'echo "Stopping service_zenohd..."',
-                'LOCAL_UID="$LOCAL_UID" LOCAL_GID="$LOCAL_GID" docker compose -f "$COMPOSE_FILE" stop service_zenohd >/dev/null 2>&1 || true',
+                (
+                    'LOCAL_UID="$LOCAL_UID" LOCAL_GID="$LOCAL_GID" '
+                    'LOG_DIR="$LOG_DIR" '
+                    'docker compose -f "$COMPOSE_FILE" stop service_zenohd >/dev/null 2>&1 || true'
+                ),
                 "",
                 'echo "Finished. service_zenohd stopped."',
                 "",
@@ -487,7 +522,11 @@ def generate_local_run_script(json_content, rmw, output_dir):
         lines.extend(
             [
                 f'echo "Starting all services: {host_services}"',
-                f'LOCAL_UID="$LOCAL_UID" LOCAL_GID="$LOCAL_GID" docker compose -f "$COMPOSE_FILE" up {host_services}',
+                (
+                    'LOCAL_UID="$LOCAL_UID" LOCAL_GID="$LOCAL_GID" '
+                    'LOG_DIR="$LOG_DIR" '
+                    f'docker compose -f "$COMPOSE_FILE" up {host_services}'
+                ),
             ]
         )
 

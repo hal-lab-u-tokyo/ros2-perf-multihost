@@ -124,11 +124,13 @@ python3 parse_json/generate_exec_scripts.py topology_example/simple.json --rmw z
 
 | ファイル | 用途 |
 |---|---|
-| `host{N}_exec.sh` | 各ホストのコンテナ内（またはネイティブ）で実行するROSノード起動スクリプト |
 | `host{N}_run.sh` | 各ホスト向け compose を起動するラッパースクリプト（UID/GID 自動設定） |
 | `host{N}_compose.yaml` | 実機デプロイ用の各ホスト向けcompose定義 |
+| `host{N}_exec.sh` | 各ホストのコンテナ内（またはネイティブ）で実行するROSノード起動スクリプト |
 | `local_run.sh` | `local_compose.yaml` を使って全サービスを起動するラッパースクリプト（検証用） |
 | `local_compose.yaml` | 作業PC上で全サービスをまとめて起動するcompose定義（検証用） |
+
+`host{N}_run.sh` / `local_run.sh` から起動される各ノードの `--log_dir` は、`exec_scripts/` の1つ上（= 実行ディレクトリ）配下の `node_log/raw_<payload_size>B/run<run_idx>/` になります。例: `performance_ws/latest/node_log/raw_64B/run1/`。
 
 ### 作業PC上での検証実行（Docker）
 
