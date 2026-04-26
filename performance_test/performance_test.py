@@ -68,9 +68,9 @@ if __name__ == "__main__":
         exec_policy=args.exec_policy,
     )
 
-    for run_idx in range(args.trials):
+    for trial_idx in range(args.trials):
         run_test(
-            run_idx,
+            trial_idx,
             start_exec_scripts_py,
             hosts,
             args.ws_dir,

@@ -17,12 +17,12 @@ python3 generate_exec_scripts.py ../topology_example/simple.json --rmw fastdds -
 
 ### Options Supported by Generated Scripts
 
-Generated `host*_run.sh` and `local_run.sh` scripts support the runtime options below. `--eval-time` is applied to every launched node (Publisher / Subscriber / Intermediate). Payload size and period are taken from JSON topology values and passed directly to Publisher / Intermediate nodes. `--run-idx` is available only on `host*_run.sh` and `local_run.sh`. For the JSON schema, see [topology_example/README.md](./topology_example/README.md).
+Generated `host*_run.sh` and `local_run.sh` scripts support the runtime options below. `--eval-time` is applied to every launched node (Publisher / Subscriber / Intermediate). Payload size and period are taken from JSON topology values and passed directly to Publisher / Intermediate nodes. `--trial-idx` is available only on `host*_run.sh` and `local_run.sh`. For the JSON schema, see [topology_example/README.md](./topology_example/README.md).
 
 | Option | Short | Description | Default |
 |---|---|---|---|
 | --eval-time | -t | Evaluation time in seconds | 60 |
-| --run-idx | -r | Run index for local execution | 1 |
+| --trial-idx | -r | Trial index for local execution | 1 |
 
 #### Examples
 
@@ -102,7 +102,7 @@ Generated files:
 - `publishers` / `subscribers` / `intermediates`: Node name lists grouped by role
 - `topics`: Topic names in alphabetical order
 
-Each node launched from `host{N}_run.sh` or `local_run.sh` receives a `--log_dir` under `results/YYYY-MM-DD_hh-mm-ss/exec_logs/run<run_idx>/` inside the generated run directory. `results/latest` is updated as a symbolic link to the active run directory. Example: `performance_ws/latest/results/2026-04-26_13-21-45/exec_logs/run1/`.
+Each node launched from `host{N}_run.sh` or `local_run.sh` receives a `--log_dir` under `results/YYYY-MM-DD_hh-mm-ss/exec_logs/trial<trial_idx>/` inside the generated run directory. `results/latest` is updated as a symbolic link to the active run directory. Example: `performance_ws/latest/results/2026-04-26_13-21-45/exec_logs/trial1/`.
 
 ### Local Verification with Docker
 

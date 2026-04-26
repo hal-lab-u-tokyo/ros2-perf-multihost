@@ -177,11 +177,11 @@ def prepare_run():
 @app.route("/start", methods=["POST"])
 def start_script():
     body = request.get_json(silent=True) or {}
-    run_idx = body.get("run_idx", 1)
+    trial_idx = body.get("trial_idx", 1)
     eval_time = body.get("eval_time")
 
     try:
-        run_idx = _to_int(run_idx, "run_idx")
+        trial_idx = _to_int(trial_idx, "trial_idx")
         if eval_time is not None:
             eval_time = _to_int(eval_time, "eval_time")
 
@@ -196,7 +196,7 @@ def start_script():
             "results",
             run_timestamp,
             "exec_logs",
-            f"run{run_idx}",
+            f"trial{trial_idx}",
         )
         os.makedirs(log_dir, exist_ok=True)
 
@@ -208,10 +208,10 @@ def start_script():
         env["LOG_DIR"] = log_dir
 
         app.logger.info(
-            "[start] host=%s scenario=%s run=%s timestamp=%s script=%s",
+            "[start] host=%s scenario=%s trial=%s timestamp=%s script=%s",
             resolved_host,
             ctx["scenario_dir"],
-            run_idx,
+            trial_idx,
             run_timestamp,
             script_path,
         )
@@ -230,11 +230,11 @@ def start_script():
 @app.route("/start_docker", methods=["POST"])
 def start_docker():
     body = request.get_json(silent=True) or {}
-    run_idx = body.get("run_idx", 1)
+    trial_idx = body.get("trial_idx", 1)
     eval_time = body.get("eval_time")
 
     try:
-        run_idx = _to_int(run_idx, "run_idx")
+        trial_idx = _to_int(trial_idx, "trial_idx")
         if eval_time is not None:
             eval_time = _to_int(eval_time, "eval_time")
 
@@ -246,16 +246,16 @@ def start_docker():
         cmd = ["bash", script_path]
         if eval_time is not None:
             cmd.extend(["--eval-time", str(eval_time)])
-        cmd.extend(["--run-idx", str(run_idx)])
+        cmd.extend(["--trial-idx", str(trial_idx)])
 
         env = os.environ.copy()
         env["RUN_TIMESTAMP"] = run_timestamp
 
         app.logger.info(
-            "[start_docker] host=%s scenario=%s run=%s timestamp=%s script=%s",
+            "[start_docker] host=%s scenario=%s trial=%s timestamp=%s script=%s",
             resolved_host,
             ctx["scenario_dir"],
-            run_idx,
+            trial_idx,
             run_timestamp,
             script_path,
         )

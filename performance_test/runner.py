@@ -43,7 +43,7 @@ def resolve_host_list(ws_dir, scenario, mode="raw"):
 
 
 def run_test(
-    run_idx,
+    trial_idx,
     start_exec_scripts_py,
     hosts,
     ws_dir,
@@ -51,7 +51,7 @@ def run_test(
     exec_policy="docker",
     eval_time=None,
 ):
-    print(f"=== Run trial={run_idx + 1} ===")
+    print(f"=== Run trial={trial_idx + 1} ===")
 
     hosts_str = ",".join(hosts)
     cmd = [
@@ -59,8 +59,8 @@ def run_test(
         start_exec_scripts_py,
         "--exec-policy",
         exec_policy,
-        "--run-idx",
-        str(run_idx + 1),
+        "--trial-idx",
+        str(trial_idx + 1),
         "--ws-dir",
         ws_dir,
         "--scenario",
@@ -120,28 +120,28 @@ def collect_logs(
     ws_dir="performance_ws",
     scenario="latest",
 ):
-    """Collect run logs from remote hosts into local log directory."""
+    """Collect trial logs from remote hosts into local log directory."""
     latest_dir = prefix
     src_log_dir = os.path.join(os.path.abspath(base_log_dir), latest_dir)
 
-    for run_idx in range(num_trials):
-        run_log_dir = os.path.join(src_log_dir, f"run{run_idx + 1}")
-        os.makedirs(run_log_dir, exist_ok=True)
+    for trial_idx in range(num_trials):
+        trial_log_dir = os.path.join(src_log_dir, f"trial{trial_idx + 1}")
+        os.makedirs(trial_log_dir, exist_ok=True)
 
         remote_log_dir = (
             f"/home/ubuntu/ros2-perf-multihost/{ws_dir}/{scenario}"
-            f"/results/latest/exec_logs/run{run_idx + 1}"
+            f"/results/latest/exec_logs/trial{trial_idx + 1}"
         )
 
         for host in hosts:
-            print(f"Copying logs from {host} (run{run_idx + 1})")
+            print(f"Copying logs from {host} (trial{trial_idx + 1})")
             try:
                 subprocess.run(
                     [
                         "scp",
                         "-r",
                         f"ubuntu@{host}:{remote_log_dir}/*",
-                        run_log_dir + "/",
+                        trial_log_dir + "/",
                     ],
                     text=True,
                     capture_output=True,
@@ -150,7 +150,7 @@ def collect_logs(
             except subprocess.CalledProcessError as exc:
                 print(
                     f"collect_logs failed for host={host}, "
-                    f"run=run{run_idx + 1}, remote_path={remote_log_dir}, "
+                    f"trial=trial{trial_idx + 1}, remote_path={remote_log_dir}, "
                     f"rc={exc.returncode}",
                     file=sys.stderr,
                 )

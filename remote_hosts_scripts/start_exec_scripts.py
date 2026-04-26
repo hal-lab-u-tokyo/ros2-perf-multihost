@@ -4,10 +4,10 @@ Supports both Docker and native execution modes.
 
 Usage:
   # Docker mode (sends /start_docker requests)
-      python3 start_exec_scripts.py --exec-policy docker --run-idx 1 --ws-dir performance_ws --scenario latest --hosts-list host1,host2,host3
+      python3 start_exec_scripts.py --exec-policy docker --trial-idx 1 --ws-dir performance_ws --scenario latest --hosts-list host1,host2,host3
 
   # Native mode (sends /start requests)
-      python3 start_exec_scripts.py --exec-policy native --run-idx 1 --ws-dir performance_ws --scenario latest --hosts-list host1,host2,host3
+      python3 start_exec_scripts.py --exec-policy native --trial-idx 1 --ws-dir performance_ws --scenario latest --hosts-list host1,host2,host3
 """
 
 import requests
@@ -65,10 +65,10 @@ def main():
         epilog="""
 Examples:
   # Docker mode
-      python3 start_exec_scripts.py --exec-policy docker --run-idx 1 --ws-dir performance_ws --scenario latest --hosts-list host1,host2,host3
+            python3 start_exec_scripts.py --exec-policy docker --trial-idx 1 --ws-dir performance_ws --scenario latest --hosts-list host1,host2,host3
 
   # Native mode
-      python3 start_exec_scripts.py --exec-policy native --run-idx 1 --ws-dir performance_ws --scenario latest --hosts-list host1,host2,host3
+            python3 start_exec_scripts.py --exec-policy native --trial-idx 1 --ws-dir performance_ws --scenario latest --hosts-list host1,host2,host3
         """
     )
     parser.add_argument(
@@ -77,8 +77,8 @@ Examples:
         default="docker",
         help="Execution mode. docker sends /start_docker, native sends /start (default: docker)",
     )
-    parser.add_argument("--run-idx", type=int, default=1,
-                        help="Run index (trial number)")
+    parser.add_argument("--trial-idx", type=int, default=1,
+                        help="Trial index")
     parser.add_argument(
         "--prepare-run",
         action="store_true",
@@ -93,7 +93,7 @@ Examples:
 
     args = parser.parse_args()
 
-    run_idx = args.run_idx
+    trial_idx = args.trial_idx
     ws_dir = args.ws_dir
     scenario = args.scenario
     hosts_list = args.hosts_list
@@ -152,7 +152,7 @@ Examples:
                 "scenario": scenario,
             }
             if not args.prepare_run:
-                request_body["run_idx"] = run_idx
+                request_body["trial_idx"] = trial_idx
             if eval_time is not None and not args.prepare_run:
                 request_body["eval_time"] = eval_time
 
