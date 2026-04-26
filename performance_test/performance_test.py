@@ -1,47 +1,110 @@
 import os
 import subprocess
+import sys
 import time
 import csv
 import numpy as np
 import argparse
 from throughput_calc import calc_throughput
 
-# 設定
-# default_payload_sizes = [64, 256, 1024, 4096, 16384, 65536, 262144]
-default_payload_sizes = [64]
+
+def get_metadata_value(key, metadata_path):
+    """Extract a value from metadata.txt by key."""
+    try:
+        with open(metadata_path, "r") as f:
+            for line in f:
+                line = line.strip()
+                if line.startswith(f"{key}:"):
+                    return line[len(key) + 1:].strip()
+    except (FileNotFoundError, IOError):
+        pass
+    return None
 
 
-def parse_payloads(payload_arg):
-    payloads = []
-    for raw in payload_arg.split(","):
-        v = raw.strip()
-        if not v:
-            continue
-        try:
-            size = int(v)
-        except ValueError as e:
-            raise argparse.ArgumentTypeError(
-                f"Invalid payload size: '{v}'. Use comma separated integers, e.g. 64,256"
-            ) from e
-        if size <= 0:
-            raise argparse.ArgumentTypeError(
-                f"Payload size must be a positive integer: {size}"
-            )
-        payloads.append(size)
+def resolve_host_list(ws_dir, scenario, mode="raw", num_hosts=None):
+    """Resolve host list from environment or metadata.txt.
 
-    if not payloads:
-        raise argparse.ArgumentTypeError(
-            "At least one payload size is required. Example: --payload \"64,256\""
+    Args:
+        ws_dir: Workspace directory containing scenarios
+        scenario: Scenario directory name  
+        mode: Ignored (for compatibility); hosts are always from metadata
+        num_hosts: If provided, limit to first N hosts
+
+    Returns:
+        List of hostname/IP addresses
+
+    Raises:
+        FileNotFoundError: If metadata.txt is not found
+        ValueError: If no hosts found in metadata.txt
+    """
+    # Check environment variable first
+    env_hosts = os.environ.get("ROS2_PERF_HOSTS")
+    if env_hosts:
+        hosts = [h.strip() for h in env_hosts.split(",") if h.strip()]
+        if num_hosts:
+            hosts = hosts[:num_hosts]
+        return hosts
+
+    # Read from metadata.txt (required)
+    metadata_path = os.path.join(ws_dir, scenario, "metadata.txt")
+    if not os.path.exists(metadata_path):
+        raise FileNotFoundError(f"metadata.txt not found: {metadata_path}")
+
+    # Try deployment_hosts first, then hosts
+    metadata_hosts = get_metadata_value("deployment_hosts", metadata_path)
+    if not metadata_hosts:
+        metadata_hosts = get_metadata_value("hosts", metadata_path)
+
+    if not metadata_hosts:
+        raise ValueError(
+            f"No hosts found in {metadata_path}. "
+            "Define 'hosts' or 'deployment_hosts' in metadata.txt"
         )
-    return payloads
+
+    hosts = [h.strip() for h in metadata_hosts.split(",") if h.strip()]
+    if num_hosts:
+        hosts = hosts[:num_hosts]
+    return hosts
 
 
-def run_test(payload_size, run_idx, start_scripts_py, num_hosts):
-    print(f"=== Run payload={payload_size}B, trial={run_idx + 1} ===")
+def run_test(run_idx, start_exec_scripts_py, hosts, ws_dir, scenario, exec_policy="docker", payload_size=None, period_ms=None, eval_time=None):
+    print(f"=== Run trial={run_idx + 1} ===")
+    # Convert host list to comma-separated string for passing to start_exec_scripts.py
+    hosts_str = ",".join(hosts)
+    cmd = [
+        "python3",
+        start_exec_scripts_py,
+        "--exec-policy",
+        exec_policy,
+        "--run-idx",
+        str(run_idx + 1),
+        "--num-hosts",
+        str(len(hosts)),
+        "--ws-dir",
+        ws_dir,
+        "--scenario",
+        scenario,
+    ]
+
+    # Add optional explicit hosts list
+    cmd.extend([
+        "--hosts-list",
+        hosts_str,
+    ])
+
+    # Build environment with optional test parameters
+    env = os.environ.copy()
+    if payload_size is not None:
+        env["PAYLOAD_SIZE"] = str(payload_size)
+    if period_ms is not None:
+        env["PERIOD_MS"] = str(period_ms)
+    if eval_time is not None:
+        env["EVAL_TIME"] = str(eval_time)
+
     result = subprocess.run(
-        ["python3", start_scripts_py, str(
-            payload_size), str(num_hosts), str(run_idx + 1)],
+        cmd,
         text=True,
+        env=env,
     )
     print(result)
     if result.returncode != 0:
@@ -51,18 +114,40 @@ def run_test(payload_size, run_idx, start_scripts_py, num_hosts):
 
 
 def aggregate_total_latency(
-    base_log_dir, result_parent_dir, prefix, payload_size, num_trials, num_hosts, period_ms=100, eval_time=60
+    base_log_dir,
+    result_parent_dir,
+    prefix,
+    payload_size,
+    num_trials,
+    hosts,
+    period_ms=None,
+    eval_time=None,
+    ws_dir="performance_ws",
+    scenario="latest",
 ):
+    if period_ms is None:
+        period_ms = 100
+    if eval_time is None:
+        eval_time = 60
+
     latest_dir = f"{prefix}_{payload_size}B"
     log_parent = os.path.abspath(base_log_dir)
     src_log_dir = os.path.join(log_parent, latest_dir)
-
-    hosts = ["pi0", "pi1", "pi2", "pi3", "pi4"][:num_hosts]
     for run_idx in range(num_trials):
         run_log_dir = os.path.join(src_log_dir, f"run{run_idx + 1}")
         os.makedirs(run_log_dir, exist_ok=True)
-        remote_log_dir = f"/home/ubuntu/ros2-perf-multihost/logs/{
-            prefix}_{payload_size}B/run{run_idx + 1}"
+        if prefix == "docker":
+            # 新フロー: host*_run.sh が <ws-dir>/<scenario>/results/latest/exec_logs/... に出力
+            remote_log_dir = (
+                f"/home/ubuntu/ros2-perf-multihost/{ws_dir}/{scenario}"
+                f"/results/latest/exec_logs/raw_{payload_size}B/run{run_idx + 1}"
+            )
+        else:
+            # 旧rawフロー: /start が /logs/raw_* に出力
+            remote_log_dir = (
+                f"/home/ubuntu/ros2-perf-multihost/logs/"
+                f"{prefix}_{payload_size}B/run{run_idx + 1}"
+            )
         for host in hosts:
             print(f"Copying logs from {host} (run{run_idx + 1})")
             subprocess.run(
@@ -342,41 +427,93 @@ def read_monitor_metrics(path):
 
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser()
-    parser.add_argument("--hosts", type=int, default=3,
-                        help="使用するホスト数 (デフォルト: 3)")
-    parser.add_argument("--trials", type=int, default=10,
-                        help="1ペイロードサイズあたりの試行回数 (デフォルト: 10)")
+    parser = argparse.ArgumentParser(
+        description="Run performance tests using run.sh defaults")
+    parser.add_argument("--trials", type=int, default=3,
+                        help="試行回数 (デフォルト: 3)")
+    parser.add_argument("--payload-size", type=int, default=None,
+                        help="ペイロードサイズ (バイト、未指定の場合は run.sh のデフォルト: 64)")
+    parser.add_argument("--period-ms", type=int, default=None,
+                        help="測定間隔 (ミリ秒、未指定の場合は run.sh のデフォルト: 100)")
+    parser.add_argument("--eval-time", type=int, default=None,
+                        help="評価時間 (秒、未指定の場合は run.sh のデフォルト: 60)")
     parser.add_argument(
-        "--payload",
-        type=parse_payloads,
-        default=default_payload_sizes,
-        help="ペイロードサイズをカンマ区切りで指定 (例: \"64,256\")",
+        "--exec-policy",
+        choices=["docker", "native"],
+        default="docker",
+        help="実行方式を指定 (デフォルト: docker)",
     )
-    parser.add_argument("--docker", action="store_true",
-                        help="Dockerを使用する場合は指定")
+    parser.add_argument(
+        "--ws-dir",
+        type=str,
+        default="performance_ws",
+        help="ワークスペースディレクトリ (デフォルト: performance_ws)",
+    )
+    parser.add_argument(
+        "--scenario",
+        type=str,
+        default="latest",
+        help="シナリオディレクトリ名 (デフォルト: latest)",
+    )
     args = parser.parse_args()
+
+    # Forward optional overrides only when explicitly requested.
+    requested_payload_size = args.payload_size
+    payload_sizes = [
+        requested_payload_size if requested_payload_size is not None else 64]
+    period_ms = args.period_ms
+    eval_time = args.eval_time
 
     base_log_dir = "./logs"
     base_result_dir = "./results"
     os.makedirs(base_log_dir, exist_ok=True)
     os.makedirs(base_result_dir, exist_ok=True)
 
-    if args.docker:
-        start_scripts_py = "../manager_scripts/start_docker_scripts.py"
-        prefix = "docker"
-    else:
-        start_scripts_py = "../manager_scripts/start_scripts.py"
-        prefix = "raw"
+    # Resolve absolute path to start script (cwd-independent)
+    script_dir = os.path.dirname(os.path.abspath(__file__))
+    # performance_test -> ros2-perf-multihost
+    repo_root = os.path.dirname(script_dir)
+    start_exec_scripts_py = os.path.join(
+        repo_root, "manager_scripts", "start_exec_scripts.py")
+    prefix = "docker" if args.exec_policy == "docker" else "raw"
 
-    payload_sizes = args.payload
-    for payload_size in payload_sizes:
-        print(f"=== Payload size: {payload_size}B ===")
+    # Resolve actual host list from metadata (metadata.txt is authoritative)
+    try:
+        hosts = resolve_host_list(
+            args.ws_dir, args.scenario, mode=args.exec_policy
+        )
+    except (FileNotFoundError, ValueError) as e:
+        print(f"ERROR: {e}", file=sys.stderr)
+        sys.exit(1)
+    print(f"Using hosts: {hosts}")
+    print(f"Note: payload_size, period_ms, eval_time are determined by run.sh defaults")
+    for result_payload_size in payload_sizes:
+        print(f"=== Payload size: {result_payload_size}B ===")
         for run_idx in range(args.trials):
-            run_test(payload_size, run_idx, start_scripts_py, args.hosts)
+            run_test(
+                run_idx,
+                start_exec_scripts_py,
+                hosts,
+                args.ws_dir,
+                args.scenario,
+                exec_policy=args.exec_policy,
+                payload_size=requested_payload_size,
+                period_ms=period_ms,
+                eval_time=eval_time,
+            )
             time.sleep(10)
         aggregate_total_latency(
-            base_log_dir, base_result_dir, prefix, payload_size, args.trials, args.hosts)
+            base_log_dir,
+            base_result_dir,
+            prefix,
+            result_payload_size,
+            args.trials,
+            hosts,
+            period_ms=period_ms,
+            eval_time=eval_time,
+            ws_dir=args.ws_dir,
+            scenario=args.scenario,
+        )
     print("All tests and aggregation complete.")
 
     # --- ここから全ペイロードサイズの集計CSVをまとめる処理 ---

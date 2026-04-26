@@ -131,6 +131,7 @@ fi
 
 REMOTE_RUN_DIR="${REMOTE_REPO_BASE}/${WS_DIR}/${SCENARIO_DIR}"
 REMOTE_EXEC_DIR="${REMOTE_RUN_DIR}/exec_scripts"
+REMOTE_ALIAS_DIR="${REMOTE_REPO_BASE}/${WS_DIR}/${SCENARIO_INPUT}"
 
 echo "=== Metadata ==="
 echo "metadata_path : ${METADATA_PATH}"
@@ -140,6 +141,11 @@ echo "scenario_dir  : ${SCENARIO_DIR}"
 echo "hosts         : ${HOSTS[*]}"
 echo "local_exec_dir: ${LOCAL_EXEC_DIR}"
 echo "remote_exec_dir: ${REMOTE_EXEC_DIR}"
+if [[ "${SCENARIO_INPUT}" != "${SCENARIO_DIR}" ]]; then
+    echo "remote_alias_dir: ${REMOTE_ALIAS_DIR} -> ${REMOTE_RUN_DIR}"
+fi
+
+failed_hosts=()
 
 for host in "${HOSTS[@]}"; do
     host_exec="${host}_exec.sh"
@@ -147,27 +153,86 @@ for host in "${HOSTS[@]}"; do
     host_compose="${host}_compose.yaml"
 
     echo "=== Validating local files for ${host} ==="
+    local_files_ok=true
     for file in "${host_exec}" "${host_run}" "${host_compose}"; do
         if [[ ! -f "${LOCAL_EXEC_DIR}/${file}" ]]; then
             echo "ERROR: missing local file: ${LOCAL_EXEC_DIR}/${file}" >&2
-            exit 1
+            failed_hosts+=("${host}")
+            local_files_ok=false
+            break
         fi
     done
+    
+    if [[ "${local_files_ok}" != "true" ]]; then
+        continue
+    fi
 
     echo "=== Copying exec scripts to ${host} ==="
-    ssh "${host}" "mkdir -p '${REMOTE_EXEC_DIR}'"
+    
+    # Create remote directory
+    if ! err="$(ssh "${host}" "mkdir -p '${REMOTE_EXEC_DIR}'" 2>&1)"; then
+        echo "ERROR: Failed to create directory on ${host}" >&2
+        if [[ -n "${err}" ]]; then
+            echo "  ssh: ${err}" >&2
+        fi
+        failed_hosts+=("${host}")
+        continue
+    fi
 
-    scp \
+    # Copy exec scripts
+    if ! err="$(scp \
         "${LOCAL_EXEC_DIR}/${host_exec}" \
         "${LOCAL_EXEC_DIR}/${host_run}" \
         "${LOCAL_EXEC_DIR}/${host_compose}" \
-        "${host}:${REMOTE_EXEC_DIR}/"
+        "${host}:${REMOTE_EXEC_DIR}/" 2>&1)"; then
+        echo "ERROR: Failed to copy scripts to ${host}" >&2
+        if [[ -n "${err}" ]]; then
+            echo "  scp: ${err}" >&2
+        fi
+        failed_hosts+=("${host}")
+        continue
+    fi
 
-    # 参照しやすいよう metadata も同梱
-    scp "${LOCAL_RUN_DIR}/metadata.txt" "${host}:${REMOTE_RUN_DIR}/metadata.txt"
+    # Copy metadata
+    if ! err="$(scp "${LOCAL_RUN_DIR}/metadata.txt" "${host}:${REMOTE_RUN_DIR}/metadata.txt" 2>&1)"; then
+        echo "ERROR: Failed to copy metadata to ${host}" >&2
+        if [[ -n "${err}" ]]; then
+            echo "  scp: ${err}" >&2
+        fi
+        failed_hosts+=("${host}")
+        continue
+    fi
 
-    ssh "${host}" "chmod +x '${REMOTE_EXEC_DIR}/${host_exec}' '${REMOTE_EXEC_DIR}/${host_run}'"
+    # Set execute permissions
+    if ! err="$(ssh "${host}" "chmod +x '${REMOTE_EXEC_DIR}/${host_exec}' '${REMOTE_EXEC_DIR}/${host_run}'" 2>&1)"; then
+        echo "ERROR: Failed to set permissions on ${host}" >&2
+        if [[ -n "${err}" ]]; then
+            echo "  ssh: ${err}" >&2
+        fi
+        failed_hosts+=("${host}")
+        continue
+    fi
+
+    if [[ "${SCENARIO_INPUT}" != "${SCENARIO_DIR}" ]]; then
+        remote_alias_parent="$(dirname "${REMOTE_ALIAS_DIR}")"
+        remote_alias_name="$(basename "${REMOTE_ALIAS_DIR}")"
+        remote_target_name="$(basename "${REMOTE_RUN_DIR}")"
+        if ! err="$(ssh "${host}" "cd '${remote_alias_parent}' && ln -sfn '${remote_target_name}' '${remote_alias_name}'" 2>&1)"; then
+            echo "ERROR: Failed to update alias ${REMOTE_ALIAS_DIR} on ${host}" >&2
+            if [[ -n "${err}" ]]; then
+                echo "  ssh: ${err}" >&2
+            fi
+            failed_hosts+=("${host}")
+            continue
+        fi
+    fi
+    
     echo "=== Done for ${host} ==="
 done
 
-echo "=== All host-specific exec scripts distributed ==="
+echo "=== Distribution complete ==="
+
+if [[ ${#failed_hosts[@]} -gt 0 ]]; then
+    echo "ERROR: ${#failed_hosts[@]} host(s) failed: ${failed_hosts[*]}" >&2
+    exit 1
+fi

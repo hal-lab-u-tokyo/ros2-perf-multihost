@@ -171,44 +171,59 @@ docker pull ghcr.io/hal-lab-u-tokyo/ros2-perf-multihost:latest
 
 ## RESTサーバの起動と自動性能評価
 
-マルチホスト構成では、各 Raspberry Pi 上で REST サーバ（実体は `manager_scripts.py`）を起動し、そこに対して制御スクリプトからリクエストを送ることでベンチマークを自動実行します。
+マルチホスト構成では、各 Raspberry Pi 上で REST サーバ（実体は `rest_server.py`）を起動し、そこに対して制御スクリプトからリクエストを送ることでベンチマークを自動実行します。
 
 1. 全ての Raspberry Pi で REST サーバを起動
 
-`manager_scripts/start_all_servers.sh` を使うと、複数ホストに対して一括で REST サーバを立ち上げられます。
+`start_servers.sh` / `start_all_servers.sh` は使わず、各ホストへ SSH して `manager_scripts/rest_server.py` を直接起動します。
 
 ```bash
-cd manager_scripts
-chmod +x start_all_servers.sh
-# HOSTS 配列に各 Raspberry Pi の IP アドレスを設定してから実行
-./start_all_servers.sh
+cd /home/takasehideki/ros2/ros2-perf-multihost
+
+# metadata.txt から hosts を取得して順番に起動
+HOSTS=$(awk -F': ' '/^hosts:/{print $2}' performance_ws/latest/metadata.txt | tr ',' ' ')
+for host in $HOSTS; do
+	host=$(echo "$host" | xargs)
+	echo "Starting rest_server.py on ${host}"
+	ssh -o BatchMode=yes -o StrictHostKeyChecking=no -o ConnectTimeout=5 "ubuntu@${host}" \
+		'cd /home/ubuntu/ros2-perf-multihost && setsid nohup python3 manager_scripts/rest_server.py > /home/ubuntu/rest.log 2>&1 < /dev/null & echo $! > /home/ubuntu/rest.pid'
+done
 ```
 
-このスクリプトは `HOSTS` 配列に列挙した各ホストへ SSH し、
+必要なら各ホストで REST サーバの疎通を確認してください。
 
-- `manager_scripts/manager_scripts.py` をバックグラウンド起動
-- ログを `/home/ubuntu/rest.log` に出力
-- ポート `5000` で REST サーバが応答するまで `nc` でヘルスチェック
+```bash
+for host in $HOSTS; do
+	host=$(echo "$host" | xargs)
+	nc -z -w 1 "$host" 5000 && echo "[$host] up" || echo "[$host] not ready"
+done
+```
 
-を行います。事前に各ホストでリポジトリと仮想環境を同じパスに用意しておいてください。
+事前に各ホストでリポジトリと Python 実行環境を同じパスに用意しておいてください。
 
 2. ベンチマークスクリプト `performance_test.py` の実行
 
-REST サーバ起動後、`performance_test/performance_test.py` を使って、ペイロードサイズ・試行回数・ホスト数・実行環境をまとめて指定して測定を行います。
+REST サーバ起動後、`performance_test/performance_test.py` を使って、ペイロードサイズ・試行回数・実行環境を指定して測定を行います。
+このスクリプトは内部で `manager_scripts/start_exec_scripts.py` を呼び出し、実行対象ホストは `performance_ws/<scenario>/metadata.txt` の `hosts` から自動解決します。
 
 ```bash
 cd performance_test
-python3 performance_test.py --hosts 3 --trials 10 --docker
-# 複数ペイロードサイズを明示する場合
-python3 performance_test.py --hosts 3 --trials 10 --docker --payload "64,256"
+python3 performance_test.py --trials 10
+# ネイティブ実行に切り替える場合
+python3 performance_test.py --exec-policy native --trials 10
+# パラメータを明示する場合
+python3 performance_test.py --payload-size 256 --period-ms 50 --eval-time 120
 ```
 
 主な引数:
 
-- `--hosts`: 使用するホスト数（JSON の `hosts` の数、および実際の Raspberry Pi 台数と合わせてください）
 - `--trials`: 各ペイロードサイズあたりの試行回数
-- `--payload`: ペイロードサイズをカンマ区切りで指定（例: `--payload "64,256"`）。未指定時は `64` を使用
-- `--docker`: Docker コンテナを経由したテストを行う場合に指定（内部で `manager_scripts/start_docker_scripts.py` を呼び出します）
+- `--exec-policy`: 実行方式を `docker` または `native` から指定（デフォルト: `docker`）
+- `--ws-dir`: 実行スクリプト生成先のベースディレクトリ（デフォルト: `performance_ws`）
+- `--scenario`: 使用するシナリオディレクトリ（デフォルト: `latest`）
+- `--payload-size`: ペイロードサイズを指定。未指定時は `*_run.sh` / `*_exec.sh` 側の既定値を使います
+- `--period-ms`: Publish 周期を指定。未指定時は `*_run.sh` / `*_exec.sh` 側の既定値を使います
+- `--eval-time`: 計測時間を指定。未指定時は `*_run.sh` / `*_exec.sh` 側の既定値を使います
 
 `performance_test.py` は各試行ごとに REST 経由でノード群を起動し、終了後に各ホストからログを `scp` で収集します。ログは `performance_test/logs` 以下に、集計結果（レイテンシ・スループット・ホスト使用率）は `performance_test/results` 以下に CSV 形式で保存されます。
 
@@ -217,5 +232,3 @@ RMWにZenohを利用する場合は，マネージャで下記を実行する必
 ```
 ./manager_scripts/start_zenoh_router.sh foreground 
 ```
-
----
