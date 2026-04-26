@@ -175,24 +175,31 @@ docker pull ghcr.io/hal-lab-u-tokyo/ros2-perf-multihost:latest
 
 1. 全ての Raspberry Pi で REST サーバを起動
 
-`manager_scripts/start_all_servers.sh` を使うと、複数ホストに対して一括で REST サーバを立ち上げられます。
+`start_servers.sh` / `start_all_servers.sh` は使わず、各ホストへ SSH して `manager_scripts/rest_server.py` を直接起動します。
 
 ```bash
-cd manager_scripts
-chmod +x start_all_servers.sh
-./start_all_servers.sh
+cd /home/takasehideki/ros2/ros2-perf-multihost
 
-# メタデータ参照先を明示する場合
-./start_all_servers.sh --ws-dir performance_ws --scenario latest
+# metadata.txt から hosts を取得して順番に起動
+HOSTS=$(awk -F': ' '/^hosts:/{print $2}' performance_ws/latest/metadata.txt | tr ',' ' ')
+for host in $HOSTS; do
+	host=$(echo "$host" | xargs)
+	echo "Starting rest_server.py on ${host}"
+	ssh -o BatchMode=yes -o StrictHostKeyChecking=no -o ConnectTimeout=5 "ubuntu@${host}" \
+		'cd /home/ubuntu/ros2-perf-multihost && setsid nohup python3 manager_scripts/rest_server.py > /home/ubuntu/rest.log 2>&1 < /dev/null & echo $! > /home/ubuntu/rest.pid'
+done
 ```
 
-このスクリプトは `performance_ws/<scenario>/metadata.txt`（または `--ws-dir/--scenario` で指定したパス）から `hosts` を自動解決し、各ホストへ SSH して
+必要なら各ホストで REST サーバの疎通を確認してください。
 
-- `manager_scripts/rest_server.py` をバックグラウンド起動
-- ログを `/home/ubuntu/rest.log` に出力
-- ポート `5000` で REST サーバが応答するまで `nc` でヘルスチェック
+```bash
+for host in $HOSTS; do
+	host=$(echo "$host" | xargs)
+	nc -z -w 1 "$host" 5000 && echo "[$host] up" || echo "[$host] not ready"
+done
+```
 
-を行います。事前に各ホストでリポジトリと仮想環境を同じパスに用意しておいてください。
+事前に各ホストでリポジトリと Python 実行環境を同じパスに用意しておいてください。
 
 2. ベンチマークスクリプト `performance_test.py` の実行
 
