@@ -68,14 +68,10 @@ publisher / subscriber の配列要素は、上記と同じく topic_name が必
 
 以下を JSON に書いても、現在の generate_exec_scripts.py では実行コマンド生成に使われません。
 
-- ルートの payload_size
-- 各 publisher エントリ内の payload_size
-- intermediate 内の publisher / subscriber 配下を含む各トピック定義内の payload_size
-- 各 publisher エントリ内の period_ms
-- ルートの rmw（RMW は JSON ではなく、generate_exec_scripts.py 実行時の --rmw 引数で指定する仕様）
+- ルートの rmw（RMW はコマンドライン引数 --rmw で指定）
 
-実行時の payload size は JSON 内の payload_size ではなく、環境変数 PAYLOAD_SIZE (既定 64) のみで決まります。
-RMW も同様に JSON からは読み取られず、--rmw で与えた値（既定: fastdds）が使われます。
+`payload_size` / `period_ms` / `eval_time` は JSON で定義した値が既定値として使われます。
+`_run.sh` / `_exec.sh` 実行時に `--payload-size` / `--period-ms` / `--eval-time` を指定すると、その値で上書きできます。
 
 ## 4. 最小テンプレート
 
