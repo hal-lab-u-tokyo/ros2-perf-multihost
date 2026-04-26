@@ -27,11 +27,11 @@ def _normalize_ws_dir(ws_dir):
     """--ws-dir の値を正規化して検証する"""
     normalized = os.path.normpath(ws_dir.strip())
     if not normalized or normalized == ".":
-        raise ValueError("--ws-dir cannot be empty or '.'.")
+        raise argparse.ArgumentTypeError("--ws-dir cannot be empty or '.'.")
     if os.path.isabs(normalized):
-        raise ValueError("--ws-dir must be a relative path.")
-    if normalized.startswith(".."):
-        raise ValueError(
+        raise argparse.ArgumentTypeError("--ws-dir must be a relative path.")
+    if normalized == ".." or normalized.startswith(".." + os.sep):
+        raise argparse.ArgumentTypeError(
             "--ws-dir cannot point outside the project directory.")
     return normalized
 
@@ -431,11 +431,11 @@ def _run_script_common_prefix(lines):
             'mkdir -p "$RESULTS_HOST_DIR"',
             'RUN_TIMESTAMP="${RUN_TIMESTAMP:-$(date +%Y-%d-%m_%H-%M-%S)}"',
             'RUN_RESULTS_HOST_DIR="$RESULTS_HOST_DIR/$RUN_TIMESTAMP"',
-            'EXEC_LOGS_HOST_DIR="$RUN_RESULTS_HOST_DIR/exec_logs"',
+            'EXEC_LOGS_HOST_DIR="$RUN_RESULTS_HOST_DIR/exec_logs/raw_${PAYLOAD_SIZE}B/run${RUN_IDX}"',
             'mkdir -p "$EXEC_LOGS_HOST_DIR"',
             'ln -sfn "$RUN_TIMESTAMP" "$RESULTS_HOST_DIR/latest"',
             (
-                f'LOG_DIR="${{LOG_DIR:-{PROJECT_ROOT_IN_CONTAINER}/{PERF_WS_DIR}/${{RUN_DIR_NAME}}/results/${{RUN_TIMESTAMP}}/exec_logs}}"'
+                f'LOG_DIR="${{LOG_DIR:-{PROJECT_ROOT_IN_CONTAINER}/{PERF_WS_DIR}/${{RUN_DIR_NAME}}/results/${{RUN_TIMESTAMP}}/exec_logs/raw_${{PAYLOAD_SIZE}}B/run${{RUN_IDX}}}}"'
             ),
             "",
             'cd "$PROJECT_ROOT"',
@@ -559,7 +559,7 @@ if __name__ == "__main__":
     parser.add_argument("json_path", help="Path to the input JSON file")
     parser.add_argument(
         "--ws-dir",
-        type=str,
+        type=_normalize_ws_dir,
         default=DEFAULT_PERF_WS_DIR,
         help=f"Base directory for generated artifacts (default: {DEFAULT_PERF_WS_DIR})",
     )
@@ -572,11 +572,10 @@ if __name__ == "__main__":
     )
     args = parser.parse_args()
 
-    ws_dir = _normalize_ws_dir(args.ws_dir)
-    PERF_WS_DIR = ws_dir
+    PERF_WS_DIR = args.ws_dir
 
     project_root, output_dir, run_dir_name = resolve_output_paths(
-        args.json_path, args.rmw, ws_dir
+        args.json_path, args.rmw, args.ws_dir
     )
 
     with open(args.json_path, "r") as f:

@@ -113,7 +113,7 @@ python3 parse_json/generate_exec_scripts.py <topology.json> [--rmw <rmw>] [--ws-
 - `--rmw`: RMW実装（`fastdds` / `zenoh` / `cyclonedds`、デフォルト: `fastdds`）
 
 出力先は `<ws-dir>/<JSONファイル名>-<rmw>/exec_scripts/` です。既に存在する場合は上書き確認を行い、`Yes` のときは `exec_scripts/*` を削除して再生成します。`<ws-dir>/latest` は常に最新に生成されたディレクトリへのシンボリックリンクになります。
-`performance_ws/` ディレクトリは自動生成されますが、リポジトリ管理からはは `.gitignore` で除外しています。
+`performance_ws/` ディレクトリは自動生成されますが、リポジトリ管理からは `.gitignore` で除外しています。
 
 ```bash
 # 例: zenoh で topology_example を使う場合
@@ -130,7 +130,7 @@ python3 parse_json/generate_exec_scripts.py topology_example/simple.json --rmw z
 | `local_run.sh` | `local_compose.yaml` を使って全サービスを起動するラッパースクリプト（検証用） |
 | `local_compose.yaml` | 作業PC上で全サービスをまとめて起動するcompose定義（検証用） |
 
-`host{N}_run.sh` / `local_run.sh` から起動される各ノードの `--log_dir` は、`exec_scripts/` の1つ上（= 実行ディレクトリ）配下の `results/YYYY-DD-MM_hh-mm-ss/` になります。`results/latest` は最新ディレクトリへのシンボリックリンクとして更新されます。例: `performance_ws/latest/results/2026-26-04_13-21-45/`。
+`host{N}_run.sh` / `local_run.sh` から起動される各ノードの `--log_dir` は、`exec_scripts/` の1つ上（= 実行ディレクトリ）配下の `results/YYYY-DD-MM_hh-mm-ss/exec_logs/raw_<payload_size>B/run<run_idx>/` になります。`results/latest` は最新ディレクトリへのシンボリックリンクとして更新されます。例: `performance_ws/latest/results/2026-26-04_13-21-45/exec_logs/raw_64B/run1/`。
 
 ### 作業PC上での検証実行（Docker）
 
