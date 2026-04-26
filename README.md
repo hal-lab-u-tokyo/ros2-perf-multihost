@@ -103,21 +103,21 @@ docker pull ghcr.io/hal-lab-u-tokyo/ros2-perf-multihost:latest
 プロジェクトルートから実行します。
 
 ```bash
-python3 parse_json/generate_exec_scripts.py <topology.json> --rmw <rmw> [--label <label>]
+python3 parse_json/generate_exec_scripts.py <topology.json> [--rmw <rmw>] [--ws-dir <dir>]
 ```
 
 引数:
 
 - `<topology.json>`: トポロジー定義JSONファイルのパス
+- `--ws-dir`: 生成物のベースディレクトリ（デフォルト: `performance_ws`）
 - `--rmw`: RMW実装（`fastdds` / `zenoh` / `cyclonedds`、デフォルト: `fastdds`）
-- `--label`: 実行ラベル（省略可）。同名ラベルが既に存在する場合は警告を表示します
 
-出力先は `performance_ws/<YYYY-DD-MM_HH-mm-ss>/exec_scripts/`（`--label` 指定時は `performance_ws/<label>-<YYYY-DD-MM_HH-mm-ss>/exec_scripts/`）です。`performance_ws/latest` は常に最新の実行ディレクトリへのシンボリックリンクになります。
-`performance_ws/` ディレクトリ自体は `performance_ws/.gitkeep` でリポジトリ管理し、実行時に生成される中身は `.gitignore` で除外しています。
+出力先は `<ws-dir>/<JSONファイル名>-<rmw>/exec_scripts/` です。既に存在する場合は上書き確認を行い、`Yes` のときは `exec_scripts/*` を削除して再生成します。`<ws-dir>/latest` は常に最新に生成されたディレクトリへのシンボリックリンクになります。
+`performance_ws/` ディレクトリは自動生成されますが、リポジトリ管理からはは `.gitignore` で除外しています。
 
 ```bash
 # 例: zenoh で topology_example を使う場合
-python3 parse_json/generate_exec_scripts.py topology_example/simple.json --rmw zenoh --label myrun
+python3 parse_json/generate_exec_scripts.py topology_example/simple.json --rmw zenoh
 ```
 
 生成されるファイル:
@@ -130,7 +130,7 @@ python3 parse_json/generate_exec_scripts.py topology_example/simple.json --rmw z
 | `local_run.sh` | `local_compose.yaml` を使って全サービスを起動するラッパースクリプト（検証用） |
 | `local_compose.yaml` | 作業PC上で全サービスをまとめて起動するcompose定義（検証用） |
 
-`host{N}_run.sh` / `local_run.sh` から起動される各ノードの `--log_dir` は、`exec_scripts/` の1つ上（= 実行ディレクトリ）配下の `node_log/raw_<payload_size>B/run<run_idx>/` になります。例: `performance_ws/latest/node_log/raw_64B/run1/`。
+`host{N}_run.sh` / `local_run.sh` から起動される各ノードの `--log_dir` は、`exec_scripts/` の1つ上（= 実行ディレクトリ）配下の `results/YYYY-DD-MM_hh-mm-ss/` になります。`results/latest` は最新ディレクトリへのシンボリックリンクとして更新されます。例: `performance_ws/latest/results/2026-26-04_13-21-45/`。
 
 ### 作業PC上での検証実行（Docker）
 
