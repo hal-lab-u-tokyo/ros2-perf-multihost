@@ -102,7 +102,7 @@ Generated files:
 - `publishers` / `subscribers` / `intermediates`: Node name lists grouped by role
 - `topics`: Topic names in alphabetical order
 
-Each node launched from `host{N}_run.sh` or `local_run.sh` receives a `--log_dir` under `results/YYYY-MM-DD_hh-mm-ss/exec_logs/raw_<payload_size>B/run<run_idx>/` inside the generated run directory. `results/latest` is updated as a symbolic link to the latest run directory. Example: `performance_ws/latest/results/2026-04-26_13-21-45/exec_logs/raw_64B/run1/`.
+Each node launched from `host{N}_run.sh` or `local_run.sh` receives a `--log_dir` under `results/YYYY-MM-DD_hh-mm-ss/exec_logs/run<run_idx>/` inside the generated run directory. `results/latest` is updated as a symbolic link to the active run directory. Example: `performance_ws/latest/results/2026-04-26_13-21-45/exec_logs/run1/`.
 
 ### Local Verification with Docker
 

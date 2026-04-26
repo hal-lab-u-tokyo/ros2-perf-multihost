@@ -77,8 +77,13 @@ Examples:
         default="docker",
         help="Execution mode. docker sends /start_docker, native sends /start (default: docker)",
     )
-    parser.add_argument("--run-idx", type=int, required=True,
+    parser.add_argument("--run-idx", type=int, default=1,
                         help="Run index (trial number)")
+    parser.add_argument(
+        "--prepare-run",
+        action="store_true",
+        help="Prepare run timestamp/latest on all hosts before trials",
+    )
     parser.add_argument("--ws-dir", default="performance_ws",
                         help="Workspace directory (default: performance_ws)")
     parser.add_argument("--scenario", default="latest",
@@ -113,7 +118,12 @@ Examples:
     eval_time = os.environ.get("EVAL_TIME")
 
     # Determine endpoint and timeout based on mode
-    if args.exec_policy == "docker":
+    if args.prepare_run:
+        endpoint = "/prepare_run"
+        timeout = (5, 30)
+        print(
+            f"Using prepare mode: {endpoint} endpoint with timeout {timeout}")
+    elif args.exec_policy == "docker":
         endpoint = "/start_docker"
         timeout = (5, 300)  # (connect, read) in seconds
         print(f"Using Docker mode: {endpoint} endpoint with timeout {timeout}")
@@ -128,18 +138,22 @@ Examples:
 
     def start(host):
         try:
-            if args.exec_policy == "docker":
+            if args.prepare_run:
+                print(
+                    f"{host}: sending {endpoint} request (prepare mode)...", flush=True)
+            elif args.exec_policy == "docker":
                 print(
                     f"{host}: sending {endpoint} request (Docker mode)...", flush=True)
             else:
                 print(f"{host}: sending {endpoint} request...", flush=True)
 
             request_body = {
-                "run_idx": run_idx,
                 "ws_dir": ws_dir,
                 "scenario": scenario,
             }
-            if eval_time is not None:
+            if not args.prepare_run:
+                request_body["run_idx"] = run_idx
+            if eval_time is not None and not args.prepare_run:
                 request_body["eval_time"] = eval_time
 
             r = requests.post(

@@ -1,4 +1,5 @@
 from flask import Flask, jsonify, request
+from datetime import datetime
 import logging
 import os
 import socket
@@ -125,6 +126,54 @@ def _run_script(cmd, env=None):
     return jsonify({"status": "finished", "stdout": result.stdout}), 200
 
 
+def _prepare_results_timestamp(ctx):
+    results_dir = os.path.join(
+        REPO_ROOT, ctx["ws_dir"], ctx["scenario_dir"], "results")
+    os.makedirs(results_dir, exist_ok=True)
+
+    run_timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+    run_dir = os.path.join(results_dir, run_timestamp)
+    os.makedirs(os.path.join(run_dir, "exec_logs"), exist_ok=True)
+
+    latest_link = os.path.join(results_dir, "latest")
+    if os.path.lexists(latest_link):
+        if os.path.islink(latest_link) or os.path.isfile(latest_link):
+            os.remove(latest_link)
+        elif os.path.isdir(latest_link):
+            os.rmdir(latest_link)
+    os.symlink(run_timestamp, latest_link)
+
+    return run_timestamp
+
+
+def _resolve_active_timestamp(ctx):
+    results_dir = os.path.join(
+        REPO_ROOT, ctx["ws_dir"], ctx["scenario_dir"], "results")
+    latest_link = os.path.join(results_dir, "latest")
+    if os.path.islink(latest_link):
+        return os.readlink(latest_link)
+    return _prepare_results_timestamp(ctx)
+
+
+@app.route("/prepare_run", methods=["POST"])
+def prepare_run():
+    body = request.get_json(silent=True) or {}
+    try:
+        ctx = _resolve_exec_context(body)
+        run_timestamp = _prepare_results_timestamp(ctx)
+        app.logger.info(
+            "[prepare_run] scenario=%s timestamp=%s",
+            ctx["scenario_dir"],
+            run_timestamp,
+        )
+        return jsonify({"status": "prepared", "run_timestamp": run_timestamp}), 200
+    except FileNotFoundError as exc:
+        return jsonify({"error": str(exc)}), 404
+    except Exception as exc:
+        app.logger.exception("[prepare_run] exception")
+        return jsonify({"error": str(exc)}), 500
+
+
 @app.route("/start", methods=["POST"])
 def start_script():
     body = request.get_json(silent=True) or {}
@@ -139,12 +188,14 @@ def start_script():
         ctx = _resolve_exec_context(body)
         resolved_host, script_path = _resolve_host_script(
             ctx["exec_dir"], ctx["hosts"], "exec.sh")
-
-        effective_payload_size = 64
+        run_timestamp = _resolve_active_timestamp(ctx)
         log_dir = os.path.join(
             REPO_ROOT,
-            "logs",
-            f"raw_{effective_payload_size}B",
+            ctx["ws_dir"],
+            ctx["scenario_dir"],
+            "results",
+            run_timestamp,
+            "exec_logs",
             f"run{run_idx}",
         )
         os.makedirs(log_dir, exist_ok=True)
@@ -157,11 +208,11 @@ def start_script():
         env["LOG_DIR"] = log_dir
 
         app.logger.info(
-            "[start] host=%s scenario=%s payload=%s run=%s script=%s",
+            "[start] host=%s scenario=%s run=%s timestamp=%s script=%s",
             resolved_host,
             ctx["scenario_dir"],
-            "json",
             run_idx,
+            run_timestamp,
             script_path,
         )
         return _run_script(cmd, env=env)
@@ -190,21 +241,25 @@ def start_docker():
         ctx = _resolve_exec_context(body)
         resolved_host, script_path = _resolve_host_script(
             ctx["exec_dir"], ctx["hosts"], "run.sh")
+        run_timestamp = _resolve_active_timestamp(ctx)
 
         cmd = ["bash", script_path]
         if eval_time is not None:
             cmd.extend(["--eval-time", str(eval_time)])
         cmd.extend(["--run-idx", str(run_idx)])
 
+        env = os.environ.copy()
+        env["RUN_TIMESTAMP"] = run_timestamp
+
         app.logger.info(
-            "[start_docker] host=%s scenario=%s payload=%s run=%s script=%s",
+            "[start_docker] host=%s scenario=%s run=%s timestamp=%s script=%s",
             resolved_host,
             ctx["scenario_dir"],
-            "json",
             run_idx,
+            run_timestamp,
             script_path,
         )
-        return _run_script(cmd)
+        return _run_script(cmd, env=env)
     except ValueError as exc:
         return jsonify({"error": str(exc)}), 400
     except FileNotFoundError as exc:

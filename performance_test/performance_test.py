@@ -4,7 +4,7 @@ import sys
 import time
 
 from analyzer import aggregate_total_latency
-from runner import collect_logs, resolve_host_list, run_test
+from runner import collect_logs, prepare_run, resolve_host_list, run_test
 
 
 if __name__ == "__main__":
@@ -34,8 +34,6 @@ if __name__ == "__main__":
     )
     args = parser.parse_args()
 
-    # payload_size and period_ms are fixed by generated run/exec scripts.
-    log_payload_tag = 64
     eval_time = args.eval_time
 
     base_log_dir = "./logs"
@@ -61,6 +59,15 @@ if __name__ == "__main__":
         sys.exit(1)
     print(f"Using hosts: {hosts}")
     print(f"Note: payload_size and period_ms are determined by topology JSON; eval_time can be overridden")
+
+    prepare_run(
+        start_exec_scripts_py,
+        hosts,
+        args.ws_dir,
+        args.scenario,
+        exec_policy=args.exec_policy,
+    )
+
     for run_idx in range(args.trials):
         run_test(
             run_idx,
@@ -76,7 +83,6 @@ if __name__ == "__main__":
     collect_logs(
         base_log_dir,
         prefix,
-        log_payload_tag,
         args.trials,
         hosts,
         ws_dir=args.ws_dir,
@@ -87,7 +93,6 @@ if __name__ == "__main__":
         base_log_dir,
         base_result_dir,
         prefix,
-        log_payload_tag,
         args.trials,
         hosts,
         eval_time=eval_time,

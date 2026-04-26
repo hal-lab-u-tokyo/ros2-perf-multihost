@@ -83,33 +83,55 @@ def run_test(
         print(f"run_test failed: rc={result.returncode}")
 
 
+def prepare_run(
+    start_exec_scripts_py,
+    hosts,
+    ws_dir,
+    scenario,
+    exec_policy="docker",
+):
+    """Initialize run timestamp/latest on all hosts before trial loop."""
+    hosts_str = ",".join(hosts)
+    cmd = [
+        sys.executable,
+        start_exec_scripts_py,
+        "--exec-policy",
+        exec_policy,
+        "--prepare-run",
+        "--ws-dir",
+        ws_dir,
+        "--scenario",
+        scenario,
+        "--hosts-list",
+        hosts_str,
+    ]
+
+    result = subprocess.run(cmd, text=True)
+    print(result)
+    if result.returncode != 0:
+        raise RuntimeError(f"prepare_run failed: rc={result.returncode}")
+
+
 def collect_logs(
     base_log_dir,
     prefix,
-    payload_size,
     num_trials,
     hosts,
     ws_dir="performance_ws",
     scenario="latest",
 ):
     """Collect run logs from remote hosts into local log directory."""
-    latest_dir = f"{prefix}_{payload_size}B"
+    latest_dir = prefix
     src_log_dir = os.path.join(os.path.abspath(base_log_dir), latest_dir)
 
     for run_idx in range(num_trials):
         run_log_dir = os.path.join(src_log_dir, f"run{run_idx + 1}")
         os.makedirs(run_log_dir, exist_ok=True)
 
-        if prefix == "docker":
-            remote_log_dir = (
-                f"/home/ubuntu/ros2-perf-multihost/{ws_dir}/{scenario}"
-                f"/results/latest/exec_logs/raw_{payload_size}B/run{run_idx + 1}"
-            )
-        else:
-            remote_log_dir = (
-                f"/home/ubuntu/ros2-perf-multihost/logs/"
-                f"{prefix}_{payload_size}B/run{run_idx + 1}"
-            )
+        remote_log_dir = (
+            f"/home/ubuntu/ros2-perf-multihost/{ws_dir}/{scenario}"
+            f"/results/latest/exec_logs/run{run_idx + 1}"
+        )
 
         for host in hosts:
             print(f"Copying logs from {host} (run{run_idx + 1})")

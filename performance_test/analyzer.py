@@ -51,18 +51,18 @@ def aggregate_total_latency(
     base_log_dir,
     result_parent_dir,
     prefix,
-    payload_size,
     num_trials,
     hosts,
     period_ms=None,
     eval_time=None,
+    payload_size_for_throughput=64,
 ):
     if period_ms is None:
         period_ms = 100
     if eval_time is None:
         eval_time = 60
 
-    latest_dir = f"{prefix}_{payload_size}B"
+    latest_dir = prefix
     run_dir = os.path.join(result_parent_dir, latest_dir)
     log_dir = os.path.join(base_log_dir, latest_dir)
 
@@ -130,7 +130,8 @@ def aggregate_total_latency(
                 topics = len(topic_set)
 
         sent = int(eval_time * 1000 / period_ms) * topics
-        bps, mbps = calc_throughput(total_loss, sent, payload_size, eval_time)
+        bps, mbps = calc_throughput(
+            total_loss, sent, payload_size_for_throughput, eval_time)
         throughput_rows.append([f"run{run_idx + 1}", bps, mbps])
         all_throughputs_bps.append(bps)
         all_throughputs_mbps.append(mbps)
@@ -161,8 +162,7 @@ def aggregate_total_latency(
                 min_bps, min_mbps, max_bps, max_mbps]
         )
 
-    latency_csv_path = os.path.join(
-        run_dir, f"total_latency_{payload_size}B.csv")
+    latency_csv_path = os.path.join(run_dir, "total_latency.csv")
     with open(latency_csv_path, "w", newline="") as f:
         writer = csv.writer(f)
         writer.writerow(["run", "lost[#]", "mean[ms]", "sd[ms]",
@@ -170,8 +170,7 @@ def aggregate_total_latency(
         writer.writerows(rows)
     print(f"  Aggregated CSV saved: {latency_csv_path}")
 
-    throughput_csv_path = os.path.join(
-        run_dir, f"throughput_{payload_size}B.csv")
+    throughput_csv_path = os.path.join(run_dir, "throughput.csv")
     with open(throughput_csv_path, "w", newline="") as f:
         writer = csv.writer(f)
         writer.writerow(["run", "throughput[B/s]", "throughput[MB/s]"])
@@ -204,8 +203,7 @@ def aggregate_total_latency(
                 )
 
     if host_runs_usage_rows:
-        host_runs_usage_csv = os.path.join(
-            run_dir, f"host_runs_usage_{payload_size}B.csv")
+        host_runs_usage_csv = os.path.join(run_dir, "host_runs_usage.csv")
         with open(host_runs_usage_csv, "w", newline="") as f:
             writer = csv.writer(f)
             writer.writerow(
@@ -255,8 +253,7 @@ def aggregate_total_latency(
         )
 
     if host_summary_rows:
-        host_summary_csv = os.path.join(
-            run_dir, f"host_usage_summary_{payload_size}B.csv")
+        host_summary_csv = os.path.join(run_dir, "host_usage_summary.csv")
         with open(host_summary_csv, "w", newline="") as f:
             writer = csv.writer(f)
             writer.writerow(
