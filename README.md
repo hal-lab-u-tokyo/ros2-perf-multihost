@@ -17,14 +17,12 @@ python3 generate_exec_scripts.py ../topology_example/simple.json --rmw fastdds -
 
 ### Options Supported by Generated Scripts
 
-Generated `host*_run.sh` and `local_run.sh` scripts support the runtime options below. `--eval-time` is applied to every launched node (Publisher / Subscriber / Intermediate). `--period-ms` and `--payload-size` are applied to Publisher and Intermediate nodes only. `--run-idx` is available only on `host*_run.sh` and `local_run.sh`. For the JSON schema, see [topology_example/README.md](./topology_example/README.md).
+Generated `host*_run.sh` and `local_run.sh` scripts support the runtime options below. `--eval-time` is applied to every launched node (Publisher / Subscriber / Intermediate). `payload_size` and `period_ms` must be specified in each Publisher / Intermediate topic entry in the topology JSON, and those values are passed directly to Publisher / Intermediate nodes. `--trial-idx` is available only on `host*_run.sh` and `local_run.sh`. For the JSON schema, see [topology_example/README.md](./topology_example/README.md).
 
 | Option | Short | Description | Default |
 |---|---|---|---|
 | --eval-time | -t | Evaluation time in seconds | 60 |
-| --period-ms | -p | Publish period in milliseconds | 100 |
-| --payload-size | -s | Payload size in bytes | 64 |
-| --run-idx | -r | Run index for local execution | 1 |
+| --trial-idx | -r | Trial index for local execution | 1 |
 
 #### Examples
 
@@ -32,14 +30,14 @@ Generated `host*_run.sh` and `local_run.sh` scripts support the runtime options 
 # Use default values
 ./host1_exec.sh
 
-# Override defaults
-./host1_run.sh --eval-time 120 --period-ms 50 --payload-size 256
+# Override eval-time
+./host1_run.sh --eval-time 120
 
 # Short options
-./host1_run.sh -t 120 -p 50 -s 256
+./host1_run.sh -t 120
 ```
 
-`--eval-time` is applied to all nodes launched through `*_run.sh` or `local_run.sh`. `--period-ms` and `--payload-size` apply only to Publisher and Intermediate nodes; Subscriber nodes do not use them.
+`--eval-time` is applied to all nodes launched through `*_run.sh` or `local_run.sh`. `payload_size` and `period_ms` are read from each Publisher/Intermediate entry in the topology JSON.
 
 ### Pull the Shared Docker Image
 
@@ -86,7 +84,7 @@ Generated files:
 
 **1. general info**
 - `command`: Full command line used to run the generator
-- `timestamp`: Script execution time in `YYYY-DD-MM_hh-mm-ss` format
+- `timestamp`: Script execution time in `YYYY-MM-DD_hh-mm-ss` format
 - `json`: Input JSON file name
 - `json_path`: Input JSON file path
 - `ws_dir`: Output base directory
@@ -103,8 +101,9 @@ Generated files:
 - `hosts`: Host name list, for example `host1, host2`
 - `publishers` / `subscribers` / `intermediates`: Node name lists grouped by role
 - `topics`: Topic names in alphabetical order
+- `topic_runtime_json`: Per-topic runtime config used for analysis (`payload_size`, `period_ms`, `publisher_count`)
 
-Each node launched from `host{N}_run.sh` or `local_run.sh` receives a `--log_dir` under `results/YYYY-DD-MM_hh-mm-ss/exec_logs/raw_<payload_size>B/run<run_idx>/` inside the generated run directory. `results/latest` is updated as a symbolic link to the latest run directory. Example: `performance_ws/latest/results/2026-26-04_13-21-45/exec_logs/raw_64B/run1/`.
+Each node launched from `host{N}_run.sh` or `local_run.sh` receives a `--log_dir` under `results/YYYY-MM-DD_hh-mm-ss/exec_logs/trial<trial_idx>/` inside the generated run directory. `results/latest` is updated as a symbolic link to the active run directory. Example: `performance_ws/latest/results/2026-04-26_13-21-45/exec_logs/trial1/`.
 
 ### Local Verification with Docker
 
@@ -185,21 +184,19 @@ After the REST servers are running, use `performance_test/performance_test.py` t
 python3 performance_test/performance_test.py
 # Switch to native execution
 python3 performance_test/performance_test.py --exec-policy native
-# Override runtime parameters explicitly
-python3 performance_test/performance_test.py --payload-size 256 --period-ms 50 --eval-time 120
+# Override eval-time explicitly
+python3 performance_test/performance_test.py --eval-time 120
 ```
 
 Main arguments:
 
 - `--exec-policy`: Execution mode, either `docker` or `native` (default: `docker`)
-- `--trials`: Number of trials per payload size (default: `3`)
+- `--trials`: Number of trials (default: `3`)
 - `--ws-dir`: Base directory that contains generated execution scripts (default: `performance_ws`)
 - `--scenario`: Scenario directory to use (default: `latest`)
-- `--payload-size`: Override payload size; if omitted, the default from `*_run.sh` or `*_exec.sh` is used
-- `--period-ms`: Override publish period; if omitted, the default from `*_run.sh` or `*_exec.sh` is used
 - `--eval-time`: Override evaluation time; if omitted, the default from `*_run.sh` or `*_exec.sh` is used
 
-`performance_test.py` launches node groups via REST for each trial, then collects logs from each host with `scp`. Raw logs are stored under `performance_test/logs`, and aggregated CSV outputs for latency, throughput, and host usage are written under `performance_test/results`.
+`performance_test.py` launches node groups via REST for each trial, then collects logs from each host with `scp`. On prepare, the manager creates `<ws-dir>/<scenario>/results/<session_timestamp>/` and updates `<ws-dir>/<scenario>/results/latest` to point to it. Trial logs are collected under `<ws-dir>/<scenario>/results/latest/logs/trial<N>/`, and aggregated outputs (for example `total_latency.csv`, `throughput.csv`, `host_trials_usage.csv`, `host_usage_summary.csv`) are written under `<ws-dir>/<scenario>/results/latest/csv/`.
 
 When using Zenoh as the RMW, start the router on the manager host before running the benchmark.
 

@@ -1,11 +1,86 @@
 import csv
+import json
 import os
 import subprocess
 import sys
 
 import numpy as np
 
-from throughput_calc import calc_throughput
+
+def _read_metadata_value(metadata_path, key):
+    """Return the raw value for `key:` from metadata.txt, or None."""
+    if not os.path.exists(metadata_path):
+        return None
+    with open(metadata_path, "r") as f:
+        for line in f:
+            if line.startswith(f"{key}:"):
+                return line.split(":", 1)[1].strip()
+    return None
+
+
+def _parse_all_latency_losses(all_latency_path):
+    """Parse all_latency.txt rows into (topic, loss_count)."""
+    rows = []
+    if not os.path.exists(all_latency_path):
+        return rows
+    with open(all_latency_path, "r") as f:
+        lines = f.readlines()
+    for line in lines[2:]:
+        parts = line.strip().split()
+        if len(parts) < 3:
+            continue
+        topic = parts[1]
+        try:
+            loss_count = float(parts[2])
+        except ValueError:
+            continue
+        rows.append((topic, loss_count))
+    return rows
+
+
+def _collect_topic_runtime_config(ws_dir, scenario):
+    """Load topic-level period/payload/publisher_count from metadata.txt."""
+    metadata_path = os.path.join(ws_dir, scenario, "metadata.txt")
+    runtime_json = _read_metadata_value(metadata_path, "topic_runtime_json")
+    if not runtime_json:
+        raise ValueError(
+            f"Missing 'topic_runtime_json' in metadata: {metadata_path}. "
+            "Regenerate scripts with manager_scripts/generate_exec_scripts.py."
+        )
+
+    try:
+        loaded = json.loads(runtime_json)
+    except json.JSONDecodeError as exc:
+        raise ValueError(
+            f"Invalid 'topic_runtime_json' in metadata: {metadata_path}"
+        ) from exc
+
+    topic_cfg = {}
+    for topic, cfg in loaded.items():
+        try:
+            payload_size = int(cfg["payload_size"])
+            period_ms = int(cfg["period_ms"])
+            publisher_count = int(cfg["publisher_count"])
+        except (KeyError, TypeError, ValueError) as exc:
+            raise ValueError(
+                f"Invalid config for topic '{topic}' in topic_runtime_json"
+            ) from exc
+        if payload_size <= 0 or period_ms <= 0 or publisher_count <= 0:
+            raise ValueError(
+                f"Non-positive payload/period/publisher_count for topic '{topic}'"
+            )
+        topic_cfg[topic] = {
+            "payload_size": payload_size,
+            "period_ms": period_ms,
+            "publisher_count": publisher_count,
+        }
+
+    if not topic_cfg:
+        raise ValueError(
+            f"Empty 'topic_runtime_json' in metadata: {metadata_path}"
+        )
+
+    return topic_cfg
 
 
 def read_monitor_metrics(path):
@@ -48,38 +123,34 @@ def read_monitor_metrics(path):
 
 
 def aggregate_total_latency(
-    base_log_dir,
-    result_parent_dir,
-    prefix,
-    payload_size,
+    log_dir,
+    csv_dir,
     num_trials,
     hosts,
-    period_ms=None,
     eval_time=None,
+    ws_dir="performance_ws",
+    scenario="latest",
 ):
-    if period_ms is None:
-        period_ms = 100
     if eval_time is None:
         eval_time = 60
 
-    latest_dir = f"{prefix}_{payload_size}B"
-    run_dir = os.path.join(result_parent_dir, latest_dir)
-    log_dir = os.path.join(base_log_dir, latest_dir)
+    trial_dir = csv_dir
+    topic_runtime_cfg = _collect_topic_runtime_config(ws_dir, scenario)
 
     analyzer_script = os.path.join(os.path.dirname(__file__), "all_latency.py")
     try:
         subprocess.run(
             [sys.executable, analyzer_script, "--logs",
-                log_dir, "--results", run_dir],
+                log_dir, "--results", trial_dir],
             check=True,
         )
     except subprocess.CalledProcessError as exc:
         raise RuntimeError(
             f"Failed to analyze latency data with {analyzer_script} "
-            f"for logs at {log_dir} and results at {run_dir} "
+            f"for logs at {log_dir} and results at {trial_dir} "
             f"(exit code {exc.returncode})."
         ) from exc
-    print(f"  Saved results to {run_dir}")
+    print(f"  Saved results to {trial_dir}")
 
     rows = []
     all_values = []
@@ -87,9 +158,9 @@ def aggregate_total_latency(
     all_throughputs_bps = []
     all_throughputs_mbps = []
 
-    for run_idx in range(num_trials):
-        run_results_dir = os.path.join(run_dir, f"run{run_idx + 1}")
-        total_path = os.path.join(run_results_dir, "total_latency.txt")
+    for trial_idx in range(num_trials):
+        trial_results_dir = os.path.join(trial_dir, f"trial{trial_idx + 1}")
+        total_path = os.path.join(trial_results_dir, "total_latency.txt")
         if not os.path.exists(total_path):
             continue
 
@@ -101,7 +172,7 @@ def aggregate_total_latency(
 
         rows.append(
             [
-                f"run{run_idx + 1}",
+                f"trial{trial_idx + 1}",
                 values[0],
                 values[1],
                 values[2],
@@ -113,25 +184,26 @@ def aggregate_total_latency(
             ]
         )
         all_values.append([float(values[0])] + [float(v) for v in values[1:]])
-        print(f"  Aggregated run{run_idx + 1} from {total_path}")
+        print(f"  Aggregated trial{trial_idx + 1} from {total_path}")
         print(f"    Values: {values}")
 
-        total_loss = float(values[0])
-        all_latency_path = os.path.join(run_results_dir, "all_latency.txt")
-        topics = 0
-        if os.path.exists(all_latency_path):
-            with open(all_latency_path, "r") as af:
-                alines = af.readlines()
-                topic_set = set()
-                for line in alines[2:]:
-                    parts = line.split()
-                    if len(parts) >= 2:
-                        topic_set.add(parts[1])
-                topics = len(topic_set)
+        all_latency_path = os.path.join(trial_results_dir, "all_latency.txt")
 
-        sent = int(eval_time * 1000 / period_ms) * topics
-        bps, mbps = calc_throughput(total_loss, sent, payload_size, eval_time)
-        throughput_rows.append([f"run{run_idx + 1}", bps, mbps])
+        total_received_bytes = 0.0
+        for topic_name, topic_loss in _parse_all_latency_losses(all_latency_path):
+            cfg = topic_runtime_cfg.get(topic_name)
+            if not cfg:
+                raise ValueError(
+                    f"Topic '{topic_name}' in {all_latency_path} is missing from topic_runtime_json"
+                )
+            sent_per_pub = int(eval_time * 1000 / cfg["period_ms"])
+            sent = sent_per_pub * cfg["publisher_count"]
+            received = max(sent - topic_loss, 0)
+            total_received_bytes += received * cfg["payload_size"]
+
+        bps = total_received_bytes / eval_time if eval_time > 0 else 0.0
+        mbps = bps / 1_000_000
+        throughput_rows.append([f"trial{trial_idx + 1}", bps, mbps])
         all_throughputs_bps.append(bps)
         all_throughputs_mbps.append(mbps)
 
@@ -161,37 +233,35 @@ def aggregate_total_latency(
                 min_bps, min_mbps, max_bps, max_mbps]
         )
 
-    latency_csv_path = os.path.join(
-        run_dir, f"total_latency_{payload_size}B.csv")
+    latency_csv_path = os.path.join(trial_dir, "total_latency.csv")
     with open(latency_csv_path, "w", newline="") as f:
         writer = csv.writer(f)
-        writer.writerow(["run", "lost[#]", "mean[ms]", "sd[ms]",
+        writer.writerow(["trial", "lost[#]", "mean[ms]", "sd[ms]",
                         "min[ms]", "q1[ms]", "mid[ms]", "q3[ms]", "max[ms]"])
         writer.writerows(rows)
     print(f"  Aggregated CSV saved: {latency_csv_path}")
 
-    throughput_csv_path = os.path.join(
-        run_dir, f"throughput_{payload_size}B.csv")
+    throughput_csv_path = os.path.join(trial_dir, "throughput.csv")
     with open(throughput_csv_path, "w", newline="") as f:
         writer = csv.writer(f)
-        writer.writerow(["run", "throughput[B/s]", "throughput[MB/s]"])
+        writer.writerow(["trial", "throughput[B/s]", "throughput[MB/s]"])
         writer.writerows(throughput_rows)
     print(f"  Aggregated throughput CSV saved: {throughput_csv_path}")
 
-    host_runs_usage_rows = []
-    src_log_dir = os.path.join(os.path.abspath(base_log_dir), latest_dir)
+    host_trials_usage_rows = []
+    src_log_dir = os.path.abspath(log_dir)
 
-    for run_idx in range(num_trials):
-        run_log_dir = os.path.join(src_log_dir, f"run{run_idx + 1}")
+    for trial_idx in range(num_trials):
+        trial_log_dir = os.path.join(src_log_dir, f"trial{trial_idx + 1}")
         for host in hosts:
             monitor_path = os.path.join(
-                run_log_dir, f"{host}_monitor_host.csv")
+                trial_log_dir, f"{host}_monitor_host.csv")
             metrics = read_monitor_metrics(monitor_path)
             if metrics:
-                host_runs_usage_rows.append(
+                host_trials_usage_rows.append(
                     [
                         host,
-                        f"run{run_idx + 1}",
+                        f"trial{trial_idx + 1}",
                         metrics["cpu_mean"],
                         metrics["cpu_max"],
                         metrics["mem_mean"],
@@ -203,15 +273,15 @@ def aggregate_total_latency(
                     ]
                 )
 
-    if host_runs_usage_rows:
-        host_runs_usage_csv = os.path.join(
-            run_dir, f"host_runs_usage_{payload_size}B.csv")
-        with open(host_runs_usage_csv, "w", newline="") as f:
+    if host_trials_usage_rows:
+        host_trials_usage_csv = os.path.join(
+            trial_dir, "host_trials_usage.csv")
+        with open(host_trials_usage_csv, "w", newline="") as f:
             writer = csv.writer(f)
             writer.writerow(
                 [
                     "host",
-                    "run",
+                    "trial",
                     "cpu_mean[%]",
                     "cpu_max[%]",
                     "mem_mean[%]",
@@ -222,12 +292,12 @@ def aggregate_total_latency(
                     "samples",
                 ]
             )
-            writer.writerows(host_runs_usage_rows)
-        print(f"  Per-host run usage CSV saved: {host_runs_usage_csv}")
+            writer.writerows(host_trials_usage_rows)
+        print(f"  Per-host trial usage CSV saved: {host_trials_usage_csv}")
 
     host_summary_rows = []
     for host in hosts:
-        rows_for_host = [r for r in host_runs_usage_rows if r[0] == host]
+        rows_for_host = [r for r in host_trials_usage_rows if r[0] == host]
         if not rows_for_host:
             continue
 
@@ -255,8 +325,7 @@ def aggregate_total_latency(
         )
 
     if host_summary_rows:
-        host_summary_csv = os.path.join(
-            run_dir, f"host_usage_summary_{payload_size}B.csv")
+        host_summary_csv = os.path.join(trial_dir, "host_usage_summary.csv")
         with open(host_summary_csv, "w", newline="") as f:
             writer = csv.writer(f)
             writer.writerow(
@@ -269,7 +338,7 @@ def aggregate_total_latency(
                     "load1_mean_mean",
                     "swap_mean_mean[%]",
                     "swap_max_max[%]",
-                    "runs_covered",
+                    "trials_covered",
                 ]
             )
             writer.writerows(host_summary_rows)

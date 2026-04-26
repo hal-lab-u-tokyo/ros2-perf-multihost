@@ -47,6 +47,8 @@ Notes:
 | Key | Required | Type | Description |
 |---|---|---|---|
 | topic_name | Required | string | Topic name to publish. |
+| payload_size | Required | number | Payload size (bytes). Must be a positive integer. |
+| period_ms | Required | number | Publish period (ms). Must be a positive integer. |
 
 ### Elements of the `subscriber` Array
 
@@ -62,12 +64,13 @@ Notes:
 | subscriber | Required | array | Topic definitions for subscribed input topics. |
 
 Each element of the `intermediate` array is an object that contains the `publisher` and `subscriber` arrays shown above. Elements inside those arrays use the same `topic_name` field described above.
+For `intermediate[].publisher[]`, `payload_size` and `period_ms` are also required.
 
 ## 3. Notes
 
 The RMW implementation is selected with the command-line arguments to `generate_exec_scripts.py`. Defining it in the JSON file has no effect.
 
-If you pass `--eval-time`, `--period-ms`, or `--payload-size` to `_run.sh` or `_exec.sh`, those values are applied to all Publisher and Intermediate nodes across the launched hosts. Subscriber nodes do not use `--period-ms` or `--payload-size`.
+`--eval-time` can be passed to `_run.sh` or `_exec.sh` to override duration.
 
 ## 4. Minimal Template
 
@@ -80,7 +83,11 @@ If you pass `--eval-time`, `--period-ms`, or `--payload-size` to `_run.sh` or `_
         {
           "node_name": "pub1",
           "publisher": [
-            { "topic_name": "topic_a" }
+            {
+              "topic_name": "topic_a",
+              "payload_size": 64,
+              "period_ms": 100
+            }
           ]
         }
       ]
@@ -116,7 +123,11 @@ If you pass `--eval-time`, `--period-ms`, or `--payload-size` to `_run.sh` or `_
         {
           "node_name": "pub1",
           "publisher": [
-            { "topic_name": "topic_a" }
+            {
+              "topic_name": "topic_a",
+              "payload_size": 64,
+              "period_ms": 100
+            }
           ]
         }
       ]

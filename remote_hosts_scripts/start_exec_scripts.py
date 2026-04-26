@@ -4,10 +4,10 @@ Supports both Docker and native execution modes.
 
 Usage:
   # Docker mode (sends /start_docker requests)
-      python3 start_exec_scripts.py --exec-policy docker --run-idx 1 --ws-dir performance_ws --scenario latest --hosts-list host1,host2,host3
+      python3 start_exec_scripts.py --exec-policy docker --trial-idx 1 --ws-dir performance_ws --scenario latest --hosts-list host1,host2,host3
 
   # Native mode (sends /start requests)
-      python3 start_exec_scripts.py --exec-policy native --run-idx 1 --ws-dir performance_ws --scenario latest --hosts-list host1,host2,host3
+      python3 start_exec_scripts.py --exec-policy native --trial-idx 1 --ws-dir performance_ws --scenario latest --hosts-list host1,host2,host3
 """
 
 import requests
@@ -65,10 +65,10 @@ def main():
         epilog="""
 Examples:
   # Docker mode
-      python3 start_exec_scripts.py --exec-policy docker --run-idx 1 --ws-dir performance_ws --scenario latest --hosts-list host1,host2,host3
+            python3 start_exec_scripts.py --exec-policy docker --trial-idx 1 --ws-dir performance_ws --scenario latest --hosts-list host1,host2,host3
 
   # Native mode
-      python3 start_exec_scripts.py --exec-policy native --run-idx 1 --ws-dir performance_ws --scenario latest --hosts-list host1,host2,host3
+            python3 start_exec_scripts.py --exec-policy native --trial-idx 1 --ws-dir performance_ws --scenario latest --hosts-list host1,host2,host3
         """
     )
     parser.add_argument(
@@ -77,8 +77,13 @@ Examples:
         default="docker",
         help="Execution mode. docker sends /start_docker, native sends /start (default: docker)",
     )
-    parser.add_argument("--run-idx", type=int, required=True,
-                        help="Run index (trial number)")
+    parser.add_argument("--trial-idx", type=int, default=1,
+                        help="Trial index")
+    parser.add_argument(
+        "--prepare-run",
+        action="store_true",
+        help="Prepare run timestamp/latest on all hosts before trials",
+    )
     parser.add_argument("--ws-dir", default="performance_ws",
                         help="Workspace directory (default: performance_ws)")
     parser.add_argument("--scenario", default="latest",
@@ -88,7 +93,7 @@ Examples:
 
     args = parser.parse_args()
 
-    run_idx = args.run_idx
+    trial_idx = args.trial_idx
     ws_dir = args.ws_dir
     scenario = args.scenario
     hosts_list = args.hosts_list
@@ -109,13 +114,16 @@ Examples:
         print("ERROR: No hosts to process", file=sys.stderr)
         sys.exit(1)
 
-    # Read test parameters from environment only when explicitly provided.
-    payload_size = os.environ.get("PAYLOAD_SIZE")
-    period_ms = os.environ.get("PERIOD_MS")
+    # Read optional test parameters from environment.
     eval_time = os.environ.get("EVAL_TIME")
 
     # Determine endpoint and timeout based on mode
-    if args.exec_policy == "docker":
+    if args.prepare_run:
+        endpoint = "/prepare_run"
+        timeout = (5, 30)
+        print(
+            f"Using prepare mode: {endpoint} endpoint with timeout {timeout}")
+    elif args.exec_policy == "docker":
         endpoint = "/start_docker"
         timeout = (5, 300)  # (connect, read) in seconds
         print(f"Using Docker mode: {endpoint} endpoint with timeout {timeout}")
@@ -130,22 +138,22 @@ Examples:
 
     def start(host):
         try:
-            if args.exec_policy == "docker":
+            if args.prepare_run:
+                print(
+                    f"{host}: sending {endpoint} request (prepare mode)...", flush=True)
+            elif args.exec_policy == "docker":
                 print(
                     f"{host}: sending {endpoint} request (Docker mode)...", flush=True)
             else:
                 print(f"{host}: sending {endpoint} request...", flush=True)
 
             request_body = {
-                "run_idx": run_idx,
                 "ws_dir": ws_dir,
                 "scenario": scenario,
             }
-            if payload_size is not None:
-                request_body["payload_size"] = payload_size
-            if period_ms is not None:
-                request_body["period_ms"] = period_ms
-            if eval_time is not None:
+            if not args.prepare_run:
+                request_body["trial_idx"] = trial_idx
+            if eval_time is not None and not args.prepare_run:
                 request_body["eval_time"] = eval_time
 
             r = requests.post(

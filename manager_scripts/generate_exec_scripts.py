@@ -32,6 +32,64 @@ DEFAULT_PERIOD_MS = 100
 DEFAULT_EVAL_TIME = 60
 
 
+def _require_positive_int(entry, key, context):
+    """Read a required positive integer field from entry."""
+    if key not in entry:
+        raise ValueError(f"{context}: '{key}' is required")
+    try:
+        value = int(entry[key])
+    except (TypeError, ValueError) as exc:
+        raise ValueError(
+            f"{context}: '{key}' must be an integer"
+        ) from exc
+    if value <= 0:
+        raise ValueError(f"{context}: '{key}' must be > 0")
+    return value
+
+
+def _validate_payload_period_constraints(json_content):
+    """Enforce payload/period schema constraints for topology JSON."""
+    forbidden_root_keys = [
+        key for key in ("payload_size", "period_ms") if key in json_content
+    ]
+    if forbidden_root_keys:
+        raise ValueError(
+            "Top-level keys are not allowed: "
+            f"{', '.join(forbidden_root_keys)}. "
+            "Set payload_size and period_ms per Publisher/Intermediate topic entry."
+        )
+
+    hosts = json_content.get("hosts")
+    if not isinstance(hosts, list):
+        raise ValueError("root key 'hosts' must be an array")
+
+    for host_idx, host in enumerate(hosts):
+        host_name = host.get("host_name", f"hosts[{host_idx}]")
+        nodes = host.get("nodes", [])
+        if not isinstance(nodes, list):
+            raise ValueError(f"host '{host_name}': 'nodes' must be an array")
+
+        for node_idx, node in enumerate(nodes):
+            node_name = node.get("node_name", f"node[{node_idx}]")
+            if node.get("publisher"):
+                for pub_idx, pub in enumerate(node["publisher"]):
+                    context = f"node '{node_name}' publisher[{pub_idx}]"
+                    _require_positive_int(pub, "payload_size", context)
+                    _require_positive_int(pub, "period_ms", context)
+
+            if "intermediate" in node:
+                intermediate_entries = _normalize_intermediate_entries(
+                    node["intermediate"], node_name
+                )
+                for entry_idx, intermediate_entry in enumerate(intermediate_entries):
+                    for pub_idx, pub in enumerate(intermediate_entry.get("publisher", [])):
+                        context = (
+                            f"node '{node_name}' intermediate[{entry_idx}] publisher[{pub_idx}]"
+                        )
+                        _require_positive_int(pub, "payload_size", context)
+                        _require_positive_int(pub, "period_ms", context)
+
+
 def _normalize_ws_dir(ws_dir):
     """Normalize and validate the value passed to --ws-dir."""
     normalized = os.path.normpath(ws_dir.strip())
@@ -183,13 +241,9 @@ def _append_host_script_prelude(
             f'PERIOD_MS="${{PERIOD_MS:-{period_ms_default}}}"',
             f'EVAL_TIME="${{EVAL_TIME:-{eval_time_default}}}"',
             "",
-            "# allow runtime overrides via script options",
+            "# allow runtime override via script option",
             'while [[ $# -gt 0 ]]; do',
             '  case "$1" in',
-            '    --payload-size|-s)',
-            '      PAYLOAD_SIZE="$2"; shift 2;;',
-            '    --period-ms|-p)',
-            '      PERIOD_MS="$2"; shift 2;;',
             '    --eval-time|-t)',
             '      EVAL_TIME="$2"; shift 2;;',
             '    --)',
@@ -241,12 +295,26 @@ def _append_host_script_prelude(
 
 def _append_publisher_block(lines, node_name, pub_list, qos_opts):
     topic_names = ",".join(p["topic_name"] for p in pub_list)
+    payload_sizes = [
+        _require_positive_int(
+            p, "payload_size", f"node '{node_name}' publisher[{idx}]"
+        )
+        for idx, p in enumerate(pub_list)
+    ]
+    period_mses = [
+        _require_positive_int(
+            p, "period_ms", f"node '{node_name}' publisher[{idx}]"
+        )
+        for idx, p in enumerate(pub_list)
+    ]
+    payload_args = " ".join(f"--size {int(v)}" for v in payload_sizes)
+    period_args = " ".join(f"--period {int(v)}" for v in period_mses)
     lines.extend(
         [
             f"# {node_name} publisher",
             "( ros2 run ros2_perf_multihost_nodes publisher_node \\",
             f"  --node-name {node_name} --topic-names {topic_names} \\",
-            "  -s \"$PAYLOAD_SIZE\" -p \"$PERIOD_MS\" --eval-time \"$EVAL_TIME\" \\",
+            f"  {payload_args} {period_args} --eval-time \"$EVAL_TIME\" \\",
             f"  {qos_opts} --log-dir \"$LOG_DIR\" \\",
             ") & node_pids+=($!)",
             f'echo "Started {node_name} publisher at $(date +%Y-%m-%dT%H:%M:%S.%3N%z)"',
@@ -293,19 +361,39 @@ def _normalize_intermediate_entries(intermediate_value, node_name):
     return intermediate_value
 
 
-def _collect_intermediate_topic_names(intermediate_entries):
-    """Collect publisher and subscriber topic names from intermediate entries while preserving order and removing duplicates."""
-    pub_topics = []
+def _collect_intermediate_pub_sub(intermediate_entries):
+    """Collect publisher/subscriber topic definitions while preserving order and removing duplicates by topic name."""
+    pub_defs = []
     sub_topics = []
     for entry in intermediate_entries:
-        pub_topics.extend(p["topic_name"] for p in entry.get("publisher", []))
+        pub_defs.extend(entry.get("publisher", []))
         sub_topics.extend(s["topic_name"] for s in entry.get("subscriber", []))
-    pub_topics = list(dict.fromkeys(pub_topics))
+    pub_defs_by_topic = {}
+    for p in pub_defs:
+        topic_name = p["topic_name"]
+        if topic_name not in pub_defs_by_topic:
+            pub_defs_by_topic[topic_name] = p
+    pub_defs = list(pub_defs_by_topic.values())
     sub_topics = list(dict.fromkeys(sub_topics))
-    return pub_topics, sub_topics
+    return pub_defs, sub_topics
 
 
-def _append_intermediate_block(lines, node_name, pub_topics, sub_topics, qos_opts):
+def _append_intermediate_block(lines, node_name, pub_defs, sub_topics, qos_opts):
+    pub_topics = [p["topic_name"] for p in pub_defs]
+    payload_sizes = [
+        _require_positive_int(
+            p, "payload_size", f"node '{node_name}' intermediate publisher[{idx}]"
+        )
+        for idx, p in enumerate(pub_defs)
+    ]
+    period_mses = [
+        _require_positive_int(
+            p, "period_ms", f"node '{node_name}' intermediate publisher[{idx}]"
+        )
+        for idx, p in enumerate(pub_defs)
+    ]
+    payload_args = " ".join(f"--size {int(v)}" for v in payload_sizes)
+    period_args = " ".join(f"--period {int(v)}" for v in period_mses)
     topic_names_pub = ",".join(pub_topics)
     topic_names_sub = ",".join(sub_topics)
     lines.extend(
@@ -313,7 +401,7 @@ def _append_intermediate_block(lines, node_name, pub_topics, sub_topics, qos_opt
             f"# {node_name} intermediate",
             "( ros2 run ros2_perf_multihost_nodes intermediate_node \\",
             f"  --node-name {node_name} --topic-names-pub {topic_names_pub} --topic-names-sub {topic_names_sub} \\",
-            "  -s \"$PAYLOAD_SIZE\" -p \"$PERIOD_MS\" --eval-time \"$EVAL_TIME\" \\",
+            f"  {payload_args} {period_args} --eval-time \"$EVAL_TIME\" \\",
             f"  {qos_opts} --log-dir \"$LOG_DIR\" \\",
             ") & node_pids+=($!)",
             f'echo "Started {node_name} intermediate at $(date +%Y-%m-%dT%H:%M:%S.%3N%z)"',
@@ -388,13 +476,13 @@ def generate_exec_scripts(json_content, rmw, output_dir):
                 intermediate_entries = _normalize_intermediate_entries(
                     node["intermediate"], node_name
                 )
-                pub_topics, sub_topics = _collect_intermediate_topic_names(
+                pub_defs, sub_topics = _collect_intermediate_pub_sub(
                     intermediate_entries
                 )
                 _append_intermediate_block(
                     lines,
                     node_name,
-                    pub_topics,
+                    pub_defs,
                     sub_topics,
                     qos_opts,
                 )
@@ -566,7 +654,7 @@ def _run_script_common_prefix(
             f'PAYLOAD_SIZE="${{PAYLOAD_SIZE:-{payload_size_default}}}"',
             f'PERIOD_MS="${{PERIOD_MS:-{period_ms_default}}}"',
             f'EVAL_TIME="${{EVAL_TIME:-{eval_time_default}}}"',
-            'RUN_IDX="${RUN_IDX:-1}"',
+            'TRIAL_IDX="${TRIAL_IDX:-1}"',
             "",
             'print_help() {',
             '  cat <<EOF',
@@ -574,14 +662,12 @@ def _run_script_common_prefix(
             '',
             'Options:',
             '  -t, --eval-time SEC       Evaluation duration in seconds (default: $EVAL_TIME)',
-            '  -p, --period-ms MS        Publish period in milliseconds (default: $PERIOD_MS)',
-            '  -s, --payload-size BYTES  Payload size in bytes (default: $PAYLOAD_SIZE)',
-            '  -r, --run-idx N           Run index (default: $RUN_IDX)',
+            '  -r, --trial-idx N         Trial index (default: $TRIAL_IDX)',
             '  -h, --help                Show this help message and exit',
             '',
             'Notes:',
             '  --eval-time is applied to all nodes started via this script.',
-            '  --period-ms and --payload-size are applied to Publisher/Intermediate nodes only.',
+            '  payload_size and period_ms must be set in each Publisher/Intermediate entry in topology JSON.',
             'EOF',
             '}',
             "",
@@ -590,12 +676,8 @@ def _run_script_common_prefix(
             '  case "$1" in',
             '    --eval-time|-t)',
             '      EVAL_TIME="$2"; shift 2;;',
-            '    --period-ms|-p)',
-            '      PERIOD_MS="$2"; shift 2;;',
-            '    --payload-size|-s)',
-            '      PAYLOAD_SIZE="$2"; shift 2;;',
-            '    --run-idx|-r)',
-            '      RUN_IDX="$2"; shift 2;;',
+            '    --trial-idx|-r)',
+            '      TRIAL_IDX="$2"; shift 2;;',
             '    --help|-h)',
             '      print_help; exit 0;;',
             '    --)',
@@ -606,13 +688,16 @@ def _run_script_common_prefix(
             'done',
             'RESULTS_HOST_DIR="$RUN_ROOT_DIR/results"',
             'mkdir -p "$RESULTS_HOST_DIR"',
-            'RUN_TIMESTAMP="${RUN_TIMESTAMP:-$(date +%Y-%d-%m_%H-%M-%S)}"',
+            'if [[ -z "${RUN_TIMESTAMP:-}" ]]; then',
+            '  RUN_TIMESTAMP="$(date +%Y-%m-%d_%H-%M-%S)"',
+            'fi',
             'RUN_RESULTS_HOST_DIR="$RESULTS_HOST_DIR/$RUN_TIMESTAMP"',
-            'EXEC_LOGS_HOST_DIR="$RUN_RESULTS_HOST_DIR/exec_logs/raw_${PAYLOAD_SIZE}B/run${RUN_IDX}"',
-            'mkdir -p "$EXEC_LOGS_HOST_DIR"',
+            'mkdir -p "$RUN_RESULTS_HOST_DIR"',
             'ln -sfn "$RUN_TIMESTAMP" "$RESULTS_HOST_DIR/latest"',
+            'EXEC_LOGS_HOST_DIR="$RUN_RESULTS_HOST_DIR/exec_logs/trial${TRIAL_IDX}"',
+            'mkdir -p "$EXEC_LOGS_HOST_DIR"',
             (
-                f'LOG_DIR="${{LOG_DIR:-{PROJECT_ROOT_IN_CONTAINER}/{PERF_WS_DIR}/${{RUN_DIR_NAME}}/results/${{RUN_TIMESTAMP}}/exec_logs/raw_${{PAYLOAD_SIZE}}B/run${{RUN_IDX}}}}"'
+                f'LOG_DIR="${{LOG_DIR:-{PROJECT_ROOT_IN_CONTAINER}/{PERF_WS_DIR}/${{RUN_DIR_NAME}}/results/${{RUN_TIMESTAMP}}/exec_logs/trial${{TRIAL_IDX}}}}"'
             ),
             "",
             'cd "$PROJECT_ROOT"',
@@ -788,6 +873,52 @@ def _collect_metadata_node_names(json_content):
     return host_names, publisher_names, subscriber_names, intermediate_names, topic_names
 
 
+def _collect_topic_runtime_config(json_content):
+    """Collect topic -> payload/period/publisher_count from topology."""
+    topic_cfg = {}
+
+    def add_publisher_topic(entry, context):
+        topic = entry.get("topic_name")
+        if not topic:
+            raise ValueError(f"{context}: missing topic_name")
+        payload_size = _require_positive_int(entry, "payload_size", context)
+        period_ms = _require_positive_int(entry, "period_ms", context)
+
+        cfg = topic_cfg.setdefault(
+            topic,
+            {
+                "payload_size": payload_size,
+                "period_ms": period_ms,
+                "publisher_count": 0,
+            },
+        )
+        if cfg["payload_size"] != payload_size or cfg["period_ms"] != period_ms:
+            raise ValueError(
+                f"Inconsistent payload/period for topic '{topic}' in topology JSON"
+            )
+        cfg["publisher_count"] += 1
+
+    for host in json_content.get("hosts", []):
+        for node in host.get("nodes", []):
+            node_name = node.get("node_name", "?")
+            for pub_idx, pub in enumerate(node.get("publisher", []) or []):
+                add_publisher_topic(
+                    pub, f"node '{node_name}' publisher[{pub_idx}]")
+
+            if "intermediate" in node:
+                intermediate_entries = _normalize_intermediate_entries(
+                    node["intermediate"], node_name
+                )
+                for entry_idx, inter in enumerate(intermediate_entries):
+                    for pub_idx, pub in enumerate(inter.get("publisher", []) or []):
+                        add_publisher_topic(
+                            pub,
+                            f"node '{node_name}' intermediate[{entry_idx}] publisher[{pub_idx}]",
+                        )
+
+    return topic_cfg
+
+
 def _unique_in_order(items):
     """Remove duplicates while preserving the original order."""
     return list(dict.fromkeys(items))
@@ -811,6 +942,7 @@ def generate_metadata_file(
     publisher_names = _unique_in_order(publisher_names)
     subscriber_names = _unique_in_order(subscriber_names)
     intermediate_names = _unique_in_order(intermediate_names)
+    topic_runtime_cfg = _collect_topic_runtime_config(json_content)
 
     all_nodes = [
         node
@@ -820,7 +952,7 @@ def generate_metadata_file(
     node_count = len(all_nodes)
 
     qos = json_content.get("qos", {})
-    timestamp = datetime.now().strftime("%Y-%d-%m_%H-%M-%S")
+    timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
     sections = [
         [
             "# --- 1. general info ---",
@@ -851,6 +983,10 @@ def generate_metadata_file(
             f"subscribers: {', '.join(subscriber_names)}",
             f"intermediates: {', '.join(intermediate_names)}",
             f"topics: {', '.join(sorted(topic_names))}",
+            (
+                "topic_runtime_json: "
+                f"{json.dumps(topic_runtime_cfg, separators=(',', ':'), sort_keys=True)}"
+            ),
         ],
     ]
 
@@ -892,6 +1028,8 @@ if __name__ == "__main__":
 
     with open(args.json_path, "r") as f:
         json_content = json.load(f)
+
+    _validate_payload_period_constraints(json_content)
 
     # Generate into a temporary directory first, then swap it in after success.
     tmp_dir = output_dir + ".tmp"
