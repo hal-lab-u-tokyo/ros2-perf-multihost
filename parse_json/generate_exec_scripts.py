@@ -266,11 +266,45 @@ def _append_subscriber_block(lines, node_name, sub_list, qos_opts):
     )
 
 
-def _append_intermediate_block(lines, node_name, intermediate_list, qos_opts):
-    pub_list = intermediate_list[0]["publisher"]
-    sub_list = intermediate_list[0]["subscriber"]
-    topic_names_pub = ",".join(p["topic_name"] for p in pub_list)
-    topic_names_sub = ",".join(s["topic_name"] for s in sub_list)
+def _normalize_intermediate_entries(intermediate_value, node_name):
+    """intermediate を array 形式で検証して返す"""
+    if not isinstance(intermediate_value, list):
+        raise ValueError(
+            f"node '{node_name}': intermediate must be an array"
+        )
+    if not intermediate_value:
+        raise ValueError(
+            f"node '{node_name}': intermediate cannot be empty"
+        )
+
+    for idx, entry in enumerate(intermediate_value):
+        if not isinstance(entry, dict):
+            raise ValueError(
+                f"node '{node_name}': intermediate[{idx}] must be an object"
+            )
+        if "publisher" not in entry or "subscriber" not in entry:
+            raise ValueError(
+                f"node '{node_name}': intermediate[{idx}] must include both publisher and subscriber"
+            )
+
+    return intermediate_value
+
+
+def _collect_intermediate_topic_names(intermediate_entries):
+    """intermediate 配列から pub/sub トピック名を順序保持で重複除去して収集する"""
+    pub_topics = []
+    sub_topics = []
+    for entry in intermediate_entries:
+        pub_topics.extend(p["topic_name"] for p in entry.get("publisher", []))
+        sub_topics.extend(s["topic_name"] for s in entry.get("subscriber", []))
+    pub_topics = list(dict.fromkeys(pub_topics))
+    sub_topics = list(dict.fromkeys(sub_topics))
+    return pub_topics, sub_topics
+
+
+def _append_intermediate_block(lines, node_name, pub_topics, sub_topics, qos_opts):
+    topic_names_pub = ",".join(pub_topics)
+    topic_names_sub = ",".join(sub_topics)
     lines.extend(
         [
             f"# {node_name} intermediate",
@@ -347,11 +381,18 @@ def generate_exec_scripts(json_content, rmw, output_dir):
                     node["subscriber"],
                     qos_opts,
                 )
-            if node.get("intermediate"):
+            if "intermediate" in node:
+                intermediate_entries = _normalize_intermediate_entries(
+                    node["intermediate"], node_name
+                )
+                pub_topics, sub_topics = _collect_intermediate_topic_names(
+                    intermediate_entries
+                )
                 _append_intermediate_block(
                     lines,
                     node_name,
-                    node["intermediate"],
+                    pub_topics,
+                    sub_topics,
                     qos_opts,
                 )
 
@@ -730,12 +771,15 @@ def _collect_metadata_node_names(json_content):
                 subscriber_names.append(node_name)
                 for s in node["subscriber"]:
                     topic_names.add(s["topic_name"])
-            if node.get("intermediate"):
+            if "intermediate" in node:
                 intermediate_names.append(node_name)
-                for entry in node["intermediate"]:
-                    for p in entry.get("publisher", []):
+                intermediate_entries = _normalize_intermediate_entries(
+                    node["intermediate"], node_name
+                )
+                for intermediate_entry in intermediate_entries:
+                    for p in intermediate_entry.get("publisher", []):
                         topic_names.add(p["topic_name"])
-                    for s in entry.get("subscriber", []):
+                    for s in intermediate_entry.get("subscriber", []):
                         topic_names.add(s["topic_name"])
 
     return host_names, publisher_names, subscriber_names, intermediate_names, topic_names
