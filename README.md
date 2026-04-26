@@ -180,11 +180,13 @@ docker pull ghcr.io/hal-lab-u-tokyo/ros2-perf-multihost:latest
 ```bash
 cd manager_scripts
 chmod +x start_all_servers.sh
-# HOSTS 配列に各 Raspberry Pi の IP アドレスを設定してから実行
 ./start_all_servers.sh
+
+# メタデータ参照先を明示する場合
+./start_all_servers.sh --ws-dir performance_ws --scenario latest
 ```
 
-このスクリプトは `HOSTS` 配列に列挙した各ホストへ SSH し、
+このスクリプトは `performance_ws/<scenario>/metadata.txt`（または `--ws-dir/--scenario` で指定したパス）から `hosts` を自動解決し、各ホストへ SSH して
 
 - `manager_scripts/rest_server.py` をバックグラウンド起動
 - ログを `/home/ubuntu/rest.log` に出力
