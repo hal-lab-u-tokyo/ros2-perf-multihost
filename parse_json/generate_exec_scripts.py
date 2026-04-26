@@ -69,7 +69,7 @@ def _confirm_overwrite(output_dir, force=False, existing_json_path=None, new_jso
     if not sys.stdin.isatty():
         raise SystemExit(
             f"Error: '{output_dir}' already exists and stdin is not a TTY. "
-            "Use --force to overwrite without confirmation."
+            "Use --force (-f) to overwrite without confirmation."
         )
     msg = f"'{output_dir}' already exists."
     if (
@@ -844,6 +844,7 @@ if __name__ == "__main__":
         help=f"Base directory for generated artifacts (default: {DEFAULT_PERF_WS_DIR})",
     )
     parser.add_argument(
+        "-f",
         "--force",
         action="store_true",
         help="Overwrite existing output directory without confirmation",
