@@ -7,9 +7,6 @@ import numpy as np
 import argparse
 from throughput_calc import calc_throughput
 
-# Note: All test parameters (payload_size, period_ms, eval_time) are determined by run.sh defaults.
-# See performance_ws/<scenario>/exec_scripts/*_run.sh for details.
-
 
 def get_metadata_value(key, metadata_path):
     """Extract a value from metadata.txt by key."""
@@ -118,9 +115,16 @@ def aggregate_total_latency(
     payload_size,
     num_trials,
     hosts,
+    period_ms=None,
+    eval_time=None,
     ws_dir="performance_ws",
     scenario="latest",
 ):
+    if period_ms is None:
+        period_ms = 100
+    if eval_time is None:
+        eval_time = 60
+
     latest_dir = f"{prefix}_{payload_size}B"
     log_parent = os.path.abspath(base_log_dir)
     src_log_dir = os.path.join(log_parent, latest_dir)
