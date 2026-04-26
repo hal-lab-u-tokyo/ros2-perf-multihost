@@ -31,10 +31,10 @@ Generated `host*_run.sh` and `local_run.sh` scripts support the runtime options 
 ./host1_exec.sh
 
 # Override eval-time
-./host1_run.sh --eval-time 120
+./host1_run.sh --eval-time 60
 
 # Short options
-./host1_run.sh -t 120
+./host1_run.sh -t 60
 ```
 
 `--eval-time` is applied to all nodes launched through `*_run.sh` or `local_run.sh`. `payload_size` and `period_ms` are read from each Publisher/Intermediate entry in the topology JSON.
@@ -185,7 +185,7 @@ python3 performance_test/performance_test.py
 # Switch to native execution
 python3 performance_test/performance_test.py --exec-policy native
 # Override eval-time explicitly
-python3 performance_test/performance_test.py --eval-time 120
+python3 performance_test/performance_test.py --eval-time 60
 ```
 
 Main arguments:

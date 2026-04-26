@@ -1,5 +1,4 @@
 {
-  "eval_time": 120,
   "qos": {
     "history": "KEEP_LAST",
     "depth": 10,

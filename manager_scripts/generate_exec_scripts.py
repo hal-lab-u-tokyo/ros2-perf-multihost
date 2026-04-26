@@ -135,11 +135,7 @@ def _validate_topology_json_schema(json_content):
     if "hosts" not in json_content:
         raise ValueError("root: 'hosts' is required")
 
-    _ensure_only_allowed_keys(
-        json_content, {"qos", "hosts", "eval_time"}, root_context)
-
-    if "eval_time" in json_content:
-        _require_positive_int(json_content, "eval_time", root_context)
+    _ensure_only_allowed_keys(json_content, {"qos", "hosts"}, root_context)
 
     if "qos" in json_content:
         _validate_qos_schema(json_content["qos"])
@@ -377,6 +373,10 @@ def _append_host_script_prelude(
             '      echo "Unknown option: $1" >&2; exit 2;;',
             '  esac',
             'done',
+            'if ! [[ "$EVAL_TIME" =~ ^[0-9]+$ ]] || [[ "$EVAL_TIME" -le 0 ]]; then',
+            '  echo "ERROR: EVAL_TIME must be a positive integer." >&2',
+            '  exit 2',
+            'fi',
             "",
             'LOG_DIR="${LOG_DIR:?LOG_DIR is required. Use host*_run.sh or local_run.sh}"',
             'mkdir -p "$LOG_DIR"',
@@ -790,6 +790,10 @@ def _run_script_common_prefix(
             '      echo "Unknown option: $1" >&2; exit 2;;',
             '  esac',
             'done',
+            'if ! [[ "$EVAL_TIME" =~ ^[0-9]+$ ]] || [[ "$EVAL_TIME" -le 0 ]]; then',
+            '  echo "ERROR: EVAL_TIME must be a positive integer." >&2',
+            '  exit 2',
+            'fi',
             'RESULTS_HOST_DIR="$RUN_ROOT_DIR/results"',
             'mkdir -p "$RESULTS_HOST_DIR"',
             'if [[ -z "${RUN_TIMESTAMP:-}" ]]; then',
