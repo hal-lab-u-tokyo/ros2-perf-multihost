@@ -4,10 +4,10 @@ Supports both Docker and native execution modes.
 
 Usage:
   # Docker mode (sends /start_docker requests)
-    python3 start_exec_scripts.py --exec-policy docker <run_idx> <num_hosts> [ws_dir] [scenario] [hosts_list]
+        python3 start_exec_scripts.py --exec-policy docker --run-idx 1 --num-hosts 3 --ws-dir performance_ws --scenario latest --hosts-list host1,host2,host3
 
   # Native mode (sends /start requests)
-    python3 start_exec_scripts.py --exec-policy native <run_idx> <num_hosts> [ws_dir] [scenario] [hosts_list]
+        python3 start_exec_scripts.py --exec-policy native --run-idx 1 --num-hosts 3 --ws-dir performance_ws --scenario latest --hosts-list host1,host2,host3
 """
 
 import requests
@@ -65,10 +65,10 @@ def main():
         epilog="""
 Examples:
   # Docker mode
-    python3 start_exec_scripts.py --exec-policy docker 1 3 performance_ws latest host1,host2,host3
+        python3 start_exec_scripts.py --exec-policy docker --run-idx 1 --num-hosts 3 --ws-dir performance_ws --scenario latest --hosts-list host1,host2,host3
 
   # Native mode
-    python3 start_exec_scripts.py --exec-policy native 1 3 performance_ws latest host1,host2,host3
+        python3 start_exec_scripts.py --exec-policy native --run-idx 1 --num-hosts 3 --ws-dir performance_ws --scenario latest --hosts-list host1,host2,host3
         """
     )
     parser.add_argument(
@@ -77,29 +77,18 @@ Examples:
         default="docker",
         help="Execution mode. docker sends /start_docker, native sends /start (default: docker)",
     )
-    parser.add_argument("run_idx", type=int,
+    parser.add_argument("--run-idx", type=int, required=True,
                         help="Run index (trial number)")
-    parser.add_argument("num_hosts", type=int,
+    parser.add_argument("--num-hosts", type=int, required=True,
                         help="Number of hosts to use from metadata")
-    parser.add_argument("ws_dir", nargs="?", default="performance_ws",
+    parser.add_argument("--ws-dir", default="performance_ws",
                         help="Workspace directory (default: performance_ws)")
-    parser.add_argument("scenario", nargs="?", default="latest",
+    parser.add_argument("--scenario", default="latest",
                         help="Scenario directory name (default: latest)")
-    parser.add_argument("hosts_list", nargs="?", default=None,
+    parser.add_argument("--hosts-list", default=None,
                         help="Comma-separated list of hosts (optional; if not provided, resolved from metadata)")
 
-    # Parse known args to support backward compatibility
-    args, unknown = parser.parse_known_args()
-
-    # Support old command-line style (backward compatibility)
-    # Old style: python3 start_scripts.py <payload_size> <num_hosts> <run_idx> [ws_dir] [scenario] [hosts_list]
-    # New style: python3 start_exec_scripts.py [--exec-policy {docker,native}] <run_idx> <num_hosts> [ws_dir] [scenario] [hosts_list]
-    if len(sys.argv) >= 2 and not sys.argv[1].startswith("-"):
-        # Old style: first arg is positional
-        if len(sys.argv) < 4:
-            print("ERROR: Insufficient arguments", file=sys.stderr)
-            parser.print_help()
-            sys.exit(1)
+    args = parser.parse_args()
 
     run_idx = args.run_idx
     num_hosts = args.num_hosts

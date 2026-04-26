@@ -76,15 +76,20 @@ def run_test(run_idx, start_exec_scripts_py, hosts, ws_dir, scenario, exec_polic
         start_exec_scripts_py,
         "--exec-policy",
         exec_policy,
+        "--run-idx",
+        str(run_idx + 1),
+        "--num-hosts",
+        str(len(hosts)),
+        "--ws-dir",
+        ws_dir,
+        "--scenario",
+        scenario,
     ]
 
-    # Add remaining positional arguments
+    # Add optional explicit hosts list
     cmd.extend([
-        str(run_idx + 1),  # run_idx
-        str(len(hosts)),   # num_hosts
-        ws_dir,
-        scenario,
-        hosts_str,  # Pass actual host list
+        "--hosts-list",
+        hosts_str,
     ])
 
     # Build environment with optional test parameters
