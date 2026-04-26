@@ -88,6 +88,41 @@ RMWにZenohを利用する場合は，マネージャで下記を実行する必
 
 トポロジーごとにDockerfileを生成・ビルドする代わりに、共通の1つのDockerイメージを使い回し、トポロジーに応じた実行スクリプトとcompose定義だけを生成するアプローチです。
 
+### 実行スクリプトの生成
+
+JSON トポロジーファイルから実行スクリプト（`host*_exec.sh`, `host*_run.sh`）と Docker Compose ファイルを生成します。
+
+```bash
+cd parse_json
+python3 generate_exec_scripts.py ../topology_example/simple.json --rmw fastdds --ws-dir performance_ws
+```
+
+### 生成されたスクリプトのオプション
+
+生成される `host*_run.sh` / `local_run.sh` は、以下の実行時オプションをサポートします。`--eval-time` は起動対象の全ノード（Publisher / Subscriber / Intermediate）へ、`--period-ms` / `--payload-size` は Publisher / Intermediate ノードへ一括適用されます。`--run-idx` は `host*_run.sh` / `local_run.sh` でのみ有効です。JSON スキーマについては [topology_example/README.md](./topology_example/README.md) を参照してください。
+
+| オプション | 短形式 | 説明 | 既定値 |
+|---|---|---|---|
+| --eval-time | -t | 計測時間（秒） | 60 |
+| --period-ms | -p | Publish 周期（ミリ秒） | 100 |
+| --payload-size | -s | ペイロードサイズ（バイト） | 64 |
+| --run-idx | -r | ランインデックス（ローカル実行時） | 1 |
+
+#### 実行例
+
+```bash
+# デフォルト値を使用
+$ ./host1_exec.sh
+
+# デフォルト値を上書き
+$ ./host1_run.sh --eval-time 120 --period-ms 50 --payload-size 256
+
+# 短形式
+$ ./host1_run.sh -t 120 -p 50 -s 256
+```
+
+`--eval-time` は呼び出した `*_run.sh` / `local_run.sh` 経由で起動される全ノードに一括適用されます。`--period-ms` / `--payload-size` は Publisher / Intermediate のみに適用されます（Subscriber は使用しません）。
+
 ### 共通Dockerイメージの取得（利用者向け）
 
 ```bash
@@ -103,7 +138,7 @@ docker pull ghcr.io/hal-lab-u-tokyo/ros2-perf-multihost:latest
 プロジェクトルートから実行します。
 
 ```bash
-python3 parse_json/generate_exec_scripts.py <topology.json> [--rmw <rmw>] [--ws-dir <dir>] [--force]
+python3 parse_json/generate_exec_scripts.py <topology.json> [--rmw <rmw>] [--ws-dir <dir>] [--force|-f]
 ```
 
 引数:
@@ -111,9 +146,9 @@ python3 parse_json/generate_exec_scripts.py <topology.json> [--rmw <rmw>] [--ws-
 - `<topology.json>`: トポロジー定義JSONファイルのパス
 - `--ws-dir`: 生成物のベースディレクトリ（デフォルト: `performance_ws`）
 - `--rmw`: RMW実装（`fastdds` / `zenoh` / `cyclonedds`、デフォルト: `fastdds`）
-- `--force`: 既存の出力ディレクトリを確認なしで上書きする（CI・スクリプト実行時に使用）
+- `--force` / `-f`: 既存の出力ディレクトリを確認なしで上書きする（CI・スクリプト実行時に使用）
 
-出力先は `<ws-dir>/<JSONファイル名>-<rmw>/exec_scripts/` です。既に存在する場合は上書き確認を行い、`Yes` のときは `exec_scripts/*` を削除して再生成します。このとき、前回の生成に使ったJSONファイルのパス（`metadata.txt` の `json_path:` フィールド）と今回のパスが異なる場合（同名ファイルを別パスから指定した場合）は、追加の警告メッセージを表示します。stdin が TTY でない場合（CI・パイプ経由など）は確認プロンプトを出さずにエラー終了します。その場合は `--force` を使用してください。`<ws-dir>/latest` は常に最新に生成されたディレクトリへのシンボリックリンクになります。
+出力先は `<ws-dir>/<JSONファイル名>-<rmw>/exec_scripts/` です。既に存在する場合は上書き確認を行い、`Yes` のときは `exec_scripts/*` を削除して再生成します。このとき、前回の生成に使ったJSONファイルのパス（`metadata.txt` の `json_path:` フィールド）と今回のパスが異なる場合（同名ファイルを別パスから指定した場合）は、追加の警告メッセージを表示します。stdin が TTY でない場合（CI・パイプ経由など）は確認プロンプトを出さずにエラー終了します。その場合は `--force` または `-f` を使用してください。`<ws-dir>/latest` は常に最新に生成されたディレクトリへのシンボリックリンクになります。
 デフォルトの `performance_ws/` ディレクトリは自動生成されますが、リポジトリ管理からは `.gitignore` で除外しています。
 
 ```bash
@@ -144,8 +179,6 @@ python3 parse_json/generate_exec_scripts.py topology_example/simple.json --rmw z
 
 **2. test config** — テスト設定
 - `rmw`: 指定したRMW名
-- `eval_time`: 計測時間（秒）
-- `period_ms`: 送信周期（ms）
 - `qos_history` / `qos_depth` / `qos_reliability`: QoS設定
 
 **3. topology stats** — トポロジー統計

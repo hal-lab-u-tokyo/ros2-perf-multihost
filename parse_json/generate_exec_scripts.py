@@ -24,6 +24,9 @@ ROS_WS_IN_CONTAINER = f"{PROJECT_ROOT_IN_CONTAINER}/ros2_node_impl_ws"
 IMAGE_NAME = "ghcr.io/hal-lab-u-tokyo/ros2-perf-multihost:latest"
 DEFAULT_PERF_WS_DIR = "performance_ws"
 PERF_WS_DIR = DEFAULT_PERF_WS_DIR
+DEFAULT_PAYLOAD_SIZE = 64
+DEFAULT_PERIOD_MS = 100
+DEFAULT_EVAL_TIME = 60
 
 
 def _normalize_ws_dir(ws_dir):
@@ -69,7 +72,7 @@ def _confirm_overwrite(output_dir, force=False, existing_json_path=None, new_jso
     if not sys.stdin.isatty():
         raise SystemExit(
             f"Error: '{output_dir}' already exists and stdin is not a TTY. "
-            "Use --force to overwrite without confirmation."
+            "Use --force (-f) to overwrite without confirmation."
         )
     msg = f"'{output_dir}' already exists."
     if (
@@ -154,7 +157,14 @@ def _rmw_env_lines(rmw):
     return [f'# Unknown RMW "{rmw}", using default settings']
 
 
-def _append_host_script_prelude(lines, host_name, rmw):
+def _append_host_script_prelude(
+    lines,
+    host_name,
+    rmw,
+    payload_size_default,
+    period_ms_default,
+    eval_time_default,
+):
     """host*_exec.sh の共通前半を追加する"""
     lines.extend(
         [
@@ -166,7 +176,25 @@ def _append_host_script_prelude(lines, host_name, rmw):
             '# 集約した ROS 2 ノード実装ワークスペース',
             'ROS_WS="${ROS2_NODE_IMPL_WS:-$PROJECT_ROOT/ros2_node_impl_ws}"',
             "",
-            'PAYLOAD_SIZE="${PAYLOAD_SIZE:-64}"',
+            f'PAYLOAD_SIZE="${{PAYLOAD_SIZE:-{payload_size_default}}}"',
+            f'PERIOD_MS="${{PERIOD_MS:-{period_ms_default}}}"',
+            f'EVAL_TIME="${{EVAL_TIME:-{eval_time_default}}}"',
+            "",
+            "# allow runtime overrides via script options",
+            'while [[ $# -gt 0 ]]; do',
+            '  case "$1" in',
+            '    --payload-size|-s)',
+            '      PAYLOAD_SIZE="$2"; shift 2;;',
+            '    --period-ms|-p)',
+            '      PERIOD_MS="$2"; shift 2;;',
+            '    --eval-time|-t)',
+            '      EVAL_TIME="$2"; shift 2;;',
+            '    --)',
+            '      shift; break;;',
+            '    *)',
+            '      echo "Unknown option: $1" >&2; exit 2;;',
+            '  esac',
+            'done',
             "",
             'LOG_DIR="${LOG_DIR:?LOG_DIR is required. Use host*_run.sh or local_run.sh}"',
             'mkdir -p "$LOG_DIR"',
@@ -208,30 +236,30 @@ def _append_host_script_prelude(lines, host_name, rmw):
     )
 
 
-def _append_publisher_block(lines, node_name, pub_list, period_ms, eval_time, qos_opts):
+def _append_publisher_block(lines, node_name, pub_list, qos_opts):
     topic_names = ",".join(p["topic_name"] for p in pub_list)
     lines.extend(
         [
             f"# {node_name} publisher",
             "( ros2 run ros2_perf_multihost_nodes publisher_node \\",
-            f"  --node_name {node_name} --topic_names {topic_names} \\",
-            f"  -s \"$PAYLOAD_SIZE\" -p {period_ms} --eval_time {eval_time} \\",
-            f"  {qos_opts} --log_dir \"$LOG_DIR\" \\",
+            f"  --node-name {node_name} --topic-names {topic_names} \\",
+            "  -s \"$PAYLOAD_SIZE\" -p \"$PERIOD_MS\" --eval-time \"$EVAL_TIME\" \\",
+            f"  {qos_opts} --log-dir \"$LOG_DIR\" \\",
             ") & node_pids+=($!)",
             f'echo "Started {node_name} publisher at $(date +%Y-%m-%dT%H:%M:%S.%3N%z)"',
         ]
     )
 
 
-def _append_subscriber_block(lines, node_name, sub_list, eval_time, qos_opts):
+def _append_subscriber_block(lines, node_name, sub_list, qos_opts):
     topic_names = ",".join(s["topic_name"] for s in sub_list)
     lines.extend(
         [
             f"# {node_name} subscriber",
             "( ros2 run ros2_perf_multihost_nodes subscriber_node \\",
-            f"  --node_name {node_name} --topic_names {topic_names} \\",
-            f"  --eval_time {eval_time} \\",
-            f"  {qos_opts} --log_dir \"$LOG_DIR\" \\",
+            f"  --node-name {node_name} --topic-names {topic_names} \\",
+            "  --eval-time \"$EVAL_TIME\" \\",
+            f"  {qos_opts} --log-dir \"$LOG_DIR\" \\",
             ") & node_pids+=($!)",
             f'echo "Started {node_name} subscriber at $(date +%Y-%m-%dT%H:%M:%S.%3N%z)"',
         ]
@@ -274,16 +302,16 @@ def _collect_intermediate_topic_names(intermediate_entries):
     return pub_topics, sub_topics
 
 
-def _append_intermediate_block(lines, node_name, pub_topics, sub_topics, period_ms, eval_time, qos_opts):
+def _append_intermediate_block(lines, node_name, pub_topics, sub_topics, qos_opts):
     topic_names_pub = ",".join(pub_topics)
     topic_names_sub = ",".join(sub_topics)
     lines.extend(
         [
             f"# {node_name} intermediate",
             "( ros2 run ros2_perf_multihost_nodes intermediate_node \\",
-            f"  --node_name {node_name} --topic_names_pub {topic_names_pub} --topic_names_sub {topic_names_sub} \\",
-            f"  -s \"$PAYLOAD_SIZE\" -p {period_ms} --eval_time {eval_time} \\",
-            f"  {qos_opts} --log_dir \"$LOG_DIR\" \\",
+            f"  --node-name {node_name} --topic-names-pub {topic_names_pub} --topic-names-sub {topic_names_sub} \\",
+            "  -s \"$PAYLOAD_SIZE\" -p \"$PERIOD_MS\" --eval-time \"$EVAL_TIME\" \\",
+            f"  {qos_opts} --log-dir \"$LOG_DIR\" \\",
             ") & node_pids+=($!)",
             f'echo "Started {node_name} intermediate at $(date +%Y-%m-%dT%H:%M:%S.%3N%z)"',
         ]
@@ -310,16 +338,17 @@ def generate_exec_scripts(json_content, rmw, output_dir):
     """各ホスト用のコンテナ内実行スクリプトを生成する"""
     os.makedirs(output_dir, exist_ok=True)
 
-    eval_time = json_content.get("eval_time", 60)
-    period_ms = json_content.get("period_ms", 100)
+    payload_size_default = DEFAULT_PAYLOAD_SIZE
+    period_ms_default = DEFAULT_PERIOD_MS
+    eval_time_default = DEFAULT_EVAL_TIME
 
     qos_config = json_content.get("qos", {})
     qos_history = qos_config.get("history", "KEEP_LAST")
     qos_depth = qos_config.get("depth", 1)
     qos_reliability = qos_config.get("reliability", "RELIABLE")
     qos_opts = (
-        f"--qos_history {qos_history} --qos_depth {qos_depth} "
-        f"--qos_reliability {qos_reliability}"
+        f"--qos-history {qos_history} --qos-depth {qos_depth} "
+        f"--qos-reliability {qos_reliability}"
     )
 
     for host_dict in json_content["hosts"]:
@@ -327,7 +356,14 @@ def generate_exec_scripts(json_content, rmw, output_dir):
         script_path = os.path.join(output_dir, f"{host_name}_exec.sh")
         lines = []
 
-        _append_host_script_prelude(lines, host_name, rmw)
+        _append_host_script_prelude(
+            lines,
+            host_name,
+            rmw,
+            payload_size_default,
+            period_ms_default,
+            eval_time_default,
+        )
 
         for node in host_dict["nodes"]:
             node_name = node["node_name"]
@@ -336,8 +372,6 @@ def generate_exec_scripts(json_content, rmw, output_dir):
                     lines,
                     node_name,
                     node["publisher"],
-                    period_ms,
-                    eval_time,
                     qos_opts,
                 )
             if node.get("subscriber"):
@@ -345,7 +379,6 @@ def generate_exec_scripts(json_content, rmw, output_dir):
                     lines,
                     node_name,
                     node["subscriber"],
-                    eval_time,
                     qos_opts,
                 )
             if "intermediate" in node:
@@ -360,8 +393,6 @@ def generate_exec_scripts(json_content, rmw, output_dir):
                     node_name,
                     pub_topics,
                     sub_topics,
-                    period_ms,
-                    eval_time,
                     qos_opts,
                 )
 
@@ -379,6 +410,9 @@ def _append_common_service(
     rmw,
     project_root,
     output_dir,
+    payload_size_default,
+    period_ms_default,
+    eval_time_default,
     depends_on_zenohd=False,
 ):
     lines.append(f"  {service_name}:")
@@ -405,7 +439,10 @@ def _append_common_service(
         lines.append("      - RMW_IMPLEMENTATION=rmw_fastrtps_cpp")
     elif rmw == "cyclonedds":
         lines.append("      - RMW_IMPLEMENTATION=rmw_cyclonedds_cpp")
-    lines.append("      - PAYLOAD_SIZE=${PAYLOAD_SIZE:-64}")
+    lines.append(
+        f"      - PAYLOAD_SIZE=${{PAYLOAD_SIZE:-{payload_size_default}}}")
+    lines.append(f"      - PERIOD_MS=${{PERIOD_MS:-{period_ms_default}}}")
+    lines.append(f"      - EVAL_TIME=${{EVAL_TIME:-{eval_time_default}}}")
     lines.append("      - LOG_DIR=${LOG_DIR:-}")
     if depends_on_zenohd and rmw == "zenoh":
         lines.append("    depends_on:")
@@ -449,6 +486,9 @@ def _append_zenohd_service(lines, project_root, output_dir):
 
 def generate_compose(json_content, rmw, output_dir, project_root):
     """開発PC検証用に、全ホストを含む local_compose.yaml を生成する"""
+    payload_size_default = DEFAULT_PAYLOAD_SIZE
+    period_ms_default = DEFAULT_PERIOD_MS
+    eval_time_default = DEFAULT_EVAL_TIME
     lines = ["services:"]
 
     for host_dict in json_content["hosts"]:
@@ -461,6 +501,9 @@ def generate_compose(json_content, rmw, output_dir, project_root):
             rmw,
             project_root,
             output_dir,
+            payload_size_default,
+            period_ms_default,
+            eval_time_default,
             depends_on_zenohd=(rmw == "zenoh"),
         )
 
@@ -474,6 +517,9 @@ def generate_compose(json_content, rmw, output_dir, project_root):
 
 def generate_compose_per_host(json_content, rmw, output_dir, project_root):
     """実運用向けに、ホストごとの host*_compose.yaml を生成する"""
+    payload_size_default = DEFAULT_PAYLOAD_SIZE
+    period_ms_default = DEFAULT_PERIOD_MS
+    eval_time_default = DEFAULT_EVAL_TIME
     for host_dict in json_content["hosts"]:
         host_name = host_dict["host_name"]
         lines = ["services:"]
@@ -484,6 +530,9 @@ def generate_compose_per_host(json_content, rmw, output_dir, project_root):
             rmw,
             project_root,
             output_dir,
+            payload_size_default,
+            period_ms_default,
+            eval_time_default,
         )
 
         compose_path = os.path.join(output_dir, f"{host_name}_compose.yaml")
@@ -491,7 +540,13 @@ def generate_compose_per_host(json_content, rmw, output_dir, project_root):
             f.write("\n".join(lines) + "\n")
 
 
-def _run_script_common_prefix(lines, rel_root):
+def _run_script_common_prefix(
+    lines,
+    rel_root,
+    payload_size_default,
+    period_ms_default,
+    eval_time_default,
+):
     """runスクリプト共通の前半を追加する"""
     lines.extend(
         [
@@ -505,8 +560,47 @@ def _run_script_common_prefix(lines, rel_root):
             f'PROJECT_ROOT="$(cd "$SCRIPT_DIR/{rel_root}" && pwd)"',
             'LOCAL_UID="${LOCAL_UID:-$(id -u)}"',
             'LOCAL_GID="${LOCAL_GID:-$(id -g)}"',
-            'PAYLOAD_SIZE="${PAYLOAD_SIZE:-64}"',
+            f'PAYLOAD_SIZE="${{PAYLOAD_SIZE:-{payload_size_default}}}"',
+            f'PERIOD_MS="${{PERIOD_MS:-{period_ms_default}}}"',
+            f'EVAL_TIME="${{EVAL_TIME:-{eval_time_default}}}"',
             'RUN_IDX="${RUN_IDX:-1}"',
+            "",
+            'print_help() {',
+            '  cat <<EOF',
+            'Usage: $(basename "$0") [OPTIONS]',
+            '',
+            'Options:',
+            '  -t, --eval-time SEC       Evaluation duration in seconds (default: $EVAL_TIME)',
+            '  -p, --period-ms MS        Publish period in milliseconds (default: $PERIOD_MS)',
+            '  -s, --payload-size BYTES  Payload size in bytes (default: $PAYLOAD_SIZE)',
+            '  -r, --run-idx N           Run index (default: $RUN_IDX)',
+            '  -h, --help                Show this help message and exit',
+            '',
+            'Notes:',
+            '  --eval-time is applied to all nodes started via this script.',
+            '  --period-ms and --payload-size are applied to Publisher/Intermediate nodes only.',
+            'EOF',
+            '}',
+            "",
+            "# allow runtime overrides via script options",
+            'while [[ $# -gt 0 ]]; do',
+            '  case "$1" in',
+            '    --eval-time|-t)',
+            '      EVAL_TIME="$2"; shift 2;;',
+            '    --period-ms|-p)',
+            '      PERIOD_MS="$2"; shift 2;;',
+            '    --payload-size|-s)',
+            '      PAYLOAD_SIZE="$2"; shift 2;;',
+            '    --run-idx|-r)',
+            '      RUN_IDX="$2"; shift 2;;',
+            '    --help|-h)',
+            '      print_help; exit 0;;',
+            '    --)',
+            '      shift; break;;',
+            '    *)',
+            '      echo "Unknown option: $1" >&2; exit 2;;',
+            '  esac',
+            'done',
             'RESULTS_HOST_DIR="$RUN_ROOT_DIR/results"',
             'mkdir -p "$RESULTS_HOST_DIR"',
             'RUN_TIMESTAMP="${RUN_TIMESTAMP:-$(date +%Y-%d-%m_%H-%M-%S)}"',
@@ -522,6 +616,7 @@ def _run_script_common_prefix(lines, rel_root):
             "",
             'echo "Running containers as uid:gid $LOCAL_UID:$LOCAL_GID"',
             'echo "LOG_DIR (in container): $LOG_DIR"',
+            'echo "PAYLOAD_SIZE=$PAYLOAD_SIZE PERIOD_MS=$PERIOD_MS EVAL_TIME=$EVAL_TIME"',
             "",
         ]
     )
@@ -530,12 +625,21 @@ def _run_script_common_prefix(lines, rel_root):
 def generate_host_run_scripts(json_content, output_dir, project_root):
     """host*_run.sh: 各ホスト用composeを起動するラッパスクリプトを生成する"""
     rel_root = os.path.relpath(project_root, output_dir)
+    payload_size_default = DEFAULT_PAYLOAD_SIZE
+    period_ms_default = DEFAULT_PERIOD_MS
+    eval_time_default = DEFAULT_EVAL_TIME
     for host_dict in json_content["hosts"]:
         host_name = host_dict["host_name"]
         script_path = os.path.join(output_dir, f"{host_name}_run.sh")
         compose_file = f"$SCRIPT_DIR/{host_name}_compose.yaml"
         lines = []
-        _run_script_common_prefix(lines, rel_root)
+        _run_script_common_prefix(
+            lines,
+            rel_root,
+            payload_size_default,
+            period_ms_default,
+            eval_time_default,
+        )
         lines.extend(
             [
                 f'COMPOSE_FILE="{compose_file}"',
@@ -543,11 +647,13 @@ def generate_host_run_scripts(json_content, output_dir, project_root):
                 'echo "Cleaning up previous containers (including orphans)..."',
                 (
                     f'LOCAL_UID="$LOCAL_UID" LOCAL_GID="$LOCAL_GID" '
+                    'PAYLOAD_SIZE="$PAYLOAD_SIZE" PERIOD_MS="$PERIOD_MS" EVAL_TIME="$EVAL_TIME" '
                     'LOG_DIR="$LOG_DIR" '
                     'docker compose -f "$COMPOSE_FILE" down --remove-orphans >/dev/null 2>&1 || true'
                 ),
                 (
                     f'LOCAL_UID="$LOCAL_UID" LOCAL_GID="$LOCAL_GID" '
+                    'PAYLOAD_SIZE="$PAYLOAD_SIZE" PERIOD_MS="$PERIOD_MS" EVAL_TIME="$EVAL_TIME" '
                     'LOG_DIR="$LOG_DIR" '
                     f'docker compose -f "$COMPOSE_FILE" up service_{host_name}'
                 ),
@@ -568,7 +674,13 @@ def generate_local_run_script(json_content, rmw, output_dir, project_root):
 
     script_path = os.path.join(output_dir, "local_run.sh")
     lines = []
-    _run_script_common_prefix(lines, rel_root)
+    _run_script_common_prefix(
+        lines,
+        rel_root,
+        DEFAULT_PAYLOAD_SIZE,
+        DEFAULT_PERIOD_MS,
+        DEFAULT_EVAL_TIME,
+    )
     lines.extend(
         [
             'COMPOSE_FILE="$SCRIPT_DIR/local_compose.yaml"',
@@ -576,6 +688,7 @@ def generate_local_run_script(json_content, rmw, output_dir, project_root):
             'echo "Cleaning up previous containers (including orphans)..."',
             (
                 'LOCAL_UID="$LOCAL_UID" LOCAL_GID="$LOCAL_GID" '
+                'PAYLOAD_SIZE="$PAYLOAD_SIZE" PERIOD_MS="$PERIOD_MS" EVAL_TIME="$EVAL_TIME" '
                 'LOG_DIR="$LOG_DIR" '
                 'docker compose -f "$COMPOSE_FILE" down --remove-orphans >/dev/null 2>&1 || true'
             ),
@@ -589,6 +702,7 @@ def generate_local_run_script(json_content, rmw, output_dir, project_root):
                 'echo "[1/3] Starting service_zenohd..."',
                 (
                     'LOCAL_UID="$LOCAL_UID" LOCAL_GID="$LOCAL_GID" '
+                    'PAYLOAD_SIZE="$PAYLOAD_SIZE" PERIOD_MS="$PERIOD_MS" EVAL_TIME="$EVAL_TIME" '
                     'LOG_DIR="$LOG_DIR" '
                     'docker compose -f "$COMPOSE_FILE" up -d service_zenohd'
                 ),
@@ -600,6 +714,7 @@ def generate_local_run_script(json_content, rmw, output_dir, project_root):
                 "status=0",
                 (
                     'LOCAL_UID="$LOCAL_UID" LOCAL_GID="$LOCAL_GID" '
+                    'PAYLOAD_SIZE="$PAYLOAD_SIZE" PERIOD_MS="$PERIOD_MS" EVAL_TIME="$EVAL_TIME" '
                     'LOG_DIR="$LOG_DIR" '
                     f'docker compose -f "$COMPOSE_FILE" up {host_services} || status=$?'
                 ),
@@ -607,6 +722,7 @@ def generate_local_run_script(json_content, rmw, output_dir, project_root):
                 'echo "Stopping service_zenohd..."',
                 (
                     'LOCAL_UID="$LOCAL_UID" LOCAL_GID="$LOCAL_GID" '
+                    'PAYLOAD_SIZE="$PAYLOAD_SIZE" PERIOD_MS="$PERIOD_MS" EVAL_TIME="$EVAL_TIME" '
                     'LOG_DIR="$LOG_DIR" '
                     'docker compose -f "$COMPOSE_FILE" stop service_zenohd >/dev/null 2>&1 || true'
                 ),
@@ -622,6 +738,7 @@ def generate_local_run_script(json_content, rmw, output_dir, project_root):
                 f'echo "Starting all services: {host_services}"',
                 (
                     'LOCAL_UID="$LOCAL_UID" LOCAL_GID="$LOCAL_GID" '
+                    'PAYLOAD_SIZE="$PAYLOAD_SIZE" PERIOD_MS="$PERIOD_MS" EVAL_TIME="$EVAL_TIME" '
                     'LOG_DIR="$LOG_DIR" '
                     f'docker compose -f "$COMPOSE_FILE" up {host_services}'
                 ),
@@ -700,7 +817,6 @@ def generate_metadata_file(
     node_count = len(all_nodes)
 
     qos = json_content.get("qos", {})
-
     timestamp = datetime.now().strftime("%Y-%d-%m_%H-%M-%S")
     sections = [
         [
@@ -715,8 +831,6 @@ def generate_metadata_file(
         [
             "# --- 2. test config ---",
             f"rmw: {rmw}",
-            f"eval_time: {json_content.get('eval_time', 60)}",
-            f"period_ms: {json_content.get('period_ms', 100)}",
             f"qos_history: {qos.get('history', 'KEEP_LAST')}",
             f"qos_depth: {qos.get('depth', 1)}",
             f"qos_reliability: {qos.get('reliability', 'RELIABLE')}",
@@ -753,6 +867,7 @@ if __name__ == "__main__":
         help=f"Base directory for generated artifacts (default: {DEFAULT_PERF_WS_DIR})",
     )
     parser.add_argument(
+        "-f",
         "--force",
         action="store_true",
         help="Overwrite existing output directory without confirmation",
