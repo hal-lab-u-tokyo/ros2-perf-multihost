@@ -117,16 +117,18 @@ def resolve_output_paths(json_path, rmw, ws_dir, force=False):
     run_dir = os.path.join(perf_ws_dir, scenario_dir)
     output_dir = os.path.join(run_dir, "exec_scripts")
 
-    if os.path.isdir(output_dir):
+    overwrite = os.path.isdir(output_dir)
+    if overwrite:
         existing_json_path = _read_existing_json_path(run_dir)
-        if not _confirm_overwrite(output_dir, force=force, existing_json_path=existing_json_path, new_json_path=json_path):
+        if not _confirm_overwrite(
+            output_dir,
+            force=force,
+            existing_json_path=existing_json_path,
+            new_json_path=json_path,
+        ):
             raise SystemExit("Canceled by user. No files were generated.")
-        _clear_directory_contents(output_dir)
-    else:
-        os.makedirs(output_dir, exist_ok=True)
 
-    _update_latest_symlink(perf_ws_dir, scenario_dir)
-    return project_root, output_dir, scenario_dir
+    return project_root, output_dir, scenario_dir, overwrite
 
 
 def _rmw_env_lines(rmw):
@@ -723,18 +725,40 @@ if __name__ == "__main__":
 
     PERF_WS_DIR = args.ws_dir
 
-    project_root, output_dir, scenario_dir = resolve_output_paths(
+    project_root, output_dir, scenario_dir, overwrite = resolve_output_paths(
         args.json_path, args.rmw, args.ws_dir, force=args.force
     )
 
     with open(args.json_path, "r") as f:
         json_content = json.load(f)
 
-    generate_exec_scripts(json_content, args.rmw, output_dir)
-    generate_compose(json_content, args.rmw, output_dir, project_root)
-    generate_compose_per_host(json_content, args.rmw, output_dir, project_root)
-    generate_host_run_scripts(json_content, output_dir, project_root)
-    generate_local_run_script(json_content, args.rmw, output_dir, project_root)
+    # 一時ディレクトリに生成してから成功後にスワップする
+    tmp_dir = output_dir + ".tmp"
+    if os.path.exists(tmp_dir):
+        shutil.rmtree(tmp_dir)
+    os.makedirs(tmp_dir)
+
+    try:
+        generate_exec_scripts(json_content, args.rmw, tmp_dir)
+        generate_compose(json_content, args.rmw, tmp_dir, project_root)
+        generate_compose_per_host(
+            json_content, args.rmw, tmp_dir, project_root)
+        generate_host_run_scripts(json_content, tmp_dir, project_root)
+        generate_local_run_script(
+            json_content, args.rmw, tmp_dir, project_root)
+
+        # 生成成功 → 既存と swap
+        if overwrite:
+            _clear_directory_contents(output_dir)
+            shutil.rmtree(output_dir)
+        os.rename(tmp_dir, output_dir)
+    except Exception:
+        shutil.rmtree(tmp_dir, ignore_errors=True)
+        raise
+
+    perf_ws_dir = os.path.join(project_root, PERF_WS_DIR)
+    _update_latest_symlink(perf_ws_dir, scenario_dir)
+
     generate_metadata_file(
         json_content,
         args.json_path,
