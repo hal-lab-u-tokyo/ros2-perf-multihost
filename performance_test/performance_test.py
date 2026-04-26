@@ -474,7 +474,7 @@ if __name__ == "__main__":
     # performance_test -> ros2-perf-multihost
     repo_root = os.path.dirname(script_dir)
     start_exec_scripts_py = os.path.join(
-        repo_root, "manager_scripts", "start_exec_scripts.py")
+        repo_root, "remote_hosts_scripts", "start_exec_scripts.py")
     prefix = "docker" if args.exec_policy == "docker" else "raw"
 
     # Resolve actual host list from metadata (metadata.txt is authoritative)

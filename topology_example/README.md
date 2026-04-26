@@ -2,7 +2,7 @@
 
 このディレクトリの JSON は、以下の自動生成スクリプトで実行スクリプトへ変換されます。
 
-- parse_json/generate_exec_scripts.py
+- manager_scripts/generate_exec_scripts.py
 
 ## 1. ルートキー
 
