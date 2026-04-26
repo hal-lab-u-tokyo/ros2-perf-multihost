@@ -102,6 +102,6 @@ with open(out_csv, "w", newline="") as f:
 
         except Exception as e:
             print(f"Error in monitoring loop: {e}", file=sys.stderr)
-            # エラーが発生してもループを継続
+            # Keep the monitoring loop running even if one iteration fails.
 
         time.sleep(interval)

@@ -88,7 +88,7 @@ def _resolve_host_script(exec_dir, hosts, suffix):
         if os.path.isfile(script_path):
             return cand, script_path
 
-    # metadata の host 名が FQDN などで微妙に異なる場合のフォールバック
+    # Fallback for cases where metadata host names differ slightly, for example by FQDN.
     base = candidates[-1]
     for host in hosts:
         if host == base or host.startswith(base) or base.startswith(host):

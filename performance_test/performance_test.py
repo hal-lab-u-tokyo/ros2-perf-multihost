@@ -11,30 +11,30 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(
         description="Run performance tests using run.sh defaults")
     parser.add_argument("--trials", type=int, default=3,
-                        help="試行回数 (デフォルト: 3)")
+                        help="Number of trials (default: 3)")
     parser.add_argument("--payload-size", type=int, default=None,
-                        help="ペイロードサイズ (バイト、未指定の場合は run.sh のデフォルト: 64)")
+                        help="Payload size in bytes; if omitted, use the run.sh default (64)")
     parser.add_argument("--period-ms", type=int, default=None,
-                        help="測定間隔 (ミリ秒、未指定の場合は run.sh のデフォルト: 100)")
+                        help="Measurement interval in milliseconds; if omitted, use the run.sh default (100)")
     parser.add_argument("--eval-time", type=int, default=None,
-                        help="評価時間 (秒、未指定の場合は run.sh のデフォルト: 60)")
+                        help="Evaluation duration in seconds; if omitted, use the run.sh default (60)")
     parser.add_argument(
         "--exec-policy",
         choices=["docker", "native"],
         default="docker",
-        help="実行方式を指定 (デフォルト: docker)",
+        help="Execution mode (default: docker)",
     )
     parser.add_argument(
         "--ws-dir",
         type=str,
         default="performance_ws",
-        help="ワークスペースディレクトリ (デフォルト: performance_ws)",
+        help="Workspace directory (default: performance_ws)",
     )
     parser.add_argument(
         "--scenario",
         type=str,
         default="latest",
-        help="シナリオディレクトリ名 (デフォルト: latest)",
+        help="Scenario directory name (default: latest)",
     )
     args = parser.parse_args()
 

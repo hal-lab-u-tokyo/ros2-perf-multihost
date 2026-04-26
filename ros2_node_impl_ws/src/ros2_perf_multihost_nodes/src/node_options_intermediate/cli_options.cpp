@@ -11,7 +11,7 @@
 
 namespace node_options {
 
-// デフォルト値
+// Default values
 Options::Options() {
   eval_time = 60;
   log_dir = "";
@@ -20,10 +20,10 @@ Options::Options() {
   qos_reliability = "RELIABLE";
 }
 
-// コンストラクタ
+// Constructor
 Options::Options(int argc, char** argv) : Options() { parse(argc, argv); }
 
-// 受け取ったコマンドライン引数をもとに、option変数を更新
+// Update option fields from the provided command-line arguments.
 void Options::parse(int argc, char** argv) {
   constexpr int kDefaultPayloadSize = 64;
   constexpr int kDefaultPeriodMs = 100;
@@ -148,7 +148,7 @@ void Options::parse(int argc, char** argv) {
   }
 }
 
-// コマンドラインでの表示を見やすくするためのオーバーロード処理
+// Overload for a readable command-line summary.
 std::ostream& operator<<(std::ostream& os, const Options& options) {
   os << "Node Name: " << options.node_name << std::endl;
   os << "Evaluation time: " << options.eval_time << "s" << std::endl;

@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 set -eo pipefail
 
-# 設定
-# TODO: 必要に応じて編集
+# Configuration
+# TODO: adjust as needed for your environment
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
 CONFIG_DEFAULT="${REPO_ROOT}/ros2_node_impl_ws/zenoh_config/DEFAULT_RMW_ZENOH_ROUTER_CONFIG.json5"
@@ -14,16 +14,16 @@ PORT="${ZENOH_PORT:-7447}"
 
 usage() {
     echo "Usage: $0 {start|foreground|stop|status|wait}"
-    echo "  start       : 背景起動 (nohup)・PID/ログ管理"
-    echo "  foreground  : 前景起動 (CTRL-Cで停止)"
-    echo "  stop        : PID/プロセスを停止"
-    echo "  status      : プロセス/ポートの状態表示"
-    echo "  wait        : ポート${PORT}がLISTENになるまで待機"
+    echo "  start       : start in the background with nohup, PID, and log management"
+    echo "  foreground  : start in the foreground and stop with CTRL-C"
+    echo "  stop        : stop the router process using the PID if available"
+    echo "  status      : show process and listening port status"
+    echo "  wait        : wait until port ${PORT} starts listening"
     echo "Env: ZENOH_ROUTER_CONFIG_URI, RUST_LOG, ZENOH_PORT"
 }
 
 ensure_env() {
-    # ROS 2環境を可能なら読み込み
+    # Load the ROS 2 environment when available.
     if [ -f "/opt/ros/jazzy/setup.bash" ]; then
         source /opt/ros/jazzy/setup.bash
     fi
@@ -35,7 +35,7 @@ ensure_env() {
 start_bg() {
     ensure_env
     mkdir -p "$LOG_DIR"
-    # 既存のrmw_zenohdがあれば止める
+    # Stop an existing rmw_zenohd process before starting a new one.
     if pgrep -x rmw_zenohd >/dev/null 2>&1; then
         echo "Existing rmw_zenohd found — killing it"
         pkill -x rmw_zenohd || true

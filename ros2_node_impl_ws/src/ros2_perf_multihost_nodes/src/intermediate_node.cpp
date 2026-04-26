@@ -26,11 +26,11 @@ struct MessageLog {
   rclcpp::Time time_stamp;
 };
 
-// コマンドラインオプション
-static node_options::Options parse_options(int argc, char **argv) {
+// Command-line option parsing
+static node_options::Options parse_options(int argc, char** argv) {
   auto non_ros_args = rclcpp::remove_ros_arguments(argc, argv);
-  std::vector<char *> non_ros_args_c_strings;
-  for (auto &arg : non_ros_args) {
+  std::vector<char*> non_ros_args_c_strings;
+  for (auto& arg : non_ros_args) {
     non_ros_args_c_strings.push_back(&arg.front());
   }
   int non_ros_argc = static_cast<int>(non_ros_args_c_strings.size());
@@ -40,7 +40,7 @@ static node_options::Options parse_options(int argc, char **argv) {
   return options;
 }
 
-static void create_result_directory(const node_options::Options &options) {
+static void create_result_directory(const node_options::Options& options) {
   if (options.log_dir.empty()) {
     return;
   }
@@ -70,7 +70,7 @@ static void create_result_directory(const node_options::Options &options) {
     ss.clear();
   }
 
-  for (const auto &file_path : log_file_paths) {
+  for (const auto& file_path : log_file_paths) {
     std::ofstream ofs(file_path);
     if (ofs) {
       std::cout << "Log file created: " << file_path << std::endl;
@@ -83,7 +83,7 @@ static void create_result_directory(const node_options::Options &options) {
 
 class Intermediate : public rclcpp::Node {
  public:
-  explicit Intermediate(const node_options::Options &options)
+  explicit Intermediate(const node_options::Options& options)
       : Node(options.node_name) {
     node_name = options.node_name;
     if (options.log_dir.empty()) {
@@ -96,7 +96,7 @@ class Intermediate : public rclcpp::Node {
     }
     create_metadata_file(options);
 
-    // Qos設定
+    // QoS configuration
     rclcpp::QoS qos = rclcpp::QoS(rclcpp::KeepLast(1));
 
     if (options.qos_history == "KEEP_LAST") {
@@ -110,9 +110,9 @@ class Intermediate : public rclcpp::Node {
       qos.best_effort();
     }
 
-    // まずはPub
+    // Set up publishers first.
     for (size_t i = 0; i < options.topic_names_pub.size(); ++i) {
-      const std::string &topic_name = options.topic_names_pub[i];
+      const std::string& topic_name = options.topic_names_pub[i];
       int payload_size = options.payload_size[i];
       int period_ms = options.period_ms[i];
 
@@ -187,13 +187,13 @@ class Intermediate : public rclcpp::Node {
       //   shutdown_node); shutdown_timers_.emplace(topic_name, shutdown_timer);
       // }
 
-      // 単独なら、通常通りtimerでpub
+      // If this topic is publish-only, use the regular timer-based publisher.
       if (std::find(options.topic_names_sub.begin(),
                     options.topic_names_sub.end(),
                     topic_name) == options.topic_names_sub.end()) {
         auto publish_message = [this, topic_name, payload_size,
                                 eval_time = options.eval_time]() -> void {
-          // 購読者がいない間は送信しない
+          // Do not publish until at least one subscriber is connected.
           if (publishers_[topic_name]->get_subscription_count() == 0) {
             return;
           }
@@ -261,7 +261,8 @@ class Intermediate : public rclcpp::Node {
             std::chrono::seconds(options.eval_time + 10), shutdown_node);
         shutdown_timers_.emplace(topic_name, shutdown_timer);
       }
-      // 兼任なら、timerでのpubはせずsubからのcallbackを待つ
+      // If this topic is both subscribed and published, wait for the subscriber
+      // callback instead of a timer.
       else {
         auto publisher =
             create_publisher<ros2_perf_multihost_nodes::msg::IntMessage>(
@@ -279,9 +280,9 @@ class Intermediate : public rclcpp::Node {
       }
     }
 
-    // Subscriberの宣言
+    // Set up subscribers.
     for (size_t i = 0; i < options.topic_names_sub.size(); ++i) {
-      const std::string &topic_name = options.topic_names_sub[i];
+      const std::string& topic_name = options.topic_names_sub[i];
       start_time_sub_[topic_name] = this->get_clock()->now();
       end_time_sub_[topic_name] =
           start_time_sub_[topic_name] +
@@ -293,7 +294,7 @@ class Intermediate : public rclcpp::Node {
       //     message_) -> void
       //   {
       //     if (message_->header.node_name == self_node) {
-      //       return; // 自ノードの送信は記録しない
+      //       return; // Ignore messages published by this node itself.
       //     }
 
       //     auto sub_time = this->get_clock()->now();
@@ -332,12 +333,12 @@ class Intermediate : public rclcpp::Node {
       //   create_wall_timer(std::chrono::seconds(options.eval_time + 10),
       //   shutdown_node); shutdown_timers_.emplace(topic_name, shutdown_timer);
       // }
-      // `callback`を事前に宣言
+      // Declare `callback` ahead of the two branching cases.
       std::function<void(
           const ros2_perf_multihost_nodes::msg::IntMessage::SharedPtr)>
           callback;
 
-      // 単独なら
+      // If this topic is subscribe-only.
       if (std::find(options.topic_names_pub.begin(),
                     options.topic_names_pub.end(),
                     topic_name) == options.topic_names_pub.end()) {
@@ -385,7 +386,7 @@ class Intermediate : public rclcpp::Node {
             std::chrono::seconds(options.eval_time + 10), shutdown_node);
         shutdown_timers_.emplace(topic_name, shutdown_timer);
       }
-      // 兼任なら
+      // If this topic is both subscribed and published.
       else {
         auto callback =
             [this, topic_name, self_node = node_name,
@@ -440,7 +441,7 @@ class Intermediate : public rclcpp::Node {
             end_time_pub_[topic_name] = this->get_clock()->now();
             return;
           }
-          for (const auto &byte : message_->data) {
+          for (const auto& byte : message_->data) {
             oss << std::hex << (int)byte << " ";
           }
           oss << std::dec << "Time: " << std::fixed << std::setprecision(9)
@@ -496,7 +497,7 @@ class Intermediate : public rclcpp::Node {
   std::unordered_map<std::string, rclcpp::Time> end_time_pub_;
   std::unordered_map<std::string, rclcpp::Time> end_time_sub_;
 
-  void create_metadata_file(const node_options::Options &options) {
+  void create_metadata_file(const node_options::Options& options) {
     if (log_dir.empty()) {
       return;
     }
@@ -523,22 +524,22 @@ class Intermediate : public rclcpp::Node {
     file << "Name: " << options.node_name << "\n";
     file << "NodeType: " << "Intermediate" << "\n";
     file << "Topics(Pub): ";
-    for (const std::string &topic_name : options.topic_names_pub) {
+    for (const std::string& topic_name : options.topic_names_pub) {
       file << topic_name << ",";
     }
     file << "\n";
     file << "PayloadSize: ";
-    for (const int &payload_size : options.payload_size) {
+    for (const int& payload_size : options.payload_size) {
       file << payload_size << ",";
     }
     file << "\n";
     file << "Period: ";
-    for (const int &period_ms : options.period_ms) {
+    for (const int& period_ms : options.period_ms) {
       file << period_ms << ",";
     }
     file << "\n";
     file << "Topics(Sub): ";
-    for (const std::string &topic_name : options.topic_names_sub) {
+    for (const std::string& topic_name : options.topic_names_sub) {
       file << topic_name << ",";
     }
 
@@ -547,34 +548,34 @@ class Intermediate : public rclcpp::Node {
                 p.string().c_str());
   }
 
-  // ログ記録用
+  // Storage for recorded logs
   std::string node_name;
   std::string log_dir;
   std::map<std::string, std::vector<MessageLog>> message_logs_pub_;
   std::map<std::string, std::vector<MessageLog>> message_logs_sub_;
 
-  void record_log_pub_(const std::string &topic_name,
-                       const std::string &pub_node_name,
-                       const uint32_t &message_idx,
-                       const rclcpp::Time &time_stamp) {
+  void record_log_pub_(const std::string& topic_name,
+                       const std::string& pub_node_name,
+                       const uint32_t& message_idx,
+                       const rclcpp::Time& time_stamp) {
     MessageLog log = {pub_node_name, message_idx, time_stamp};
     message_logs_pub_[topic_name].emplace_back(log);
   }
-  void record_log_sub_(const std::string &topic_name,
-                       const std::string &pub_node_name,
-                       const uint32_t &message_idx,
-                       const rclcpp::Time &time_stamp) {
+  void record_log_sub_(const std::string& topic_name,
+                       const std::string& pub_node_name,
+                       const uint32_t& message_idx,
+                       const rclcpp::Time& time_stamp) {
     MessageLog log = {pub_node_name, message_idx, time_stamp};
     message_logs_sub_[topic_name].emplace_back(log);
   }
 
   void write_all_logs_pub_(
-      const std::map<std::string, std::vector<MessageLog>> &message_logs_pub_) {
+      const std::map<std::string, std::vector<MessageLog>>& message_logs_pub_) {
     if (log_dir.empty()) {
       return;
     }
 
-    for (const auto &[topic_name, topic_logs] : message_logs_pub_) {
+    for (const auto& [topic_name, topic_logs] : message_logs_pub_) {
       std::filesystem::path p = std::filesystem::path(log_dir) /
                                 (node_name + "_log") /
                                 (topic_name + "_pub_log.txt");
@@ -600,7 +601,7 @@ class Intermediate : public rclcpp::Node {
            << "\n";
       file << "EndTime: " << end_time_pub_[topic_name].nanoseconds() << "\n";
 
-      for (const auto &log : topic_logs) {
+      for (const auto& log : topic_logs) {
         file << "Pub Node_Name: " << log.pub_node_name
              << ", Index: " << log.message_idx
              << ", Timestamp: " << log.time_stamp.nanoseconds() << "\n";
@@ -613,12 +614,12 @@ class Intermediate : public rclcpp::Node {
   }
 
   void write_all_logs_sub_(
-      const std::map<std::string, std::vector<MessageLog>> &message_logs_sub_) {
+      const std::map<std::string, std::vector<MessageLog>>& message_logs_sub_) {
     if (log_dir.empty()) {
       return;
     }
 
-    for (const auto &[topic_name, topic_logs] : message_logs_sub_) {
+    for (const auto& [topic_name, topic_logs] : message_logs_sub_) {
       std::filesystem::path p = std::filesystem::path(log_dir) /
                                 (node_name + "_log") /
                                 (topic_name + "_sub_log.txt");
@@ -644,7 +645,7 @@ class Intermediate : public rclcpp::Node {
            << "\n";
       file << "EndTime: " << end_time_sub_[topic_name].nanoseconds() << "\n";
 
-      for (const auto &log : topic_logs) {
+      for (const auto& log : topic_logs) {
         file << "Pub Node_Name: " << log.pub_node_name
              << ", Index: " << log.message_idx
              << ", Timestamp: " << log.time_stamp.nanoseconds() << "\n";
@@ -657,7 +658,7 @@ class Intermediate : public rclcpp::Node {
   }
 };
 
-int main(int argc, char *argv[]) {
+int main(int argc, char* argv[]) {
   auto options = parse_options(argc, argv);
   create_result_directory(options);
   std::cout << options << "\n"
