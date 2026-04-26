@@ -10,9 +10,12 @@ JSONファイルを受け取り、docker/ 配下の共通Dockerfileで起動す�
 """
 
 import argparse
+import hashlib
 import json
 import os
 import shutil
+import sys
+from datetime import datetime
 
 
 # コンテナ内のプロジェクトルートと ROS 2 ワークスペース
@@ -552,6 +555,118 @@ def generate_local_run_script(json_content, rmw, output_dir):
     os.chmod(script_path, 0o755)
 
 
+def _collect_metadata_node_names(json_content):
+    """metadata.txt 用に host / publisher / subscriber / intermediate ノード名とトピック数を収集する"""
+    host_names = []
+    publisher_names = []
+    subscriber_names = []
+    intermediate_names = []
+    topic_names = set()
+
+    for host_dict in json_content["hosts"]:
+        host_names.append(host_dict["host_name"])
+        for node in host_dict.get("nodes", []):
+            node_name = node["node_name"]
+            if node.get("publisher"):
+                publisher_names.append(node_name)
+                for p in node["publisher"]:
+                    topic_names.add(p["topic_name"])
+            if node.get("subscriber"):
+                subscriber_names.append(node_name)
+                for s in node["subscriber"]:
+                    topic_names.add(s["topic_name"])
+            if node.get("intermediate"):
+                intermediate_names.append(node_name)
+                for entry in node["intermediate"]:
+                    for p in entry.get("publisher", []):
+                        topic_names.add(p["topic_name"])
+                    for s in entry.get("subscriber", []):
+                        topic_names.add(s["topic_name"])
+
+    return host_names, publisher_names, subscriber_names, intermediate_names, topic_names
+
+
+def _unique_in_order(items):
+    """順序を保ったまま重複除去する"""
+    return list(dict.fromkeys(items))
+
+
+def generate_metadata_file(
+    json_content, json_path, rmw, ws_dir, project_root, run_dir_name
+):
+    """<ws-dir>/latest/metadata.txt を生成する"""
+    latest_dir = os.path.join(project_root, ws_dir, "latest")
+    metadata_path = os.path.join(latest_dir, "metadata.txt")
+
+    with open(json_path, "rb") as f:
+        json_md5 = hashlib.md5(f.read()).hexdigest()
+
+    (
+        host_names,
+        publisher_names,
+        subscriber_names,
+        intermediate_names,
+        topic_names,
+    ) = _collect_metadata_node_names(json_content)
+    host_names = _unique_in_order(host_names)
+    publisher_names = _unique_in_order(publisher_names)
+    subscriber_names = _unique_in_order(subscriber_names)
+    intermediate_names = _unique_in_order(intermediate_names)
+
+    all_nodes = [
+        node
+        for host in json_content["hosts"]
+        for node in host.get("nodes", [])
+    ]
+    node_count = len(all_nodes)
+
+    qos = json_content.get("qos", {})
+
+    timestamp = datetime.now().strftime("%Y-%d-%m_%H-%M-%S")
+    sections = [
+        [
+            "# --- 1. identification ---",
+            f"timestamp: {timestamp}",
+            f"json: {os.path.basename(json_path)}",
+            f"hash_md5: {json_md5}",
+        ],
+        [
+            "# --- 2. reproducibility ---",
+            f"command: {' '.join(sys.argv)}",
+            f"json_path: {json_path}",
+            f"ws_dir: {ws_dir}",
+            f"run_dir: {run_dir_name}",
+        ],
+        [
+            "# --- 3. test config ---",
+            f"rmw: {rmw}",
+            f"eval_time: {json_content.get('eval_time', 60)}",
+            f"period_ms: {json_content.get('period_ms', 100)}",
+            f"payload_default: 64",
+            f"qos_history: {qos.get('history', 'KEEP_LAST')}",
+            f"qos_depth: {qos.get('depth', 1)}",
+            f"qos_reliability: {qos.get('reliability', 'RELIABLE')}",
+        ],
+        [
+            "# --- 4. topology stats ---",
+            f"host_count: {len(host_names)}",
+            f"node_count: {node_count}",
+            f"publisher_count: {len(publisher_names)}",
+            f"subscriber_count: {len(subscriber_names)}",
+            f"intermediate_count: {len(intermediate_names)}",
+            f"topic_count: {len(topic_names)}",
+            f"hosts: {', '.join(host_names)}",
+            f"publishers: {', '.join(publisher_names)}",
+            f"subscribers: {', '.join(subscriber_names)}",
+            f"intermediates: {', '.join(intermediate_names)}",
+            f"topics: {', '.join(sorted(topic_names))}",
+        ],
+    ]
+
+    with open(metadata_path, "w") as f:
+        f.write("\n\n".join("\n".join(sec) for sec in sections) + "\n")
+
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(
         description="Generate Docker execution scripts and compose files from a JSON topology"
@@ -586,6 +701,14 @@ if __name__ == "__main__":
     generate_compose_per_host(json_content, args.rmw, output_dir, project_root)
     generate_host_run_scripts(json_content, output_dir)
     generate_local_run_script(json_content, args.rmw, output_dir)
+    generate_metadata_file(
+        json_content,
+        args.json_path,
+        args.rmw,
+        args.ws_dir,
+        project_root,
+        run_dir_name,
+    )
 
     print(
         f"Generated host*_run.sh, host*_exec.sh, host*_compose.yaml, local_run.sh, local_compose.yaml"

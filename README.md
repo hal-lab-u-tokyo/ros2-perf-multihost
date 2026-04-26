@@ -129,6 +129,35 @@ python3 parse_json/generate_exec_scripts.py topology_example/simple.json --rmw z
 | `host{N}_exec.sh` | 各ホストのコンテナ内（またはネイティブ）で実行するROSノード起動スクリプト |
 | `local_run.sh` | `local_compose.yaml` を使って全サービスを起動するラッパースクリプト（検証用） |
 | `local_compose.yaml` | 作業PC上で全サービスをまとめて起動するcompose定義（検証用） |
+| `metadata.txt` | 最新実行ディレクトリのメタ情報（入力JSON名、MD5、RMW、トポロジー統計など） |
+
+`metadata.txt` は `<ws-dir>/latest/metadata.txt` に生成され、以下の情報がカテゴリ別に記録されます。
+
+**1. identification** — 識別情報
+- `timestamp`: スクリプト実行日時（`YYYY-DD-MM_hh-mm-ss`）
+- `json`: 入力に指定したJSONファイル名
+- `hash_md5`: JSONファイルのMD5ハッシュ
+
+**2. reproducibility** — 再現性
+- `command`: 実行したコマンド全文
+- `json_path`: 指定したJSONファイルのパス
+- `ws_dir`: 出力ベースディレクトリ
+- `run_dir`: 生成した実行ディレクトリ名
+
+**3. test config** — テスト設定
+- `rmw`: 指定したRMW名
+- `eval_time`: 計測時間（秒）
+- `period_ms`: 送信周期（ms）
+- `payload_default`: デフォルトのペイロードサイズ（バイト）
+- `qos_history` / `qos_depth` / `qos_reliability`: QoS設定
+
+**4. topology stats** — トポロジー統計
+- `host_count` / `node_count`: ホスト数・ノード数
+- `publisher_count` / `subscriber_count` / `intermediate_count`: 役割別ノード数
+- `topic_count`: ユニークトピック数
+- `hosts`: ホスト名一覧（例: `host1, host2`）
+- `publishers` / `subscribers` / `intermediates`: 役割別ノード名一覧
+- `topics`: トピック名一覧（アルファベット順）
 
 `host{N}_run.sh` / `local_run.sh` から起動される各ノードの `--log_dir` は、`exec_scripts/` の1つ上（= 実行ディレクトリ）配下の `results/YYYY-DD-MM_hh-mm-ss/exec_logs/raw_<payload_size>B/run<run_idx>/` になります。`results/latest` は最新ディレクトリへのシンボリックリンクとして更新されます。例: `performance_ws/latest/results/2026-26-04_13-21-45/exec_logs/raw_64B/run1/`。
 
