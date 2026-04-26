@@ -114,7 +114,7 @@ python3 parse_json/generate_exec_scripts.py <topology.json> [--rmw <rmw>] [--ws-
 - `--force`: 既存の出力ディレクトリを確認なしで上書きする（CI・スクリプト実行時に使用）
 
 出力先は `<ws-dir>/<JSONファイル名>-<rmw>/exec_scripts/` です。既に存在する場合は上書き確認を行い、`Yes` のときは `exec_scripts/*` を削除して再生成します。このとき、前回の生成に使ったJSONファイルのパス（`metadata.txt` の `json_path:` フィールド）と今回のパスが異なる場合（同名ファイルを別パスから指定した場合）は、追加の警告メッセージを表示します。stdin が TTY でない場合（CI・パイプ経由など）は確認プロンプトを出さずにエラー終了します。その場合は `--force` を使用してください。`<ws-dir>/latest` は常に最新に生成されたディレクトリへのシンボリックリンクになります。
-`performance_ws/` ディレクトリは自動生成されますが、リポジトリ管理からは `.gitignore` で除外しています。
+デフォルトの `performance_ws/` ディレクトリは自動生成されますが、リポジトリ管理からは `.gitignore` で除外しています。
 
 ```bash
 # 例: zenoh で topology_example を使う場合
@@ -130,7 +130,7 @@ python3 parse_json/generate_exec_scripts.py topology_example/simple.json --rmw z
 | `host{N}_exec.sh` | 各ホストのコンテナ内（またはネイティブ）で実行するROSノード起動スクリプト |
 | `local_run.sh` | `local_compose.yaml` を使って全サービスを起動するラッパースクリプト（検証用） |
 | `local_compose.yaml` | 作業PC上で全サービスをまとめて起動するcompose定義（検証用） |
-| `metadata.txt` | 最新実行ディレクトリのメタ情報（入力JSON名、MD5、RMW、トポロジー統計など） |
+| `metadata.txt` | 最新実行ディレクトリのメタ情報（入力JSON名、RMW、トポロジー統計など） |
 
 `metadata.txt` は `<ws-dir>/latest/metadata.txt` に生成され、以下の情報がカテゴリ別に記録されます。
 
