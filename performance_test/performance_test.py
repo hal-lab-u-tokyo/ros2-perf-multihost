@@ -1,6 +1,7 @@
 import argparse
 from datetime import datetime
 import os
+import shutil
 import sys
 import time
 
@@ -59,7 +60,7 @@ if __name__ == "__main__":
         if os.path.islink(local_latest_link) or os.path.isfile(local_latest_link):
             os.remove(local_latest_link)
         elif os.path.isdir(local_latest_link):
-            os.rmdir(local_latest_link)
+            shutil.rmtree(local_latest_link)
     os.symlink(local_timestamp, local_latest_link)
 
     # Resolve actual host list from metadata (metadata.txt is authoritative)
