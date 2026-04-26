@@ -1,4 +1,11 @@
 {
+  "eval_time": 120,
+  "period_ms": 50,
+  "qos": {
+    "history": "KEEP_ALL",
+    "depth": 10,
+    "reliability": "BEST_EFFORT"
+  },
   "hosts": [
     {
       "host_name": "host1",
