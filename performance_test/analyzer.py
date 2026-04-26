@@ -67,8 +67,18 @@ def aggregate_total_latency(
     log_dir = os.path.join(base_log_dir, latest_dir)
 
     analyzer_script = os.path.join(os.path.dirname(__file__), "all_latency.py")
-    subprocess.run([sys.executable, analyzer_script,
-                   "--logs", log_dir, "--results", run_dir])
+    try:
+        subprocess.run(
+            [sys.executable, analyzer_script, "--logs",
+                log_dir, "--results", run_dir],
+            check=True,
+        )
+    except subprocess.CalledProcessError as exc:
+        raise RuntimeError(
+            f"Failed to analyze latency data with {analyzer_script} "
+            f"for logs at {log_dir} and results at {run_dir} "
+            f"(exit code {exc.returncode})."
+        ) from exc
     print(f"  Saved results to {run_dir}")
 
     rows = []

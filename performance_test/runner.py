@@ -119,7 +119,27 @@ def collect_logs(
 
         for host in hosts:
             print(f"Copying logs from {host} (run{run_idx + 1})")
-            subprocess.run(
-                ["scp", "-r",
-                    f"ubuntu@{host}:{remote_log_dir}/*", run_log_dir + "/"]
-            )
+            try:
+                subprocess.run(
+                    [
+                        "scp",
+                        "-r",
+                        f"ubuntu@{host}:{remote_log_dir}/*",
+                        run_log_dir + "/",
+                    ],
+                    text=True,
+                    capture_output=True,
+                    check=True,
+                )
+            except subprocess.CalledProcessError as exc:
+                print(
+                    f"collect_logs failed for host={host}, "
+                    f"run=run{run_idx + 1}, remote_path={remote_log_dir}, "
+                    f"rc={exc.returncode}",
+                    file=sys.stderr,
+                )
+                if exc.stderr:
+                    print(exc.stderr.strip(), file=sys.stderr)
+                elif exc.stdout:
+                    print(exc.stdout.strip(), file=sys.stderr)
+                raise

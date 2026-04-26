@@ -181,7 +181,6 @@ docker pull ghcr.io/hal-lab-u-tokyo/ros2-perf-multihost:latest
 ssh ubuntu@hostX
 cd ros2-perf-multihost
 python3 remote_hosts_scripts/rest_server.py
-done
 ```
 
 2. ベンチマークスクリプト `performance_test.py` の実行
