@@ -70,19 +70,27 @@ def resolve_host_list(ws_dir, scenario, mode="raw", num_hosts=None):
     return hosts
 
 
-def run_test(run_idx, start_scripts_py, hosts, ws_dir, scenario, payload_size=None, period_ms=None, eval_time=None):
+def run_test(run_idx, start_exec_scripts_py, hosts, ws_dir, scenario, docker=False, payload_size=None, period_ms=None, eval_time=None):
     print(f"=== Run trial={run_idx + 1} ===")
-    # Convert host list to comma-separated string for passing to start_*_scripts.py
+    # Convert host list to comma-separated string for passing to start_exec_scripts.py
     hosts_str = ",".join(hosts)
     cmd = [
         "python3",
-        start_scripts_py,
-        str(run_idx + 1),  # run_idx as 2nd argument
+        start_exec_scripts_py,
+    ]
+
+    # Add --docker flag if Docker mode
+    if docker:
+        cmd.append("--docker")
+
+    # Add remaining positional arguments
+    cmd.extend([
+        str(run_idx + 1),  # run_idx
         str(len(hosts)),   # num_hosts
         ws_dir,
         scenario,
         hosts_str,  # Pass actual host list
-    ]
+    ])
 
     # Build environment with optional test parameters
     env = os.environ.copy()
@@ -447,14 +455,9 @@ if __name__ == "__main__":
     script_dir = os.path.dirname(os.path.abspath(__file__))
     # performance_test -> ros2-perf-multihost
     repo_root = os.path.dirname(script_dir)
-    if args.docker:
-        start_scripts_py = os.path.join(
-            repo_root, "manager_scripts", "start_docker_scripts.py")
-        prefix = "docker"
-    else:
-        start_scripts_py = os.path.join(
-            repo_root, "manager_scripts", "start_scripts.py")
-        prefix = "raw"
+    start_exec_scripts_py = os.path.join(
+        repo_root, "manager_scripts", "start_exec_scripts.py")
+    prefix = "docker" if args.docker else "raw"
 
     # Resolve actual host list from metadata (metadata.txt is authoritative)
     try:
@@ -470,12 +473,15 @@ if __name__ == "__main__":
         print(f"=== Payload size: {payload_size}B ===")
         for run_idx in range(args.trials):
             run_test(
-                payload_size,
                 run_idx,
-                start_scripts_py,
+                start_exec_scripts_py,
                 hosts,
                 args.ws_dir,
                 args.scenario,
+                docker=args.docker,
+                payload_size=payload_size,
+                period_ms=period_ms,
+                eval_time=eval_time,
             )
             time.sleep(10)
         aggregate_total_latency(
