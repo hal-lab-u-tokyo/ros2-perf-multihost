@@ -197,6 +197,7 @@ chmod +x start_all_servers.sh
 2. ベンチマークスクリプト `performance_test.py` の実行
 
 REST サーバ起動後、`performance_test/performance_test.py` を使って、ペイロードサイズ・試行回数・実行環境を指定して測定を行います。
+このスクリプトは内部で `manager_scripts/start_exec_scripts.py` を呼び出し、実行対象ホストは `performance_ws/<scenario>/metadata.txt` の `hosts` から自動解決します。
 
 ```bash
 cd performance_test
@@ -210,12 +211,12 @@ python3 performance_test.py --payload-size 256 --period-ms 50 --eval-time 120
 主な引数:
 
 - `--trials`: 各ペイロードサイズあたりの試行回数
-- `--payload-size`: ペイロードサイズを指定。未指定時は `*_run.sh` / `*_exec.sh` 側の既定値を使います
-- `--period-ms`: Publish 周期を指定。未指定時は `*_run.sh` / `*_exec.sh` 側の既定値を使います
-- `--eval-time`: 計測時間を指定。未指定時は `*_run.sh` / `*_exec.sh` 側の既定値を使います
 - `--exec-policy`: 実行方式を `docker` または `native` から指定（デフォルト: `docker`）
 - `--ws-dir`: 実行スクリプト生成先のベースディレクトリ（デフォルト: `performance_ws`）
 - `--scenario`: 使用するシナリオディレクトリ（デフォルト: `latest`）
+- `--payload-size`: ペイロードサイズを指定。未指定時は `*_run.sh` / `*_exec.sh` 側の既定値を使います
+- `--period-ms`: Publish 周期を指定。未指定時は `*_run.sh` / `*_exec.sh` 側の既定値を使います
+- `--eval-time`: 計測時間を指定。未指定時は `*_run.sh` / `*_exec.sh` 側の既定値を使います
 
 `performance_test.py` は各試行ごとに REST 経由でノード群を起動し、終了後に各ホストからログを `scp` で収集します。ログは `performance_test/logs` 以下に、集計結果（レイテンシ・スループット・ホスト使用率）は `performance_test/results` 以下に CSV 形式で保存されます。
 
