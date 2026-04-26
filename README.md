@@ -88,6 +88,39 @@ RMWにZenohを利用する場合は，マネージャで下記を実行する必
 
 トポロジーごとにDockerfileを生成・ビルドする代わりに、共通の1つのDockerイメージを使い回し、トポロジーに応じた実行スクリプトとcompose定義だけを生成するアプローチです。
 
+### 実行スクリプトの生成
+
+JSON トポロジーファイルから実行スクリプト（`host*_exec.sh`, `host*_run.sh`）と Docker Compose ファイルを生成します。
+
+```bash
+cd parse_json
+python3 generate_exec_scripts.py ../topology_example/simple.json --rmw fastdds --ws-dir performance_ws
+```
+
+### 生成されたスクリプトのオプション
+
+生成される `host*_exec.sh` / `host*_run.sh` スクリプトは、JSON で定義したデフォルト値から以下のオプションで上書きできます。JSON スキーマについては [topology_example/README.md](./topology_example/README.md) を参照してください。
+
+| オプション | 短形式 | 説明 | 既定値（JSON から取得） |
+|---|---|---|---|
+| --payload-size | -s | ペイロードサイズ（バイト） | JSON の `payload_size` または 64 |
+| --period-ms | -p | Publish 周期（ミリ秒） | JSON の `period_ms` または 100 |
+| --eval-time | -t | 計測時間（秒） | JSON の `eval_time` または 60 |
+| --run-idx | -r | ランインデックス（ローカル実行時） | 1 |
+
+#### 実行例
+
+```bash
+# JSON のデフォルト値を使用
+$ ./host1_exec.sh
+
+# JSON のデフォルト値を上書き
+$ ./host1_run.sh --payload-size 256 --period-ms 50 --eval-time 120
+
+# 短形式
+$ ./host1_run.sh -s 256 -p 50 -t 120
+```
+
 ### 共通Dockerイメージの取得（利用者向け）
 
 ```bash

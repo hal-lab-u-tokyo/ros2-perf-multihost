@@ -275,9 +275,9 @@ def _append_publisher_block(lines, node_name, pub_list, qos_opts):
         [
             f"# {node_name} publisher",
             "( ros2 run ros2_perf_multihost_nodes publisher_node \\",
-            f"  --node_name {node_name} --topic_names {topic_names} \\",
-            "  -s \"$PAYLOAD_SIZE\" -p \"$PERIOD_MS\" --eval_time \"$EVAL_TIME\" \\",
-            f"  {qos_opts} --log_dir \"$LOG_DIR\" \\",
+            f"  --node-name {node_name} --topic-names {topic_names} \\",
+            "  -s \"$PAYLOAD_SIZE\" -p \"$PERIOD_MS\" --eval-time \"$EVAL_TIME\" \\",
+            f"  {qos_opts} --log-dir \"$LOG_DIR\" \\",
             ") & node_pids+=($!)",
             f'echo "Started {node_name} publisher at $(date +%Y-%m-%dT%H:%M:%S.%3N%z)"',
         ]
@@ -290,9 +290,9 @@ def _append_subscriber_block(lines, node_name, sub_list, qos_opts):
         [
             f"# {node_name} subscriber",
             "( ros2 run ros2_perf_multihost_nodes subscriber_node \\",
-            f"  --node_name {node_name} --topic_names {topic_names} \\",
-            "  --eval_time \"$EVAL_TIME\" \\",
-            f"  {qos_opts} --log_dir \"$LOG_DIR\" \\",
+            f"  --node-name {node_name} --topic-names {topic_names} \\",
+            "  --eval-time \"$EVAL_TIME\" \\",
+            f"  {qos_opts} --log-dir \"$LOG_DIR\" \\",
             ") & node_pids+=($!)",
             f'echo "Started {node_name} subscriber at $(date +%Y-%m-%dT%H:%M:%S.%3N%z)"',
         ]
@@ -308,9 +308,9 @@ def _append_intermediate_block(lines, node_name, intermediate_list, qos_opts):
         [
             f"# {node_name} intermediate",
             "( ros2 run ros2_perf_multihost_nodes intermediate_node \\",
-            f"  --node_name {node_name} --topic_names_pub {topic_names_pub} --topic_names_sub {topic_names_sub} \\",
-            "  -s \"$PAYLOAD_SIZE\" -p \"$PERIOD_MS\" --eval_time \"$EVAL_TIME\" \\",
-            f"  {qos_opts} --log_dir \"$LOG_DIR\" \\",
+            f"  --node-name {node_name} --topic-names-pub {topic_names_pub} --topic-names-sub {topic_names_sub} \\",
+            "  -s \"$PAYLOAD_SIZE\" -p \"$PERIOD_MS\" --eval-time \"$EVAL_TIME\" \\",
+            f"  {qos_opts} --log-dir \"$LOG_DIR\" \\",
             ") & node_pids+=($!)",
             f'echo "Started {node_name} intermediate at $(date +%Y-%m-%dT%H:%M:%S.%3N%z)"',
         ]
@@ -346,8 +346,8 @@ def generate_exec_scripts(json_content, rmw, output_dir):
     qos_depth = qos_config.get("depth", 1)
     qos_reliability = qos_config.get("reliability", "RELIABLE")
     qos_opts = (
-        f"--qos_history {qos_history} --qos_depth {qos_depth} "
-        f"--qos_reliability {qos_reliability}"
+        f"--qos-history {qos_history} --qos-depth {qos_depth} "
+        f"--qos-reliability {qos_reliability}"
     )
 
     for host_dict in json_content["hosts"]:
@@ -431,7 +431,8 @@ def _append_common_service(
         lines.append("      - RMW_IMPLEMENTATION=rmw_fastrtps_cpp")
     elif rmw == "cyclonedds":
         lines.append("      - RMW_IMPLEMENTATION=rmw_cyclonedds_cpp")
-    lines.append(f"      - PAYLOAD_SIZE=${{PAYLOAD_SIZE:-{payload_size_default}}}")
+    lines.append(
+        f"      - PAYLOAD_SIZE=${{PAYLOAD_SIZE:-{payload_size_default}}}")
     lines.append(f"      - PERIOD_MS=${{PERIOD_MS:-{period_ms_default}}}")
     lines.append(f"      - EVAL_TIME=${{EVAL_TIME:-{eval_time_default}}}")
     lines.append("      - LOG_DIR=${LOG_DIR:-}")

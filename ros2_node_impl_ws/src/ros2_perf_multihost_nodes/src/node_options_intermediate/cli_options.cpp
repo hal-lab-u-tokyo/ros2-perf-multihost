@@ -35,13 +35,13 @@ void Options::parse(int argc, char** argv) {
   options.custom_help("[OPTIONS]");
 
   options.add_options()("h,help", "Show this help message and exit")(
-      "node_name", "Node name (required)",
+      "node-name", "Node name (required)",
       cxxopts::value<std::string>(node_name))(
-      "topic_names_pub",
+      "topic-names-pub",
       "Publisher topic names (optional, repeatable). Required when --size or "
       "--period is provided.",
       cxxopts::value<std::vector<std::string>>(topic_names_pub))(
-      "topic_names_sub", "Subscriber topic names (optional, repeatable)",
+      "topic-names-sub", "Subscriber topic names (optional, repeatable)",
       cxxopts::value<std::vector<std::string>>(topic_names_sub))(
       "s,size",
       "Payload size in bytes for publisher topics. Provide once to broadcast "
@@ -52,34 +52,34 @@ void Options::parse(int argc, char** argv) {
       "broadcast to all publisher topics, or provide one value per publisher "
       "topic.",
       cxxopts::value<std::vector<int>>(period_ms),
-      "ms")("eval_time", "Evaluation duration in seconds",
+      "ms")("eval-time", "Evaluation duration in seconds",
             cxxopts::value<int>(eval_time)->default_value("60"), "sec")(
-      "log_dir",
+      "log-dir",
       "Directory to write logs and metadata. If omitted, no log files are "
       "created.",
       cxxopts::value<std::string>(log_dir))(
-      "qos_history", "QoS history policy: KEEP_LAST or KEEP_ALL",
+      "qos-history", "QoS history policy: KEEP_LAST or KEEP_ALL",
       cxxopts::value<std::string>(qos_history)->default_value("KEEP_LAST"))(
-      "qos_depth", "QoS depth when qos_history=KEEP_LAST",
+      "qos-depth", "QoS depth when qos_history=KEEP_LAST",
       cxxopts::value<int>(qos_depth)->default_value("1"))(
-      "qos_reliability", "QoS reliability: RELIABLE or BEST_EFFORT",
+      "qos-reliability", "QoS reliability: RELIABLE or BEST_EFFORT",
       cxxopts::value<std::string>(qos_reliability)->default_value("RELIABLE"));
 
   auto print_help = [&options]() {
     std::cout
         << "Node role:\n"
-        << "  Intermediate: can subscribe on --topic_names_sub, publish on "
-           "--topic_names_pub, and relay when topic names overlap. Logs are "
-           "written only when --log_dir is set.\n\n"
+        << "  Intermediate: can subscribe on --topic-names-sub, publish on "
+           "--topic-names-pub, and relay when topic names overlap. Logs are "
+           "written only when --log-dir is set.\n\n"
         << options.help() << "\n"
         << "Examples:\n"
         << "  ros2 run ros2_perf_multihost_nodes intermediate_node \\\n"
-        << "    --node_name relay1 --topic_names_pub topic_out "
-           "--topic_names_sub "
+        << "    --node-name relay1 --topic-names-pub topic_out "
+           "--topic-names-sub "
            "topic_in \\\n"
         << "    --size 64 --period 100\n"
         << "  ros2 run ros2_perf_multihost_nodes intermediate_node \\\n"
-        << "    --node_name sub_only --topic_names_sub topic_in\n";
+        << "    --node-name sub_only --topic-names-sub topic_in\n";
   };
 
   try {
@@ -90,8 +90,8 @@ void Options::parse(int argc, char** argv) {
       std::exit(0);
     }
 
-    if (result.count("node_name") == 0) {
-      std::cout << "Error: --node_name is required.\n\n";
+    if (result.count("node-name") == 0) {
+      std::cout << "Error: --node-name is required.\n\n";
       print_help();
       std::exit(1);
     }
@@ -118,17 +118,17 @@ void Options::parse(int argc, char** argv) {
       std::exit(1);
     }
 
-    if (result.count("topic_names_pub") == 0 &&
-        result.count("topic_names_sub") == 0) {
-      std::cout << "Error: at least one of --topic_names_pub or "
-                   "--topic_names_sub is required.\n\n";
+    if (result.count("topic-names-pub") == 0 &&
+        result.count("topic-names-sub") == 0) {
+      std::cout << "Error: at least one of --topic-names-pub or "
+                   "--topic-names-sub is required.\n\n";
       print_help();
       std::exit(1);
     }
 
     if ((result.count("size") > 0 || result.count("period") > 0) &&
-        result.count("topic_names_pub") == 0) {
-      std::cout << "Error: --size and --period require --topic_names_pub.\n\n";
+        result.count("topic-names-pub") == 0) {
+      std::cout << "Error: --size and --period require --topic-names-pub.\n\n";
       print_help();
       std::exit(1);
     }
