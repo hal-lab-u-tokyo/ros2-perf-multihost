@@ -170,33 +170,45 @@ for host in "${HOSTS[@]}"; do
     echo "=== Copying exec scripts to ${host} ==="
     
     # Create remote directory
-    if ! ssh "${host}" "mkdir -p '${REMOTE_EXEC_DIR}'" 2>/dev/null; then
+    if ! err="$(ssh "${host}" "mkdir -p '${REMOTE_EXEC_DIR}'" 2>&1)"; then
         echo "ERROR: Failed to create directory on ${host}" >&2
+        if [[ -n "${err}" ]]; then
+            echo "  ssh: ${err}" >&2
+        fi
         failed_hosts+=("${host}")
         continue
     fi
 
     # Copy exec scripts
-    if ! scp \
+    if ! err="$(scp \
         "${LOCAL_EXEC_DIR}/${host_exec}" \
         "${LOCAL_EXEC_DIR}/${host_run}" \
         "${LOCAL_EXEC_DIR}/${host_compose}" \
-        "${host}:${REMOTE_EXEC_DIR}/" 2>/dev/null; then
+        "${host}:${REMOTE_EXEC_DIR}/" 2>&1)"; then
         echo "ERROR: Failed to copy scripts to ${host}" >&2
+        if [[ -n "${err}" ]]; then
+            echo "  scp: ${err}" >&2
+        fi
         failed_hosts+=("${host}")
         continue
     fi
 
     # Copy metadata
-    if ! scp "${LOCAL_RUN_DIR}/metadata.txt" "${host}:${REMOTE_RUN_DIR}/metadata.txt" 2>/dev/null; then
+    if ! err="$(scp "${LOCAL_RUN_DIR}/metadata.txt" "${host}:${REMOTE_RUN_DIR}/metadata.txt" 2>&1)"; then
         echo "ERROR: Failed to copy metadata to ${host}" >&2
+        if [[ -n "${err}" ]]; then
+            echo "  scp: ${err}" >&2
+        fi
         failed_hosts+=("${host}")
         continue
     fi
 
     # Set execute permissions
-    if ! ssh "${host}" "chmod +x '${REMOTE_EXEC_DIR}/${host_exec}' '${REMOTE_EXEC_DIR}/${host_run}'" 2>/dev/null; then
+    if ! err="$(ssh "${host}" "chmod +x '${REMOTE_EXEC_DIR}/${host_exec}' '${REMOTE_EXEC_DIR}/${host_run}'" 2>&1)"; then
         echo "ERROR: Failed to set permissions on ${host}" >&2
+        if [[ -n "${err}" ]]; then
+            echo "  ssh: ${err}" >&2
+        fi
         failed_hosts+=("${host}")
         continue
     fi
@@ -205,8 +217,11 @@ for host in "${HOSTS[@]}"; do
         remote_alias_parent="$(dirname "${REMOTE_ALIAS_DIR}")"
         remote_alias_name="$(basename "${REMOTE_ALIAS_DIR}")"
         remote_target_name="$(basename "${REMOTE_RUN_DIR}")"
-        if ! ssh "${host}" "cd '${remote_alias_parent}' && ln -sfn '${remote_target_name}' '${remote_alias_name}'" 2>/dev/null; then
+        if ! err="$(ssh "${host}" "cd '${remote_alias_parent}' && ln -sfn '${remote_target_name}' '${remote_alias_name}'" 2>&1)"; then
             echo "ERROR: Failed to update alias ${REMOTE_ALIAS_DIR} on ${host}" >&2
+            if [[ -n "${err}" ]]; then
+                echo "  ssh: ${err}" >&2
+            fi
             failed_hosts+=("${host}")
             continue
         fi
