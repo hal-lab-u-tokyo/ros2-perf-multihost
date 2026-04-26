@@ -108,7 +108,7 @@ void Options::parse(int argc, char** argv) {
     } else if (!payload_size.empty() &&
                payload_size.size() != topic_names_pub.size()) {
       std::cout << "Error: --size must be specified once or match the number "
-                   "of --topic_names_pub entries.\n\n";
+                   "of --topic-names-pub entries.\n\n";
       print_help();
       std::exit(1);
     }
@@ -121,7 +121,7 @@ void Options::parse(int argc, char** argv) {
     } else if (!period_ms.empty() &&
                period_ms.size() != topic_names_pub.size()) {
       std::cout << "Error: --period must be specified once or match the "
-                   "number of --topic_names_pub entries.\n\n";
+                   "number of --topic-names-pub entries.\n\n";
       print_help();
       std::exit(1);
     }

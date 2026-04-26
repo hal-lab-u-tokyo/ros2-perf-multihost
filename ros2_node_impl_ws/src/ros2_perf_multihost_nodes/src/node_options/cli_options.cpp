@@ -114,7 +114,7 @@ void Options::parse(int argc, char** argv) {
       payload_size = std::vector<int>(topic_names.size(), payload_size[0]);
     } else if (payload_size.size() != topic_names.size()) {
       std::cout << "Error: --size must be specified once or match the number "
-                   "of --topic_names entries.\n\n";
+                   "of --topic-names entries.\n\n";
       print_help();
       std::exit(1);
     }
@@ -125,7 +125,7 @@ void Options::parse(int argc, char** argv) {
       period_ms = std::vector<int>(topic_names.size(), period_ms[0]);
     } else if (period_ms.size() != topic_names.size()) {
       std::cout << "Error: --period must be specified once or match the "
-                   "number of --topic_names entries.\n\n";
+                   "number of --topic-names entries.\n\n";
       print_help();
       std::exit(1);
     }

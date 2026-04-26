@@ -99,7 +99,7 @@ python3 generate_exec_scripts.py ../topology_example/simple.json --rmw fastdds -
 
 ### 生成されたスクリプトのオプション
 
-生成される `host*_exec.sh` / `host*_run.sh` スクリプトは、以下の実行時オプションをサポートします。`--eval-time` / `--period-ms` / `--payload-size` は、起動対象の全ホストにある対象ノード（Publisher / Intermediate）へ一括適用されます。JSON スキーマについては [topology_example/README.md](./topology_example/README.md) を参照してください。
+生成される `host*_run.sh` / `local_run.sh` は、以下の実行時オプションをサポートします。`--eval-time` は起動対象の全ノード（Publisher / Subscriber / Intermediate）へ、`--period-ms` / `--payload-size` は Publisher / Intermediate ノードへ一括適用されます。`--run-idx` は `host*_run.sh` / `local_run.sh` でのみ有効です。JSON スキーマについては [topology_example/README.md](./topology_example/README.md) を参照してください。
 
 | オプション | 短形式 | 説明 | 既定値 |
 |---|---|---|---|
@@ -121,7 +121,7 @@ $ ./host1_run.sh --eval-time 120 --period-ms 50 --payload-size 256
 $ ./host1_run.sh -t 120 -p 50 -s 256
 ```
 
-`--eval-time` / `--period-ms` / `--payload-size` は呼び出した `*_run.sh` 経由で起動される全ノードに対して、同じ値で一括適用されます（Subscriber は `--period-ms` / `--payload-size` を使用しません）。
+`--eval-time` は呼び出した `*_run.sh` / `local_run.sh` 経由で起動される全ノードに一括適用されます。`--period-ms` / `--payload-size` は Publisher / Intermediate のみに適用されます（Subscriber は使用しません）。
 
 ### 共通Dockerイメージの取得（利用者向け）
 

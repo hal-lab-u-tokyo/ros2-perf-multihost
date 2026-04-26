@@ -34,8 +34,8 @@ Subscriber ノードは、指定したトピック群を購読して受信時刻
 
 Intermediate ノードは、Publisher と Subscriber の両方の役割を持つノードです。
 
-- `--topic_names_sub` で購読トピックを指定できます
-- `--topic_names_pub` で送信トピックを指定できます
+- `--topic-names-sub` で購読トピックを指定できます
+- `--topic-names-pub` で送信トピックを指定できます
 - 購読専用、送信専用、購読と送信の兼任のいずれにも使えます
 - 同じトピック名が publish 側と subscribe 側の両方に含まれる場合は、受信したメッセージを中継する構成として利用できます
 - `--log-dir` を指定した場合は、送受信履歴とメタデータをファイルに保存します
@@ -70,8 +70,8 @@ ros2 run ros2_perf_multihost_nodes intermediate_node --help
 | オプション | 短形式 | 説明 | 既定値 |
 |---|---|---|---|
 | --topic-names | - | トピック名（必須、繰り返し可） | - |
-| --size | -s | ペイロードサイズ（バイト） | - |
-| --period | -p | Publish 周期（ミリ秒） | - |
+| --size | -s | ペイロードサイズ（バイト） | 64 バイト |
+| --period | -p | Publish 周期（ミリ秒） | 100 ms |
 
 ### Intermediate
 
@@ -79,8 +79,8 @@ ros2 run ros2_perf_multihost_nodes intermediate_node --help
 |---|---|---|---|
 | --topic-names-pub | - | 送信トピック名（繰り返し可） | - |
 | --topic-names-sub | - | 受信トピック名（繰り返し可） | - |
-| --size | -s | ペイロードサイズ（バイト、topic-names-pub 指定時） | - |
-| --period | -p | Publish 周期（ミリ秒、topic-names-pub 指定時） | - |
+| --size | -s | ペイロードサイズ（バイト、topic-names-pub 指定時） | 64 バイト（topic-names-pub 指定時） |
+| --period | -p | Publish 周期（ミリ秒、topic-names-pub 指定時） | 100 ms（topic-names-pub 指定時） |
 
 `--log-dir` を指定しなかった場合、ログファイルや metadata は作成されません。動作確認だけを行いたい場合は未指定のままで構いません。
 
