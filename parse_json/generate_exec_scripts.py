@@ -108,8 +108,8 @@ def resolve_output_paths(json_path, rmw, ws_dir, force=False):
     os.makedirs(perf_ws_dir, exist_ok=True)
 
     json_basename = os.path.splitext(os.path.basename(json_path))[0]
-    run_dir_name = f"{json_basename}-{rmw}"
-    run_dir = os.path.join(perf_ws_dir, run_dir_name)
+    scenario_dir = f"{json_basename}-{rmw}"
+    run_dir = os.path.join(perf_ws_dir, scenario_dir)
     output_dir = os.path.join(run_dir, "exec_scripts")
 
     if os.path.isdir(output_dir):
@@ -120,8 +120,8 @@ def resolve_output_paths(json_path, rmw, ws_dir, force=False):
     else:
         os.makedirs(output_dir, exist_ok=True)
 
-    _update_latest_symlink(perf_ws_dir, run_dir_name)
-    return project_root, output_dir, run_dir_name
+    _update_latest_symlink(perf_ws_dir, scenario_dir)
+    return project_root, output_dir, scenario_dir
 
 
 def _rmw_env_lines(rmw):
@@ -623,7 +623,7 @@ def _unique_in_order(items):
 
 
 def generate_metadata_file(
-    json_content, json_path, rmw, ws_dir, project_root, run_dir_name
+    json_content, json_path, rmw, ws_dir, project_root, scenario_dir
 ):
     """<ws-dir>/latest/metadata.txt を生成する"""
     latest_dir = os.path.join(project_root, ws_dir, "latest")
@@ -659,7 +659,7 @@ def generate_metadata_file(
             f"json: {os.path.basename(json_path)}",
             f"json_path: {json_path}",
             f"ws_dir: {ws_dir}",
-            f"scenario_dir: {run_dir_name}",
+            f"scenario_dir: {scenario_dir}",
         ],
         [
             "# --- 2. test config ---",
@@ -718,7 +718,7 @@ if __name__ == "__main__":
 
     PERF_WS_DIR = args.ws_dir
 
-    project_root, output_dir, run_dir_name = resolve_output_paths(
+    project_root, output_dir, scenario_dir = resolve_output_paths(
         args.json_path, args.rmw, args.ws_dir, force=args.force
     )
 
@@ -736,11 +736,11 @@ if __name__ == "__main__":
         args.rmw,
         args.ws_dir,
         project_root,
-        run_dir_name,
+        scenario_dir,
     )
 
     print(
         f"Generated host*_run.sh, host*_exec.sh, host*_compose.yaml, local_run.sh, local_compose.yaml"
-        f"in {PERF_WS_DIR}/{run_dir_name}/exec_scripts (latest: {PERF_WS_DIR}/latest) "
+        f"in {PERF_WS_DIR}/{scenario_dir}/exec_scripts (latest: {PERF_WS_DIR}/latest) "
         f"for {len(json_content['hosts'])} host(s) with RMW={args.rmw}"
     )
