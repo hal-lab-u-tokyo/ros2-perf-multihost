@@ -25,6 +25,9 @@ Options::Options(int argc, char** argv) : Options() { parse(argc, argv); }
 
 // 受け取ったコマンドライン引数をもとに、option変数を更新
 void Options::parse(int argc, char** argv) {
+  constexpr int kDefaultPayloadSize = 64;
+  constexpr int kDefaultPeriodMs = 100;
+
   const std::string executable_name =
       std::filesystem::path(argv[0]).filename().string();
   const std::string usage_command =
@@ -96,8 +99,11 @@ void Options::parse(int argc, char** argv) {
       std::exit(1);
     }
 
-    if (!payload_size.empty() && payload_size.size() == 1 &&
-        !topic_names_pub.empty()) {
+    if (payload_size.empty() && !topic_names_pub.empty()) {
+      payload_size =
+          std::vector<int>(topic_names_pub.size(), kDefaultPayloadSize);
+    } else if (!payload_size.empty() && payload_size.size() == 1 &&
+               !topic_names_pub.empty()) {
       payload_size = std::vector<int>(topic_names_pub.size(), payload_size[0]);
     } else if (!payload_size.empty() &&
                payload_size.size() != topic_names_pub.size()) {
@@ -107,8 +113,10 @@ void Options::parse(int argc, char** argv) {
       std::exit(1);
     }
 
-    if (!period_ms.empty() && period_ms.size() == 1 &&
-        !topic_names_pub.empty()) {
+    if (period_ms.empty() && !topic_names_pub.empty()) {
+      period_ms = std::vector<int>(topic_names_pub.size(), kDefaultPeriodMs);
+    } else if (!period_ms.empty() && period_ms.size() == 1 &&
+               !topic_names_pub.empty()) {
       period_ms = std::vector<int>(topic_names_pub.size(), period_ms[0]);
     } else if (!period_ms.empty() &&
                period_ms.size() != topic_names_pub.size()) {

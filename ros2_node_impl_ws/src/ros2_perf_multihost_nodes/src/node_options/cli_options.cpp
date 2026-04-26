@@ -25,6 +25,9 @@ Options::Options(int argc, char** argv) : Options() { parse(argc, argv); }
 
 // 受け取ったコマンドライン引数をもとに、option変数を更新
 void Options::parse(int argc, char** argv) {
+  constexpr int kDefaultPayloadSize = 64;
+  constexpr int kDefaultPeriodMs = 100;
+
   const std::string executable_name =
       std::filesystem::path(argv[0]).filename().string();
   const std::string usage_command =
@@ -100,25 +103,27 @@ void Options::parse(int argc, char** argv) {
     }
 
     if (result.count("topic-names") == 0) {
-      std::cout << "Error: --topic_names is required.\n\n";
+      std::cout << "Error: --topic-names is required.\n\n";
       print_help();
       std::exit(1);
     }
 
-    if (!payload_size.empty() && payload_size.size() == 1 &&
-        !topic_names.empty()) {
+    if (payload_size.empty()) {
+      payload_size = std::vector<int>(topic_names.size(), kDefaultPayloadSize);
+    } else if (payload_size.size() == 1 && !topic_names.empty()) {
       payload_size = std::vector<int>(topic_names.size(), payload_size[0]);
-    } else if (!payload_size.empty() &&
-               payload_size.size() != topic_names.size()) {
+    } else if (payload_size.size() != topic_names.size()) {
       std::cout << "Error: --size must be specified once or match the number "
                    "of --topic_names entries.\n\n";
       print_help();
       std::exit(1);
     }
 
-    if (!period_ms.empty() && period_ms.size() == 1 && !topic_names.empty()) {
+    if (period_ms.empty()) {
+      period_ms = std::vector<int>(topic_names.size(), kDefaultPeriodMs);
+    } else if (period_ms.size() == 1 && !topic_names.empty()) {
       period_ms = std::vector<int>(topic_names.size(), period_ms[0]);
-    } else if (!period_ms.empty() && period_ms.size() != topic_names.size()) {
+    } else if (period_ms.size() != topic_names.size()) {
       std::cout << "Error: --period must be specified once or match the "
                    "number of --topic_names entries.\n\n";
       print_help();
