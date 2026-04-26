@@ -21,14 +21,13 @@ def get_metadata_value(key, metadata_path):
     return None
 
 
-def resolve_host_list(ws_dir, scenario, mode="raw", num_hosts=None):
+def resolve_host_list(ws_dir, scenario, mode="raw"):
     """Resolve host list from environment or metadata.txt.
 
     Args:
         ws_dir: Workspace directory containing scenarios
         scenario: Scenario directory name  
         mode: Ignored (for compatibility); hosts are always from metadata
-        num_hosts: If provided, limit to first N hosts
 
     Returns:
         List of hostname/IP addresses
@@ -41,8 +40,6 @@ def resolve_host_list(ws_dir, scenario, mode="raw", num_hosts=None):
     env_hosts = os.environ.get("ROS2_PERF_HOSTS")
     if env_hosts:
         hosts = [h.strip() for h in env_hosts.split(",") if h.strip()]
-        if num_hosts:
-            hosts = hosts[:num_hosts]
         return hosts
 
     # Read from metadata.txt (required)
@@ -62,8 +59,6 @@ def resolve_host_list(ws_dir, scenario, mode="raw", num_hosts=None):
         )
 
     hosts = [h.strip() for h in metadata_hosts.split(",") if h.strip()]
-    if num_hosts:
-        hosts = hosts[:num_hosts]
     return hosts
 
 
@@ -78,8 +73,6 @@ def run_test(run_idx, start_exec_scripts_py, hosts, ws_dir, scenario, exec_polic
         exec_policy,
         "--run-idx",
         str(run_idx + 1),
-        "--num-hosts",
-        str(len(hosts)),
         "--ws-dir",
         ws_dir,
         "--scenario",
