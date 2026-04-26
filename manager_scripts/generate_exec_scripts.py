@@ -27,8 +27,6 @@ ZENOH_CONFIG_DIR_IN_CONTAINER = f"{ROS_WS_IN_CONTAINER}/zenoh_config"
 IMAGE_NAME = "ghcr.io/hal-lab-u-tokyo/ros2-perf-multihost:latest"
 DEFAULT_PERF_WS_DIR = "performance_ws"
 PERF_WS_DIR = DEFAULT_PERF_WS_DIR
-DEFAULT_PAYLOAD_SIZE = 64
-DEFAULT_PERIOD_MS = 100
 DEFAULT_EVAL_TIME = 60
 
 
@@ -222,8 +220,6 @@ def _append_host_script_prelude(
     lines,
     host_name,
     rmw,
-    payload_size_default,
-    period_ms_default,
     eval_time_default,
 ):
     """Append the shared prelude used by host*_exec.sh."""
@@ -237,8 +233,6 @@ def _append_host_script_prelude(
             '# Consolidated ROS 2 node implementation workspace',
             'ROS_WS="${ROS2_NODE_IMPL_WS:-$PROJECT_ROOT/ros2_node_impl_ws}"',
             "",
-            f'PAYLOAD_SIZE="${{PAYLOAD_SIZE:-{payload_size_default}}}"',
-            f'PERIOD_MS="${{PERIOD_MS:-{period_ms_default}}}"',
             f'EVAL_TIME="${{EVAL_TIME:-{eval_time_default}}}"',
             "",
             "# allow runtime override via script option",
@@ -429,8 +423,6 @@ def generate_exec_scripts(json_content, rmw, output_dir):
     """Generate per-host execution scripts that run inside containers."""
     os.makedirs(output_dir, exist_ok=True)
 
-    payload_size_default = DEFAULT_PAYLOAD_SIZE
-    period_ms_default = DEFAULT_PERIOD_MS
     eval_time_default = DEFAULT_EVAL_TIME
 
     qos_config = json_content.get("qos", {})
@@ -451,8 +443,6 @@ def generate_exec_scripts(json_content, rmw, output_dir):
             lines,
             host_name,
             rmw,
-            payload_size_default,
-            period_ms_default,
             eval_time_default,
         )
 
@@ -501,8 +491,6 @@ def _append_common_service(
     rmw,
     project_root,
     output_dir,
-    payload_size_default,
-    period_ms_default,
     eval_time_default,
     depends_on_zenohd=False,
 ):
@@ -530,9 +518,6 @@ def _append_common_service(
         lines.append("      - RMW_IMPLEMENTATION=rmw_fastrtps_cpp")
     elif rmw == "cyclonedds":
         lines.append("      - RMW_IMPLEMENTATION=rmw_cyclonedds_cpp")
-    lines.append(
-        f"      - PAYLOAD_SIZE=${{PAYLOAD_SIZE:-{payload_size_default}}}")
-    lines.append(f"      - PERIOD_MS=${{PERIOD_MS:-{period_ms_default}}}")
     lines.append(f"      - EVAL_TIME=${{EVAL_TIME:-{eval_time_default}}}")
     lines.append("      - LOG_DIR=${LOG_DIR:-}")
     if depends_on_zenohd and rmw == "zenoh":
@@ -577,8 +562,6 @@ def _append_zenohd_service(lines, project_root, output_dir):
 
 def generate_compose(json_content, rmw, output_dir, project_root):
     """Generate local_compose.yaml for validation on a development machine."""
-    payload_size_default = DEFAULT_PAYLOAD_SIZE
-    period_ms_default = DEFAULT_PERIOD_MS
     eval_time_default = DEFAULT_EVAL_TIME
     lines = ["services:"]
 
@@ -592,8 +575,6 @@ def generate_compose(json_content, rmw, output_dir, project_root):
             rmw,
             project_root,
             output_dir,
-            payload_size_default,
-            period_ms_default,
             eval_time_default,
             depends_on_zenohd=(rmw == "zenoh"),
         )
@@ -608,8 +589,6 @@ def generate_compose(json_content, rmw, output_dir, project_root):
 
 def generate_compose_per_host(json_content, rmw, output_dir, project_root):
     """Generate one host-specific host*_compose.yaml file per host."""
-    payload_size_default = DEFAULT_PAYLOAD_SIZE
-    period_ms_default = DEFAULT_PERIOD_MS
     eval_time_default = DEFAULT_EVAL_TIME
     for host_dict in json_content["hosts"]:
         host_name = host_dict["host_name"]
@@ -621,8 +600,6 @@ def generate_compose_per_host(json_content, rmw, output_dir, project_root):
             rmw,
             project_root,
             output_dir,
-            payload_size_default,
-            period_ms_default,
             eval_time_default,
         )
 
@@ -634,8 +611,6 @@ def generate_compose_per_host(json_content, rmw, output_dir, project_root):
 def _run_script_common_prefix(
     lines,
     rel_root,
-    payload_size_default,
-    period_ms_default,
     eval_time_default,
 ):
     """Append the shared prelude used by run scripts."""
@@ -651,8 +626,6 @@ def _run_script_common_prefix(
             f'PROJECT_ROOT="$(cd "$SCRIPT_DIR/{rel_root}" && pwd)"',
             'LOCAL_UID="${LOCAL_UID:-$(id -u)}"',
             'LOCAL_GID="${LOCAL_GID:-$(id -g)}"',
-            f'PAYLOAD_SIZE="${{PAYLOAD_SIZE:-{payload_size_default}}}"',
-            f'PERIOD_MS="${{PERIOD_MS:-{period_ms_default}}}"',
             f'EVAL_TIME="${{EVAL_TIME:-{eval_time_default}}}"',
             'TRIAL_IDX="${TRIAL_IDX:-1}"',
             "",
@@ -704,7 +677,7 @@ def _run_script_common_prefix(
             "",
             'echo "Running containers as uid:gid $LOCAL_UID:$LOCAL_GID"',
             'echo "LOG_DIR (in container): $LOG_DIR"',
-            'echo "PAYLOAD_SIZE=$PAYLOAD_SIZE PERIOD_MS=$PERIOD_MS EVAL_TIME=$EVAL_TIME"',
+            'echo "EVAL_TIME=$EVAL_TIME"',
             "",
         ]
     )
@@ -713,8 +686,6 @@ def _run_script_common_prefix(
 def generate_host_run_scripts(json_content, output_dir, project_root):
     """Generate host*_run.sh wrapper scripts for host-specific Compose files."""
     rel_root = os.path.relpath(project_root, output_dir)
-    payload_size_default = DEFAULT_PAYLOAD_SIZE
-    period_ms_default = DEFAULT_PERIOD_MS
     eval_time_default = DEFAULT_EVAL_TIME
     for host_dict in json_content["hosts"]:
         host_name = host_dict["host_name"]
@@ -724,8 +695,6 @@ def generate_host_run_scripts(json_content, output_dir, project_root):
         _run_script_common_prefix(
             lines,
             rel_root,
-            payload_size_default,
-            period_ms_default,
             eval_time_default,
         )
         lines.extend(
@@ -735,13 +704,13 @@ def generate_host_run_scripts(json_content, output_dir, project_root):
                 'echo "Cleaning up previous containers (including orphans)..."',
                 (
                     f'LOCAL_UID="$LOCAL_UID" LOCAL_GID="$LOCAL_GID" '
-                    'PAYLOAD_SIZE="$PAYLOAD_SIZE" PERIOD_MS="$PERIOD_MS" EVAL_TIME="$EVAL_TIME" '
+                    'EVAL_TIME="$EVAL_TIME" '
                     'LOG_DIR="$LOG_DIR" '
                     'docker compose -f "$COMPOSE_FILE" down --remove-orphans >/dev/null 2>&1 || true'
                 ),
                 (
                     f'LOCAL_UID="$LOCAL_UID" LOCAL_GID="$LOCAL_GID" '
-                    'PAYLOAD_SIZE="$PAYLOAD_SIZE" PERIOD_MS="$PERIOD_MS" EVAL_TIME="$EVAL_TIME" '
+                    'EVAL_TIME="$EVAL_TIME" '
                     'LOG_DIR="$LOG_DIR" '
                     f'docker compose -f "$COMPOSE_FILE" up service_{host_name}'
                 ),
@@ -765,8 +734,6 @@ def generate_local_run_script(json_content, rmw, output_dir, project_root):
     _run_script_common_prefix(
         lines,
         rel_root,
-        DEFAULT_PAYLOAD_SIZE,
-        DEFAULT_PERIOD_MS,
         DEFAULT_EVAL_TIME,
     )
     lines.extend(
@@ -776,7 +743,7 @@ def generate_local_run_script(json_content, rmw, output_dir, project_root):
             'echo "Cleaning up previous containers (including orphans)..."',
             (
                 'LOCAL_UID="$LOCAL_UID" LOCAL_GID="$LOCAL_GID" '
-                'PAYLOAD_SIZE="$PAYLOAD_SIZE" PERIOD_MS="$PERIOD_MS" EVAL_TIME="$EVAL_TIME" '
+                'EVAL_TIME="$EVAL_TIME" '
                 'LOG_DIR="$LOG_DIR" '
                 'docker compose -f "$COMPOSE_FILE" down --remove-orphans >/dev/null 2>&1 || true'
             ),
@@ -790,7 +757,7 @@ def generate_local_run_script(json_content, rmw, output_dir, project_root):
                 'echo "[1/3] Starting service_zenohd..."',
                 (
                     'LOCAL_UID="$LOCAL_UID" LOCAL_GID="$LOCAL_GID" '
-                    'PAYLOAD_SIZE="$PAYLOAD_SIZE" PERIOD_MS="$PERIOD_MS" EVAL_TIME="$EVAL_TIME" '
+                    'EVAL_TIME="$EVAL_TIME" '
                     'LOG_DIR="$LOG_DIR" '
                     'docker compose -f "$COMPOSE_FILE" up -d service_zenohd'
                 ),
@@ -802,7 +769,7 @@ def generate_local_run_script(json_content, rmw, output_dir, project_root):
                 "status=0",
                 (
                     'LOCAL_UID="$LOCAL_UID" LOCAL_GID="$LOCAL_GID" '
-                    'PAYLOAD_SIZE="$PAYLOAD_SIZE" PERIOD_MS="$PERIOD_MS" EVAL_TIME="$EVAL_TIME" '
+                    'EVAL_TIME="$EVAL_TIME" '
                     'LOG_DIR="$LOG_DIR" '
                     f'docker compose -f "$COMPOSE_FILE" up {host_services} || status=$?'
                 ),
@@ -810,7 +777,7 @@ def generate_local_run_script(json_content, rmw, output_dir, project_root):
                 'echo "Stopping service_zenohd..."',
                 (
                     'LOCAL_UID="$LOCAL_UID" LOCAL_GID="$LOCAL_GID" '
-                    'PAYLOAD_SIZE="$PAYLOAD_SIZE" PERIOD_MS="$PERIOD_MS" EVAL_TIME="$EVAL_TIME" '
+                    'EVAL_TIME="$EVAL_TIME" '
                     'LOG_DIR="$LOG_DIR" '
                     'docker compose -f "$COMPOSE_FILE" stop service_zenohd >/dev/null 2>&1 || true'
                 ),
@@ -826,7 +793,7 @@ def generate_local_run_script(json_content, rmw, output_dir, project_root):
                 f'echo "Starting all services: {host_services}"',
                 (
                     'LOCAL_UID="$LOCAL_UID" LOCAL_GID="$LOCAL_GID" '
-                    'PAYLOAD_SIZE="$PAYLOAD_SIZE" PERIOD_MS="$PERIOD_MS" EVAL_TIME="$EVAL_TIME" '
+                    'EVAL_TIME="$EVAL_TIME" '
                     'LOG_DIR="$LOG_DIR" '
                     f'docker compose -f "$COMPOSE_FILE" up {host_services}'
                 ),
