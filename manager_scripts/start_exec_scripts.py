@@ -4,10 +4,10 @@ Supports both Docker and native execution modes.
 
 Usage:
   # Docker mode (sends /start_docker requests)
-  python3 start_exec_scripts.py --docker <run_idx> <num_hosts> [ws_dir] [scenario] [hosts_list]
+    python3 start_exec_scripts.py --exec-policy docker <run_idx> <num_hosts> [ws_dir] [scenario] [hosts_list]
 
   # Native mode (sends /start requests)
-  python3 start_exec_scripts.py <run_idx> <num_hosts> [ws_dir] [scenario] [hosts_list]
+    python3 start_exec_scripts.py --exec-policy native <run_idx> <num_hosts> [ws_dir] [scenario] [hosts_list]
 """
 
 import requests
@@ -65,15 +65,18 @@ def main():
         epilog="""
 Examples:
   # Docker mode
-  python3 start_exec_scripts.py --docker 1 3 performance_ws latest host1,host2,host3
+    python3 start_exec_scripts.py --exec-policy docker 1 3 performance_ws latest host1,host2,host3
 
   # Native mode
-  python3 start_exec_scripts.py 1 3 performance_ws latest host1,host2,host3
+    python3 start_exec_scripts.py --exec-policy native 1 3 performance_ws latest host1,host2,host3
         """
     )
-    parser.add_argument("--docker", action="store_true",
-                        help="Use Docker mode (sends /start_docker requests). "
-                             "Default: native mode (/start requests)")
+    parser.add_argument(
+        "--exec-policy",
+        choices=["docker", "native"],
+        default="docker",
+        help="Execution mode. docker sends /start_docker, native sends /start (default: docker)",
+    )
     parser.add_argument("run_idx", type=int,
                         help="Run index (trial number)")
     parser.add_argument("num_hosts", type=int,
@@ -90,7 +93,7 @@ Examples:
 
     # Support old command-line style (backward compatibility)
     # Old style: python3 start_scripts.py <payload_size> <num_hosts> <run_idx> [ws_dir] [scenario] [hosts_list]
-    # New style: python3 start_exec_scripts.py [--docker] <run_idx> <num_hosts> [ws_dir] [scenario] [hosts_list]
+    # New style: python3 start_exec_scripts.py [--exec-policy {docker,native}] <run_idx> <num_hosts> [ws_dir] [scenario] [hosts_list]
     if len(sys.argv) >= 2 and not sys.argv[1].startswith("-"):
         # Old style: first arg is positional
         if len(sys.argv) < 4:
@@ -126,7 +129,7 @@ Examples:
     eval_time = os.environ.get("EVAL_TIME")
 
     # Determine endpoint and timeout based on mode
-    if args.docker:
+    if args.exec_policy == "docker":
         endpoint = "/start_docker"
         timeout = (5, 300)  # (connect, read) in seconds
         print(f"Using Docker mode: {endpoint} endpoint with timeout {timeout}")
@@ -141,7 +144,7 @@ Examples:
 
     def start(host):
         try:
-            if args.docker:
+            if args.exec_policy == "docker":
                 print(
                     f"{host}: sending {endpoint} request (Docker mode)...", flush=True)
             else:

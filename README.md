@@ -194,21 +194,24 @@ chmod +x start_all_servers.sh
 
 2. ベンチマークスクリプト `performance_test.py` の実行
 
-REST サーバ起動後、`performance_test/performance_test.py` を使って、ペイロードサイズ・試行回数・ホスト数・実行環境をまとめて指定して測定を行います。
+REST サーバ起動後、`performance_test/performance_test.py` を使って、ペイロードサイズ・試行回数・実行環境を指定して測定を行います。
 
 ```bash
 cd performance_test
-python3 performance_test.py --hosts 3 --trials 10 --docker
-# 複数ペイロードサイズを明示する場合
-python3 performance_test.py --hosts 3 --trials 10 --docker --payload "64,256"
+python3 performance_test.py --trials 10
+# ネイティブ実行に切り替える場合
+python3 performance_test.py --exec-policy native --trials 10
+# パラメータを明示する場合
+python3 performance_test.py --payload-size 256 --period-ms 50 --eval-time 120
 ```
 
 主な引数:
 
-- `--hosts`: 使用するホスト数（JSON の `hosts` の数、および実際の Raspberry Pi 台数と合わせてください）
 - `--trials`: 各ペイロードサイズあたりの試行回数
-- `--payload`: ペイロードサイズをカンマ区切りで指定（例: `--payload "64,256"`）。未指定時は `64` を使用
-- `--docker`: Docker コンテナを経由したテストを行う場合に指定（内部で `manager_scripts/start_docker_scripts.py` を呼び出します）
+- `--payload-size`: ペイロードサイズを指定。未指定時は `*_run.sh` / `*_exec.sh` 側の既定値を使います
+- `--period-ms`: Publish 周期を指定。未指定時は `*_run.sh` / `*_exec.sh` 側の既定値を使います
+- `--eval-time`: 計測時間を指定。未指定時は `*_run.sh` / `*_exec.sh` 側の既定値を使います
+- `--exec-policy`: 実行方式を `docker` または `native` から指定（デフォルト: `docker`）
 - `--ws-dir`: 実行スクリプト生成先のベースディレクトリ（デフォルト: `performance_ws`）
 - `--scenario`: 使用するシナリオディレクトリ（デフォルト: `latest`）
 

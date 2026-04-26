@@ -70,18 +70,16 @@ def resolve_host_list(ws_dir, scenario, mode="raw", num_hosts=None):
     return hosts
 
 
-def run_test(run_idx, start_exec_scripts_py, hosts, ws_dir, scenario, docker=False, payload_size=None, period_ms=None, eval_time=None):
+def run_test(run_idx, start_exec_scripts_py, hosts, ws_dir, scenario, exec_policy="docker", payload_size=None, period_ms=None, eval_time=None):
     print(f"=== Run trial={run_idx + 1} ===")
     # Convert host list to comma-separated string for passing to start_exec_scripts.py
     hosts_str = ",".join(hosts)
     cmd = [
         "python3",
         start_exec_scripts_py,
+        "--exec-policy",
+        exec_policy,
     ]
-
-    # Add --docker flag if Docker mode
-    if docker:
-        cmd.append("--docker")
 
     # Add remaining positional arguments
     cmd.extend([
@@ -430,8 +428,12 @@ if __name__ == "__main__":
                         help="測定間隔 (ミリ秒、未指定の場合は run.sh のデフォルト: 100)")
     parser.add_argument("--eval-time", type=int, default=None,
                         help="評価時間 (秒、未指定の場合は run.sh のデフォルト: 60)")
-    parser.add_argument("--docker", action="store_true",
-                        help="Dockerを使用する場合は指定")
+    parser.add_argument(
+        "--exec-policy",
+        choices=["docker", "native"],
+        default="docker",
+        help="実行方式を指定 (デフォルト: docker)",
+    )
     parser.add_argument(
         "--ws-dir",
         type=str,
@@ -464,12 +466,12 @@ if __name__ == "__main__":
     repo_root = os.path.dirname(script_dir)
     start_exec_scripts_py = os.path.join(
         repo_root, "manager_scripts", "start_exec_scripts.py")
-    prefix = "docker" if args.docker else "raw"
+    prefix = "docker" if args.exec_policy == "docker" else "raw"
 
     # Resolve actual host list from metadata (metadata.txt is authoritative)
     try:
         hosts = resolve_host_list(
-            args.ws_dir, args.scenario, mode="docker" if args.docker else "raw"
+            args.ws_dir, args.scenario, mode=args.exec_policy
         )
     except (FileNotFoundError, ValueError) as e:
         print(f"ERROR: {e}", file=sys.stderr)
@@ -485,7 +487,7 @@ if __name__ == "__main__":
                 hosts,
                 args.ws_dir,
                 args.scenario,
-                docker=args.docker,
+                exec_policy=args.exec_policy,
                 payload_size=requested_payload_size,
                 period_ms=period_ms,
                 eval_time=eval_time,
