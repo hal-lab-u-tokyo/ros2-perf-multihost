@@ -17,7 +17,7 @@ python3 generate_exec_scripts.py ../topology_example/simple.json --rmw fastdds -
 
 ### Options Supported by Generated Scripts
 
-Generated `host*_run.sh` and `local_run.sh` scripts support the runtime options below. `--eval-time` is applied to every launched node (Publisher / Subscriber / Intermediate). Payload size and period are taken from JSON topology values and passed directly to Publisher / Intermediate nodes. `--trial-idx` is available only on `host*_run.sh` and `local_run.sh`. For the JSON schema, see [topology_example/README.md](./topology_example/README.md).
+Generated `host*_run.sh` and `local_run.sh` scripts support the runtime options below. `--eval-time` is applied to every launched node (Publisher / Subscriber / Intermediate). `payload_size` and `period_ms` must be specified in each Publisher / Intermediate topic entry in the topology JSON, and those values are passed directly to Publisher / Intermediate nodes. `--trial-idx` is available only on `host*_run.sh` and `local_run.sh`. For the JSON schema, see [topology_example/README.md](./topology_example/README.md).
 
 | Option | Short | Description | Default |
 |---|---|---|---|
@@ -37,7 +37,7 @@ Generated `host*_run.sh` and `local_run.sh` scripts support the runtime options 
 ./host1_run.sh -t 120
 ```
 
-`--eval-time` is applied to all nodes launched through `*_run.sh` or `local_run.sh`. Payload size and publish period are read from each Publisher/Intermediate entry in the topology JSON.
+`--eval-time` is applied to all nodes launched through `*_run.sh` or `local_run.sh`. `payload_size` and `period_ms` are read from each Publisher/Intermediate entry in the topology JSON.
 
 ### Pull the Shared Docker Image
 

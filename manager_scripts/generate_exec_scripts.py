@@ -32,23 +32,62 @@ DEFAULT_PERIOD_MS = 100
 DEFAULT_EVAL_TIME = 60
 
 
-def _json_default_int(json_content, key, fallback):
-    """Return an integer default from top-level JSON, or fallback."""
-    value = json_content.get(key, fallback)
+def _require_positive_int(entry, key, context):
+    """Read a required positive integer field from entry."""
+    if key not in entry:
+        raise ValueError(f"{context}: '{key}' is required")
     try:
-        return int(value)
-    except (TypeError, ValueError):
-        return fallback
+        value = int(entry[key])
+    except (TypeError, ValueError) as exc:
+        raise ValueError(
+            f"{context}: '{key}' must be an integer"
+        ) from exc
+    if value <= 0:
+        raise ValueError(f"{context}: '{key}' must be > 0")
+    return value
 
 
-def _topic_numeric_field(topic_entry, key, json_content, fallback):
-    """Return a numeric topic field, falling back to top-level JSON then fallback."""
-    if key in topic_entry:
-        try:
-            return int(topic_entry[key])
-        except (TypeError, ValueError):
-            pass
-    return _json_default_int(json_content, key, fallback)
+def _validate_payload_period_constraints(json_content):
+    """Enforce payload/period schema constraints for topology JSON."""
+    forbidden_root_keys = [
+        key for key in ("payload_size", "period_ms") if key in json_content
+    ]
+    if forbidden_root_keys:
+        raise ValueError(
+            "Top-level keys are not allowed: "
+            f"{', '.join(forbidden_root_keys)}. "
+            "Set payload_size and period_ms per Publisher/Intermediate topic entry."
+        )
+
+    hosts = json_content.get("hosts")
+    if not isinstance(hosts, list):
+        raise ValueError("root key 'hosts' must be an array")
+
+    for host_idx, host in enumerate(hosts):
+        host_name = host.get("host_name", f"hosts[{host_idx}]")
+        nodes = host.get("nodes", [])
+        if not isinstance(nodes, list):
+            raise ValueError(f"host '{host_name}': 'nodes' must be an array")
+
+        for node_idx, node in enumerate(nodes):
+            node_name = node.get("node_name", f"node[{node_idx}]")
+            if node.get("publisher"):
+                for pub_idx, pub in enumerate(node["publisher"]):
+                    context = f"node '{node_name}' publisher[{pub_idx}]"
+                    _require_positive_int(pub, "payload_size", context)
+                    _require_positive_int(pub, "period_ms", context)
+
+            if "intermediate" in node:
+                intermediate_entries = _normalize_intermediate_entries(
+                    node["intermediate"], node_name
+                )
+                for entry_idx, intermediate_entry in enumerate(intermediate_entries):
+                    for pub_idx, pub in enumerate(intermediate_entry.get("publisher", [])):
+                        context = (
+                            f"node '{node_name}' intermediate[{entry_idx}] publisher[{pub_idx}]"
+                        )
+                        _require_positive_int(pub, "payload_size", context)
+                        _require_positive_int(pub, "period_ms", context)
 
 
 def _normalize_ws_dir(ws_dir):
@@ -254,16 +293,19 @@ def _append_host_script_prelude(
     )
 
 
-def _append_publisher_block(lines, node_name, pub_list, qos_opts, json_content):
+def _append_publisher_block(lines, node_name, pub_list, qos_opts):
     topic_names = ",".join(p["topic_name"] for p in pub_list)
     payload_sizes = [
-        _topic_numeric_field(
-            p, "payload_size", json_content, DEFAULT_PAYLOAD_SIZE)
-        for p in pub_list
+        _require_positive_int(
+            p, "payload_size", f"node '{node_name}' publisher[{idx}]"
+        )
+        for idx, p in enumerate(pub_list)
     ]
     period_mses = [
-        _topic_numeric_field(p, "period_ms", json_content, DEFAULT_PERIOD_MS)
-        for p in pub_list
+        _require_positive_int(
+            p, "period_ms", f"node '{node_name}' publisher[{idx}]"
+        )
+        for idx, p in enumerate(pub_list)
     ]
     payload_args = " ".join(f"--size {int(v)}" for v in payload_sizes)
     period_args = " ".join(f"--period {int(v)}" for v in period_mses)
@@ -336,16 +378,19 @@ def _collect_intermediate_pub_sub(intermediate_entries):
     return pub_defs, sub_topics
 
 
-def _append_intermediate_block(lines, node_name, pub_defs, sub_topics, qos_opts, json_content):
+def _append_intermediate_block(lines, node_name, pub_defs, sub_topics, qos_opts):
     pub_topics = [p["topic_name"] for p in pub_defs]
     payload_sizes = [
-        _topic_numeric_field(
-            p, "payload_size", json_content, DEFAULT_PAYLOAD_SIZE)
-        for p in pub_defs
+        _require_positive_int(
+            p, "payload_size", f"node '{node_name}' intermediate publisher[{idx}]"
+        )
+        for idx, p in enumerate(pub_defs)
     ]
     period_mses = [
-        _topic_numeric_field(p, "period_ms", json_content, DEFAULT_PERIOD_MS)
-        for p in pub_defs
+        _require_positive_int(
+            p, "period_ms", f"node '{node_name}' intermediate publisher[{idx}]"
+        )
+        for idx, p in enumerate(pub_defs)
     ]
     payload_args = " ".join(f"--size {int(v)}" for v in payload_sizes)
     period_args = " ".join(f"--period {int(v)}" for v in period_mses)
@@ -385,8 +430,7 @@ def generate_exec_scripts(json_content, rmw, output_dir):
     os.makedirs(output_dir, exist_ok=True)
 
     payload_size_default = DEFAULT_PAYLOAD_SIZE
-    period_ms_default = _json_default_int(
-        json_content, "period_ms", DEFAULT_PERIOD_MS)
+    period_ms_default = DEFAULT_PERIOD_MS
     eval_time_default = DEFAULT_EVAL_TIME
 
     qos_config = json_content.get("qos", {})
@@ -420,7 +464,6 @@ def generate_exec_scripts(json_content, rmw, output_dir):
                     node_name,
                     node["publisher"],
                     qos_opts,
-                    json_content,
                 )
             if node.get("subscriber"):
                 _append_subscriber_block(
@@ -442,7 +485,6 @@ def generate_exec_scripts(json_content, rmw, output_dir):
                     pub_defs,
                     sub_topics,
                     qos_opts,
-                    json_content,
                 )
 
         _append_host_script_epilogue(lines, host_name)
@@ -536,8 +578,7 @@ def _append_zenohd_service(lines, project_root, output_dir):
 def generate_compose(json_content, rmw, output_dir, project_root):
     """Generate local_compose.yaml for validation on a development machine."""
     payload_size_default = DEFAULT_PAYLOAD_SIZE
-    period_ms_default = _json_default_int(
-        json_content, "period_ms", DEFAULT_PERIOD_MS)
+    period_ms_default = DEFAULT_PERIOD_MS
     eval_time_default = DEFAULT_EVAL_TIME
     lines = ["services:"]
 
@@ -568,8 +609,7 @@ def generate_compose(json_content, rmw, output_dir, project_root):
 def generate_compose_per_host(json_content, rmw, output_dir, project_root):
     """Generate one host-specific host*_compose.yaml file per host."""
     payload_size_default = DEFAULT_PAYLOAD_SIZE
-    period_ms_default = _json_default_int(
-        json_content, "period_ms", DEFAULT_PERIOD_MS)
+    period_ms_default = DEFAULT_PERIOD_MS
     eval_time_default = DEFAULT_EVAL_TIME
     for host_dict in json_content["hosts"]:
         host_name = host_dict["host_name"]
@@ -627,7 +667,7 @@ def _run_script_common_prefix(
             '',
             'Notes:',
             '  --eval-time is applied to all nodes started via this script.',
-            '  Payload size and period are taken from topology JSON values.',
+            '  payload_size and period_ms must be set in each Publisher/Intermediate entry in topology JSON.',
             'EOF',
             '}',
             "",
@@ -678,8 +718,7 @@ def generate_host_run_scripts(json_content, output_dir, project_root):
     """Generate host*_run.sh wrapper scripts for host-specific Compose files."""
     rel_root = os.path.relpath(project_root, output_dir)
     payload_size_default = DEFAULT_PAYLOAD_SIZE
-    period_ms_default = _json_default_int(
-        json_content, "period_ms", DEFAULT_PERIOD_MS)
+    period_ms_default = DEFAULT_PERIOD_MS
     eval_time_default = DEFAULT_EVAL_TIME
     for host_dict in json_content["hosts"]:
         host_name = host_dict["host_name"]
@@ -731,7 +770,7 @@ def generate_local_run_script(json_content, rmw, output_dir, project_root):
         lines,
         rel_root,
         DEFAULT_PAYLOAD_SIZE,
-        _json_default_int(json_content, "period_ms", DEFAULT_PERIOD_MS),
+        DEFAULT_PERIOD_MS,
         DEFAULT_EVAL_TIME,
     )
     lines.extend(
@@ -942,6 +981,8 @@ if __name__ == "__main__":
 
     with open(args.json_path, "r") as f:
         json_content = json.load(f)
+
+    _validate_payload_period_constraints(json_content)
 
     # Generate into a temporary directory first, then swap it in after success.
     tmp_dir = output_dir + ".tmp"
