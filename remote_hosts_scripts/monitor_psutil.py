@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 Host-level monitor:
-usage: monitor_host.py <interval_s> <out.csv>
+usage: monitor_psutil.py <interval_s> <out.csv>
 Writes CSV: timestamp_ns,cpu_percent,load1,load5,load15,mem_total,mem_available,mem_used,mem_percent,swap_total,swap_used,swap_percent
 """
 
@@ -13,7 +13,7 @@ import psutil
 import os
 
 if len(sys.argv) < 3:
-    print("usage: monitor_host.py <interval_s> <out_csv>")
+    print("usage: monitor_psutil.py <interval_s> <out_csv>")
     sys.exit(2)
 
 interval = float(sys.argv[1])
