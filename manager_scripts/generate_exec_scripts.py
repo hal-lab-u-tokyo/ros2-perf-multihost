@@ -648,7 +648,7 @@ def _run_script_common_prefix(
             'done',
             'RESULTS_HOST_DIR="$RUN_ROOT_DIR/results"',
             'mkdir -p "$RESULTS_HOST_DIR"',
-            'RUN_TIMESTAMP="${RUN_TIMESTAMP:-$(date +%Y-%d-%m_%H-%M-%S)}"',
+            'RUN_TIMESTAMP="${RUN_TIMESTAMP:-$(date +%Y-%m-%d_%H-%M-%S)}"',
             'RUN_RESULTS_HOST_DIR="$RESULTS_HOST_DIR/$RUN_TIMESTAMP"',
             'EXEC_LOGS_HOST_DIR="$RUN_RESULTS_HOST_DIR/exec_logs/raw_${PAYLOAD_SIZE}B/run${RUN_IDX}"',
             'mkdir -p "$EXEC_LOGS_HOST_DIR"',
@@ -863,7 +863,7 @@ def generate_metadata_file(
     node_count = len(all_nodes)
 
     qos = json_content.get("qos", {})
-    timestamp = datetime.now().strftime("%Y-%d-%m_%H-%M-%S")
+    timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
     sections = [
         [
             "# --- 1. general info ---",
