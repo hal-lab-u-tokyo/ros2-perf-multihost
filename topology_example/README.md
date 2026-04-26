@@ -70,8 +70,6 @@ For `intermediate[].publisher[]`, `payload_size` and `period_ms` are also requir
 
 The RMW implementation is selected with the command-line arguments to `generate_exec_scripts.py`. Defining it in the JSON file has no effect.
 
-`--eval-time` can be passed to `_run.sh` or `_exec.sh` to override duration.
-
 ## 4. Minimal Template
 
 ```json
