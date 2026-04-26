@@ -462,11 +462,17 @@ if __name__ == "__main__":
     os.makedirs(base_log_dir, exist_ok=True)
     os.makedirs(base_result_dir, exist_ok=True)
 
+    # Resolve absolute path to start script (cwd-independent)
+    script_dir = os.path.dirname(os.path.abspath(__file__))
+    # performance_test -> ros2-perf-multihost
+    repo_root = os.path.dirname(script_dir)
     if args.docker:
-        start_scripts_py = "../manager_scripts/start_docker_scripts.py"
+        start_scripts_py = os.path.join(
+            repo_root, "manager_scripts", "start_docker_scripts.py")
         prefix = "docker"
     else:
-        start_scripts_py = "../manager_scripts/start_scripts.py"
+        start_scripts_py = os.path.join(
+            repo_root, "manager_scripts", "start_scripts.py")
         prefix = "raw"
 
     # Resolve actual host list from metadata
