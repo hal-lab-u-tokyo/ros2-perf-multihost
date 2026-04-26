@@ -2,7 +2,7 @@
   "eval_time": 120,
   "period_ms": 50,
   "qos": {
-    "history": "KEEP_ALL",
+    "history": "KEEP_LAST",
     "depth": 10,
     "reliability": "BEST_EFFORT"
   },

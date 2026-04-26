@@ -18,7 +18,7 @@
 | キー | 必須 | 型 | 既定値 | 説明 |
 |---|---|---|---|---|
 | history | 任意 | string | KEEP_LAST | QoS history。 |
-| depth | 任意 | number | 1 | QoS depth。 |
+| depth | 任意 | number | 1 | QoS depth。history が KEEP_LAST のときのみ有効で、KEEP_ALL の場合は無視される。 |
 | reliability | 任意 | string | RELIABLE | QoS reliability。 |
 
 ## 2. hosts 配下
@@ -68,11 +68,13 @@ publisher / subscriber の配列要素は、上記と同じく topic_name が必
 
 以下を JSON に書いても、現在の generate_exec_scripts.py では実行コマンド生成に使われません。
 
+- ルートの payload_size
 - 各 publisher エントリ内の payload_size
+- intermediate 内の publisher / subscriber 配下を含む各トピック定義内の payload_size
 - 各 publisher エントリ内の period_ms
 - ルートの rmw (RMW はコマンドライン引数 --rmw で指定)
 
-実行時の payload size は環境変数 PAYLOAD_SIZE (既定 64) を使用します。
+実行時の payload size は JSON 内の payload_size ではなく、環境変数 PAYLOAD_SIZE (既定 64) のみで決まります。
 
 ## 4. 最小テンプレート
 
