@@ -673,7 +673,6 @@ def generate_metadata_file(
             f"rmw: {rmw}",
             f"eval_time: {json_content.get('eval_time', 60)}",
             f"period_ms: {json_content.get('period_ms', 100)}",
-            f"payload_default: 64",
             f"qos_history: {qos.get('history', 'KEEP_LAST')}",
             f"qos_depth: {qos.get('depth', 1)}",
             f"qos_reliability: {qos.get('reliability', 'RELIABLE')}",
