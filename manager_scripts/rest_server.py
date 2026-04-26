@@ -1,145 +1,245 @@
-from flask import Flask, request, jsonify
-import subprocess
-import socket
+from flask import Flask, jsonify, request
 import logging
-import sys
 import os
+import socket
+import subprocess
+import sys
 
-logging.basicConfig(level=logging.INFO,
-                    format="%(asctime)s %(levelname)s: %(message)s", stream=sys.stdout)
+
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s %(levelname)s: %(message)s",
+    stream=sys.stdout,
+)
 
 app = Flask(__name__)
+
+REPO_ROOT = os.environ.get("ROS2_PERF_REPO_ROOT",
+                           "/home/ubuntu/ros2-perf-multihost")
+DEFAULT_WS_DIR = os.environ.get("ROS2_PERF_WS_DIR", "performance_ws")
+DEFAULT_SCENARIO = os.environ.get("ROS2_PERF_SCENARIO", "latest")
+RUN_SCRIPT_TIMEOUT_SEC = int(os.environ.get("RUN_SCRIPT_TIMEOUT_SEC", "900"))
+
+
+def _to_int(value, name):
+    try:
+        return int(value)
+    except (TypeError, ValueError) as exc:
+        raise ValueError(f"{name} must be an integer") from exc
+
+
+def _parse_simple_metadata(path):
+    data = {}
+    with open(path, "r", encoding="utf-8") as fh:
+        for line in fh:
+            if ": " not in line:
+                continue
+            key, value = line.split(": ", 1)
+            data[key.strip()] = value.strip()
+    return data
+
+
+def _resolve_exec_context(request_json):
+    request_json = request_json or {}
+    ws_dir_input = str(request_json.get("ws_dir", DEFAULT_WS_DIR)).strip()
+    scenario_input = str(request_json.get(
+        "scenario", DEFAULT_SCENARIO)).strip()
+
+    metadata_path = os.path.join(
+        REPO_ROOT, ws_dir_input, scenario_input, "metadata.txt")
+    if not os.path.isfile(metadata_path):
+        raise FileNotFoundError(f"metadata file not found: {metadata_path}")
+
+    metadata = _parse_simple_metadata(metadata_path)
+    ws_dir = metadata.get("ws_dir")
+    scenario_dir = metadata.get("scenario_dir")
+    if not ws_dir or not scenario_dir:
+        raise ValueError(
+            f"metadata is missing ws_dir/scenario_dir: {metadata_path}")
+
+    exec_dir = os.path.join(REPO_ROOT, ws_dir, scenario_dir, "exec_scripts")
+    if not os.path.isdir(exec_dir):
+        raise FileNotFoundError(
+            f"exec_scripts directory not found: {exec_dir}")
+
+    hosts = []
+    hosts_line = metadata.get("hosts", "")
+    if hosts_line:
+        hosts = [h.strip() for h in hosts_line.split(",") if h.strip()]
+
+    return {
+        "metadata_path": metadata_path,
+        "ws_dir": ws_dir,
+        "scenario_dir": scenario_dir,
+        "exec_dir": exec_dir,
+        "hosts": hosts,
+    }
+
+
+def _resolve_host_script(exec_dir, hosts, suffix):
+    hostname = socket.gethostname()
+    candidates = [hostname]
+    if "." in hostname:
+        candidates.append(hostname.split(".", 1)[0])
+
+    for cand in candidates:
+        script_name = f"{cand}_{suffix}"
+        script_path = os.path.join(exec_dir, script_name)
+        if os.path.isfile(script_path):
+            return cand, script_path
+
+    # metadata の host 名が FQDN などで微妙に異なる場合のフォールバック
+    base = candidates[-1]
+    for host in hosts:
+        if host == base or host.startswith(base) or base.startswith(host):
+            script_name = f"{host}_{suffix}"
+            script_path = os.path.join(exec_dir, script_name)
+            if os.path.isfile(script_path):
+                return host, script_path
+
+    raise FileNotFoundError(
+        f"host-specific script not found for hostname='{hostname}' in {exec_dir}"
+    )
+
+
+def _run_script(cmd, env=None):
+    result = subprocess.run(
+        cmd,
+        text=True,
+        capture_output=True,
+        timeout=RUN_SCRIPT_TIMEOUT_SEC,
+        env=env,
+    )
+    if result.returncode != 0:
+        return (
+            jsonify(
+                {
+                    "error": "script failed",
+                    "returncode": result.returncode,
+                    "stdout": result.stdout,
+                    "stderr": result.stderr,
+                }
+            ),
+            500,
+        )
+    return jsonify({"status": "finished", "stdout": result.stdout}), 200
 
 
 @app.route("/start", methods=["POST"])
 def start_script():
-    payload_size = request.json.get("payload_size")
-    run_idx = request.json.get("run_idx", 1)
-    if not payload_size:
+    body = request.get_json(silent=True) or {}
+    payload_size = body.get("payload_size")
+    run_idx = body.get("run_idx", 1)
+    period_ms = body.get("period_ms", 100)
+    eval_time = body.get("eval_time", 60)
+
+    if payload_size is None:
         return jsonify({"error": "payload_size required"}), 400
-    hostname = socket.gethostname()
-    script_path = f"/home/ubuntu/ros2-perf-multihost/host_scripts/{
-        hostname}_start.sh"
+
     try:
-        # スクリプトが終了するまで待つ
-        result = subprocess.run(
-            ["bash", script_path, str(payload_size), str(run_idx)], text=True)
-        if result.returncode == 0:
-            app.logger.info("[start] rc=0 stdout:\n%s", result.stdout)
-            return jsonify({"status": "finished", "stdout": result.stdout}), 200
-        else:
-            app.logger.error("[start] rc=%d stdout:\n%s\nstderr:\n%s",
-                             result.returncode, result.stdout, result.stderr)
-            return jsonify(
-                {"error": "script failed", "returncode": result.returncode,
-                    "stdout": result.stdout, "stderr": result.stderr}
-            ), 500
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
+        payload_size = _to_int(payload_size, "payload_size")
+        run_idx = _to_int(run_idx, "run_idx")
+        period_ms = _to_int(period_ms, "period_ms")
+        eval_time = _to_int(eval_time, "eval_time")
+
+        ctx = _resolve_exec_context(body)
+        resolved_host, script_path = _resolve_host_script(
+            ctx["exec_dir"], ctx["hosts"], "exec.sh")
+
+        log_dir = os.path.join(
+            REPO_ROOT,
+            "logs",
+            f"raw_{payload_size}B",
+            f"run{run_idx}",
+        )
+        os.makedirs(log_dir, exist_ok=True)
+
+        cmd = [
+            "bash",
+            script_path,
+            "--payload-size",
+            str(payload_size),
+            "--period-ms",
+            str(period_ms),
+            "--eval-time",
+            str(eval_time),
+        ]
+
+        env = os.environ.copy()
+        env["LOG_DIR"] = log_dir
+
+        app.logger.info(
+            "[start] host=%s scenario=%s payload=%s run=%s script=%s",
+            resolved_host,
+            ctx["scenario_dir"],
+            payload_size,
+            run_idx,
+            script_path,
+        )
+        return _run_script(cmd, env=env)
+    except ValueError as exc:
+        return jsonify({"error": str(exc)}), 400
+    except FileNotFoundError as exc:
+        return jsonify({"error": str(exc)}), 404
+    except subprocess.TimeoutExpired:
+        return jsonify({"error": f"script timeout after {RUN_SCRIPT_TIMEOUT_SEC}s"}), 504
+    except Exception as exc:
+        app.logger.exception("[start] exception")
+        return jsonify({"error": str(exc)}), 500
 
 
 @app.route("/start_docker", methods=["POST"])
 def start_docker():
-    payload_size = request.json.get("payload_size")
-    run_idx = request.json.get("run_idx", 1)
-    if not payload_size:
+    body = request.get_json(silent=True) or {}
+    payload_size = body.get("payload_size")
+    run_idx = body.get("run_idx", 1)
+    period_ms = body.get("period_ms", 100)
+    eval_time = body.get("eval_time", 60)
+
+    if payload_size is None:
         return jsonify({"error": "payload_size required"}), 400
-    hostname = socket.gethostname()
-    image_name = f"ros2_perf_{hostname}:latest"
-    logs_dir = "/home/ubuntu/ros2-perf-multihost/logs"
-    config_dir = "/home/ubuntu/ros2-perf-multihost/config"
-    current_log_dir = logs_dir + f"/docker_{payload_size}B/run{run_idx}"
-    os.makedirs(current_log_dir, exist_ok=True)
-    container_name = f"{hostname}_perf_run{run_idx}"
-    monitor_csv = f"{current_log_dir}/{hostname}_monitor_host.csv"
-    docker_timeout_sec = int(os.environ.get("DOCKER_RUN_TIMEOUT_SEC", "180"))
+
     try:
-        # 前回の同名コンテナが残っている場合は強制削除してからスタート
-        subprocess.run(
-            ["docker", "rm", "-f", container_name],
-            capture_output=True,
-        )
+        payload_size = _to_int(payload_size, "payload_size")
+        run_idx = _to_int(run_idx, "run_idx")
+        period_ms = _to_int(period_ms, "period_ms")
+        eval_time = _to_int(eval_time, "eval_time")
+
+        ctx = _resolve_exec_context(body)
+        resolved_host, script_path = _resolve_host_script(
+            ctx["exec_dir"], ctx["hosts"], "run.sh")
+
+        cmd = [
+            "bash",
+            script_path,
+            "--payload-size",
+            str(payload_size),
+            "--period-ms",
+            str(period_ms),
+            "--eval-time",
+            str(eval_time),
+            "--run-idx",
+            str(run_idx),
+        ]
+
         app.logger.info(
-            "[start_docker] host=%s payload=%s run=%s image=%s timeout=%ss",
-            hostname,
+            "[start_docker] host=%s scenario=%s payload=%s run=%s script=%s",
+            resolved_host,
+            ctx["scenario_dir"],
             payload_size,
             run_idx,
-            image_name,
-            docker_timeout_sec,
+            script_path,
         )
-        monitor_proc = subprocess.Popen(
-            [
-                "python3",
-                "/home/ubuntu/ros2-perf-multihost/performance_test/monitor_host.py",
-                "0.5",
-                monitor_csv,
-            ]
-        )
-        # Docker runコマンドを組み立て
-        cmd = [
-            "docker",
-            "run",
-            "--rm",
-            "--network",
-            "host",
-            "-e",
-            f"PAYLOAD_SIZE={payload_size}",
-            "-e",
-            f"RUN_IDX={run_idx}",
-            "-v",
-            f"{logs_dir}:/root/performance_ws/performance_test/logs_local",
-            "-v",
-            f"{config_dir}:/root/performance_ws/config:ro",
-            "--name",
-            container_name,
-            image_name,
-        ]
-        # capture_output を使わず、コンテナ標準出力を rest.log に流して進捗を可視化
-        result = subprocess.run(
-            cmd,
-            text=True,
-            timeout=docker_timeout_sec,
-        )
-        if result.returncode == 0:
-            app.logger.info("[start_docker] host=%s docker finished", hostname)
-            return jsonify({"status": "docker finished"}), 200
-        else:
-            app.logger.error(
-                "[start_docker] host=%s rc=%s",
-                hostname,
-                result.returncode,
-            )
-            return jsonify(
-                {
-                    "error": "docker run failed",
-                    "returncode": result.returncode,
-                }
-            ), 500
-    except subprocess.TimeoutExpired as e:
-        app.logger.error(
-            "[start_docker] host=%s timed out after %ss",
-            hostname,
-            docker_timeout_sec,
-        )
-        subprocess.run(["docker", "rm", "-f", container_name],
-                       capture_output=True)
-        return jsonify(
-            {
-                "error": f"docker run timeout after {docker_timeout_sec}s",
-            }
-        ), 504
-    except Exception as e:
-        app.logger.exception("[start_docker] host=%s exception", hostname)
-        return jsonify({"error": str(e)}), 500
-    finally:
-        try:
-            monitor_proc.terminate()
-            monitor_proc.wait(timeout=5)
-        except Exception:
-            try:
-                monitor_proc.kill()
-            except Exception:
-                pass
+        return _run_script(cmd)
+    except ValueError as exc:
+        return jsonify({"error": str(exc)}), 400
+    except FileNotFoundError as exc:
+        return jsonify({"error": str(exc)}), 404
+    except subprocess.TimeoutExpired:
+        return jsonify({"error": f"script timeout after {RUN_SCRIPT_TIMEOUT_SEC}s"}), 504
+    except Exception as exc:
+        app.logger.exception("[start_docker] exception")
+        return jsonify({"error": str(exc)}), 500
 
 
 if __name__ == "__main__":

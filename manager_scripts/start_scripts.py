@@ -1,27 +1,80 @@
 import requests
 import threading
 import sys
+import os
+
+
+def get_metadata_value(key, metadata_path):
+    """Extract a value from metadata.txt by key."""
+    try:
+        with open(metadata_path, "r") as f:
+            for line in f:
+                line = line.strip()
+                if line.startswith(f"{key}:"):
+                    return line[len(key) + 1:].strip()
+    except (FileNotFoundError, IOError):
+        pass
+    return None
+
+
+def resolve_host_list(ws_dir, scenario, num_hosts):
+    """Resolve host list from environment or metadata.txt."""
+    # Check environment variable first
+    env_hosts = os.environ.get("ROS2_PERF_HOSTS")
+    if env_hosts:
+        hosts = [h.strip() for h in env_hosts.split(",") if h.strip()]
+        return hosts[:num_hosts] if num_hosts else hosts
+
+    # Read from metadata.txt (required)
+    metadata_path = os.path.join(ws_dir, scenario, "metadata.txt")
+    if not os.path.exists(metadata_path):
+        raise FileNotFoundError(f"metadata.txt not found: {metadata_path}")
+
+    # Try deployment_hosts first, then hosts
+    metadata_hosts = get_metadata_value("deployment_hosts", metadata_path)
+    if not metadata_hosts:
+        metadata_hosts = get_metadata_value("hosts", metadata_path)
+
+    if not metadata_hosts:
+        raise ValueError(
+            f"No hosts found in {metadata_path}. "
+            "Define 'hosts' or 'deployment_hosts' in metadata.txt"
+        )
+
+    hosts = [h.strip() for h in metadata_hosts.split(",") if h.strip()]
+    return hosts[:num_hosts] if num_hosts else hosts
 
 
 def main():
     if len(sys.argv) < 4:
-        print("Usage: python start_scripts.py <payload_size> <num_hosts> <run_idx>")
+        print(
+            "Usage: python start_scripts.py <payload_size> <num_hosts> <run_idx> [ws_dir] [scenario] [hosts_list]")
         sys.exit(1)
     payload_size = sys.argv[1]
     num_hosts = int(sys.argv[2])
     run_idx = int(sys.argv[3])
+    ws_dir = sys.argv[4] if len(sys.argv) >= 5 else "performance_ws"
+    scenario = sys.argv[5] if len(sys.argv) >= 6 else "latest"
 
-    all_hosts = [
-        "192.168.11.106",
-        "192.168.11.107",
-        "192.168.11.108",
-    ]
-    hosts = all_hosts[:num_hosts]
+    # Support host list from parameter or resolve from metadata
+    if len(sys.argv) >= 7 and sys.argv[6]:
+        # Host list passed from performance_test.py (comma-separated)
+        hosts = [h.strip() for h in sys.argv[6].split(",") if h.strip()]
+    else:
+        # Resolve from environment, metadata, or defaults
+        hosts = resolve_host_list(ws_dir, scenario, num_hosts)
 
     def start(host):
         try:
             r = requests.post(
-                f"http://{host}:5000/start", json={"payload_size": payload_size, "run_idx": run_idx}, timeout=100
+                f"http://{host}:5000/start",
+                json={
+                    "payload_size": payload_size,
+                    "run_idx": run_idx,
+                    "ws_dir": ws_dir,
+                    "scenario": scenario,
+                },
+                timeout=100,
             )
             print(f"{host}: {r.status_code} {r.text}")
         except Exception as e:

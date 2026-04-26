@@ -11,6 +11,65 @@ from throughput_calc import calc_throughput
 default_payload_sizes = [64]
 
 
+def get_metadata_value(key, metadata_path):
+    """Extract a value from metadata.txt by key."""
+    try:
+        with open(metadata_path, "r") as f:
+            for line in f:
+                line = line.strip()
+                if line.startswith(f"{key}:"):
+                    return line[len(key) + 1:].strip()
+    except (FileNotFoundError, IOError):
+        pass
+    return None
+
+
+def resolve_host_list(ws_dir, scenario, mode="raw", num_hosts=None):
+    """Resolve host list from environment or metadata.txt.
+
+    Args:
+        ws_dir: Workspace directory containing scenarios
+        scenario: Scenario directory name  
+        mode: Ignored (for compatibility); hosts are always from metadata
+        num_hosts: If provided, limit to first N hosts
+
+    Returns:
+        List of hostname/IP addresses
+
+    Raises:
+        FileNotFoundError: If metadata.txt is not found
+        ValueError: If no hosts found in metadata.txt
+    """
+    # Check environment variable first
+    env_hosts = os.environ.get("ROS2_PERF_HOSTS")
+    if env_hosts:
+        hosts = [h.strip() for h in env_hosts.split(",") if h.strip()]
+        if num_hosts:
+            hosts = hosts[:num_hosts]
+        return hosts
+
+    # Read from metadata.txt (required)
+    metadata_path = os.path.join(ws_dir, scenario, "metadata.txt")
+    if not os.path.exists(metadata_path):
+        raise FileNotFoundError(f"metadata.txt not found: {metadata_path}")
+
+    # Try deployment_hosts first, then hosts
+    metadata_hosts = get_metadata_value("deployment_hosts", metadata_path)
+    if not metadata_hosts:
+        metadata_hosts = get_metadata_value("hosts", metadata_path)
+
+    if not metadata_hosts:
+        raise ValueError(
+            f"No hosts found in {metadata_path}. "
+            "Define 'hosts' or 'deployment_hosts' in metadata.txt"
+        )
+
+    hosts = [h.strip() for h in metadata_hosts.split(",") if h.strip()]
+    if num_hosts:
+        hosts = hosts[:num_hosts]
+    return hosts
+
+
 def parse_payloads(payload_arg):
     payloads = []
     for raw in payload_arg.split(","):
@@ -36,11 +95,22 @@ def parse_payloads(payload_arg):
     return payloads
 
 
-def run_test(payload_size, run_idx, start_scripts_py, num_hosts):
+def run_test(payload_size, run_idx, start_scripts_py, hosts, ws_dir, scenario):
     print(f"=== Run payload={payload_size}B, trial={run_idx + 1} ===")
+    # Convert host list to comma-separated string for passing to start_*_scripts.py
+    hosts_str = ",".join(hosts)
+    cmd = [
+        "python3",
+        start_scripts_py,
+        str(payload_size),
+        str(len(hosts)),  # num_hosts is still needed for backward compat
+        str(run_idx + 1),
+        ws_dir,
+        scenario,
+        hosts_str,  # Pass actual host list as 7th argument
+    ]
     result = subprocess.run(
-        ["python3", start_scripts_py, str(
-            payload_size), str(num_hosts), str(run_idx + 1)],
+        cmd,
         text=True,
     )
     print(result)
@@ -51,18 +121,35 @@ def run_test(payload_size, run_idx, start_scripts_py, num_hosts):
 
 
 def aggregate_total_latency(
-    base_log_dir, result_parent_dir, prefix, payload_size, num_trials, num_hosts, period_ms=100, eval_time=60
+    base_log_dir,
+    result_parent_dir,
+    prefix,
+    payload_size,
+    num_trials,
+    hosts,
+    period_ms=100,
+    eval_time=60,
+    ws_dir="performance_ws",
+    scenario="latest",
 ):
     latest_dir = f"{prefix}_{payload_size}B"
     log_parent = os.path.abspath(base_log_dir)
     src_log_dir = os.path.join(log_parent, latest_dir)
-
-    hosts = ["pi0", "pi1", "pi2", "pi3", "pi4"][:num_hosts]
     for run_idx in range(num_trials):
         run_log_dir = os.path.join(src_log_dir, f"run{run_idx + 1}")
         os.makedirs(run_log_dir, exist_ok=True)
-        remote_log_dir = f"/home/ubuntu/ros2-perf-multihost/logs/{
-            prefix}_{payload_size}B/run{run_idx + 1}"
+        if prefix == "docker":
+            # 新フロー: host*_run.sh が <ws-dir>/<scenario>/results/latest/exec_logs/... に出力
+            remote_log_dir = (
+                f"/home/ubuntu/ros2-perf-multihost/{ws_dir}/{scenario}"
+                f"/results/latest/exec_logs/raw_{payload_size}B/run{run_idx + 1}"
+            )
+        else:
+            # 旧rawフロー: /start が /logs/raw_* に出力
+            remote_log_dir = (
+                f"/home/ubuntu/ros2-perf-multihost/logs/"
+                f"{prefix}_{payload_size}B/run{run_idx + 1}"
+            )
         for host in hosts:
             print(f"Copying logs from {host} (run{run_idx + 1})")
             subprocess.run(
@@ -355,6 +442,18 @@ if __name__ == "__main__":
     )
     parser.add_argument("--docker", action="store_true",
                         help="Dockerを使用する場合は指定")
+    parser.add_argument(
+        "--ws-dir",
+        type=str,
+        default="performance_ws",
+        help="実行スクリプト生成先のベースディレクトリ (デフォルト: performance_ws)",
+    )
+    parser.add_argument(
+        "--scenario",
+        type=str,
+        default="latest",
+        help="使用するシナリオディレクトリ名 (デフォルト: latest)",
+    )
     args = parser.parse_args()
 
     base_log_dir = "./logs"
@@ -369,14 +468,35 @@ if __name__ == "__main__":
         start_scripts_py = "../manager_scripts/start_scripts.py"
         prefix = "raw"
 
+    # Resolve actual host list from metadata or defaults
+    hosts = resolve_host_list(
+        args.ws_dir, args.scenario, mode="docker" if args.docker else "raw", num_hosts=args.hosts
+    )
+    print(f"Using hosts: {hosts}")
+
     payload_sizes = args.payload
     for payload_size in payload_sizes:
         print(f"=== Payload size: {payload_size}B ===")
         for run_idx in range(args.trials):
-            run_test(payload_size, run_idx, start_scripts_py, args.hosts)
+            run_test(
+                payload_size,
+                run_idx,
+                start_scripts_py,
+                hosts,
+                args.ws_dir,
+                args.scenario,
+            )
             time.sleep(10)
         aggregate_total_latency(
-            base_log_dir, base_result_dir, prefix, payload_size, args.trials, args.hosts)
+            base_log_dir,
+            base_result_dir,
+            prefix,
+            payload_size,
+            args.trials,
+            hosts,
+            ws_dir=args.ws_dir,
+            scenario=args.scenario,
+        )
     print("All tests and aggregation complete.")
 
     # --- ここから全ペイロードサイズの集計CSVをまとめる処理 ---

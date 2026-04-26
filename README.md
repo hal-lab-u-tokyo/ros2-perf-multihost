@@ -209,6 +209,8 @@ python3 performance_test.py --hosts 3 --trials 10 --docker --payload "64,256"
 - `--trials`: 各ペイロードサイズあたりの試行回数
 - `--payload`: ペイロードサイズをカンマ区切りで指定（例: `--payload "64,256"`）。未指定時は `64` を使用
 - `--docker`: Docker コンテナを経由したテストを行う場合に指定（内部で `manager_scripts/start_docker_scripts.py` を呼び出します）
+- `--ws-dir`: 実行スクリプト生成先のベースディレクトリ（デフォルト: `performance_ws`）
+- `--scenario`: 使用するシナリオディレクトリ（デフォルト: `latest`）
 
 `performance_test.py` は各試行ごとに REST 経由でノード群を起動し、終了後に各ホストからログを `scp` で収集します。ログは `performance_test/logs` 以下に、集計結果（レイテンシ・スループット・ホスト使用率）は `performance_test/results` 以下に CSV 形式で保存されます。
 
