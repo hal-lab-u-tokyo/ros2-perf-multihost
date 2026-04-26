@@ -146,7 +146,6 @@ python3 parse_json/generate_exec_scripts.py topology_example/simple.json --rmw z
 - `rmw`: 指定したRMW名
 - `eval_time`: 計測時間（秒）
 - `period_ms`: 送信周期（ms）
-- `payload_default`: デフォルトのペイロードサイズ（バイト）
 - `qos_history` / `qos_depth` / `qos_reliability`: QoS設定
 
 **3. topology stats** — トポロジー統計
