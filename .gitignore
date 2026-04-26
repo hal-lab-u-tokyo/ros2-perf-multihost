@@ -13,6 +13,5 @@ log/
 performance_test/logs/
 performance_test/results/
 
-# Generated artifacts for performance result storage.
-performance_ws/*
-!performance_ws/.gitkeep
+# Generated artifacts for the default performance workspace.
+performance_ws/

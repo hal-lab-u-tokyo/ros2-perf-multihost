@@ -103,21 +103,22 @@ docker pull ghcr.io/hal-lab-u-tokyo/ros2-perf-multihost:latest
 プロジェクトルートから実行します。
 
 ```bash
-python3 parse_json/generate_exec_scripts.py <topology.json> --rmw <rmw> [--label <label>]
+python3 parse_json/generate_exec_scripts.py <topology.json> [--rmw <rmw>] [--ws-dir <dir>] [--force]
 ```
 
 引数:
 
 - `<topology.json>`: トポロジー定義JSONファイルのパス
+- `--ws-dir`: 生成物のベースディレクトリ（デフォルト: `performance_ws`）
 - `--rmw`: RMW実装（`fastdds` / `zenoh` / `cyclonedds`、デフォルト: `fastdds`）
-- `--label`: 実行ラベル（省略可）。同名ラベルが既に存在する場合は警告を表示します
+- `--force`: 既存の出力ディレクトリを確認なしで上書きする（CI・スクリプト実行時に使用）
 
-出力先は `performance_ws/<YYYY-DD-MM_HH-mm-ss>/exec_scripts/`（`--label` 指定時は `performance_ws/<label>-<YYYY-DD-MM_HH-mm-ss>/exec_scripts/`）です。`performance_ws/latest` は常に最新の実行ディレクトリへのシンボリックリンクになります。
-`performance_ws/` ディレクトリ自体は `performance_ws/.gitkeep` でリポジトリ管理し、実行時に生成される中身は `.gitignore` で除外しています。
+出力先は `<ws-dir>/<JSONファイル名>-<rmw>/exec_scripts/` です。既に存在する場合は上書き確認を行い、`Yes` のときは `exec_scripts/*` を削除して再生成します。このとき、前回の生成に使ったJSONファイルのパス（`metadata.txt` の `json_path:` フィールド）と今回のパスが異なる場合（同名ファイルを別パスから指定した場合）は、追加の警告メッセージを表示します。stdin が TTY でない場合（CI・パイプ経由など）は確認プロンプトを出さずにエラー終了します。その場合は `--force` を使用してください。`<ws-dir>/latest` は常に最新に生成されたディレクトリへのシンボリックリンクになります。
+デフォルトの `performance_ws/` ディレクトリは自動生成されますが、リポジトリ管理からは `.gitignore` で除外しています。
 
 ```bash
 # 例: zenoh で topology_example を使う場合
-python3 parse_json/generate_exec_scripts.py topology_example/simple.json --rmw zenoh --label myrun
+python3 parse_json/generate_exec_scripts.py topology_example/simple.json --rmw zenoh
 ```
 
 生成されるファイル:
@@ -129,8 +130,34 @@ python3 parse_json/generate_exec_scripts.py topology_example/simple.json --rmw z
 | `host{N}_exec.sh` | 各ホストのコンテナ内（またはネイティブ）で実行するROSノード起動スクリプト |
 | `local_run.sh` | `local_compose.yaml` を使って全サービスを起動するラッパースクリプト（検証用） |
 | `local_compose.yaml` | 作業PC上で全サービスをまとめて起動するcompose定義（検証用） |
+| `metadata.txt` | 最新実行ディレクトリのメタ情報（入力JSON名、RMW、トポロジー統計など） |
 
-`host{N}_run.sh` / `local_run.sh` から起動される各ノードの `--log_dir` は、`exec_scripts/` の1つ上（= 実行ディレクトリ）配下の `node_log/raw_<payload_size>B/run<run_idx>/` になります。例: `performance_ws/latest/node_log/raw_64B/run1/`。
+`metadata.txt` は `<ws-dir>/latest/metadata.txt` に生成され、以下の情報がカテゴリ別に記録されます。
+
+**1. general info** — 全般情報
+- `command`: 実行したコマンド全文
+- `timestamp`: スクリプト実行日時（`YYYY-DD-MM_hh-mm-ss`）
+- `json`: 入力に指定したJSONファイル名
+- `json_path`: 指定したJSONファイルのパス
+- `ws_dir`: 出力ベースディレクトリ
+- `scenario_dir`: 生成した実行ディレクトリ名
+
+**2. test config** — テスト設定
+- `rmw`: 指定したRMW名
+- `eval_time`: 計測時間（秒）
+- `period_ms`: 送信周期（ms）
+- `payload_default`: デフォルトのペイロードサイズ（バイト）
+- `qos_history` / `qos_depth` / `qos_reliability`: QoS設定
+
+**3. topology stats** — トポロジー統計
+- `host_count` / `node_count`: ホスト数・ノード数
+- `publisher_count` / `subscriber_count` / `intermediate_count`: 役割別ノード数
+- `topic_count`: ユニークトピック数
+- `hosts`: ホスト名一覧（例: `host1, host2`）
+- `publishers` / `subscribers` / `intermediates`: 役割別ノード名一覧
+- `topics`: トピック名一覧（アルファベット順）
+
+`host{N}_run.sh` / `local_run.sh` から起動される各ノードの `--log_dir` は、`exec_scripts/` の1つ上（= 実行ディレクトリ）配下の `results/YYYY-DD-MM_hh-mm-ss/exec_logs/raw_<payload_size>B/run<run_idx>/` になります。`results/latest` は最新ディレクトリへのシンボリックリンクとして更新されます。例: `performance_ws/latest/results/2026-26-04_13-21-45/exec_logs/raw_64B/run1/`。
 
 ### 作業PC上での検証実行（Docker）
 
