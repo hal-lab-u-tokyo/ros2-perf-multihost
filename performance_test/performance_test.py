@@ -7,9 +7,8 @@ import numpy as np
 import argparse
 from throughput_calc import calc_throughput
 
-# 設定
-# default_payload_sizes = [64, 256, 1024, 4096, 16384, 65536, 262144]
-default_payload_sizes = [64]
+# Note: All test parameters (payload_size, period_ms, eval_time) are determined by run.sh defaults.
+# See performance_ws/<scenario>/exec_scripts/*_run.sh for details.
 
 
 def get_metadata_value(key, metadata_path):
@@ -71,44 +70,18 @@ def resolve_host_list(ws_dir, scenario, mode="raw", num_hosts=None):
     return hosts
 
 
-def parse_payloads(payload_arg):
-    payloads = []
-    for raw in payload_arg.split(","):
-        v = raw.strip()
-        if not v:
-            continue
-        try:
-            size = int(v)
-        except ValueError as e:
-            raise argparse.ArgumentTypeError(
-                f"Invalid payload size: '{v}'. Use comma separated integers, e.g. 64,256"
-            ) from e
-        if size <= 0:
-            raise argparse.ArgumentTypeError(
-                f"Payload size must be a positive integer: {size}"
-            )
-        payloads.append(size)
-
-    if not payloads:
-        raise argparse.ArgumentTypeError(
-            "At least one payload size is required. Example: --payload \"64,256\""
-        )
-    return payloads
-
-
-def run_test(payload_size, run_idx, start_scripts_py, hosts, ws_dir, scenario):
-    print(f"=== Run payload={payload_size}B, trial={run_idx + 1} ===")
+def run_test(run_idx, start_scripts_py, hosts, ws_dir, scenario):
+    print(f"=== Run trial={run_idx + 1} ===")
     # Convert host list to comma-separated string for passing to start_*_scripts.py
     hosts_str = ",".join(hosts)
     cmd = [
         "python3",
         start_scripts_py,
-        str(payload_size),
-        str(len(hosts)),  # num_hosts is still needed for backward compat
-        str(run_idx + 1),
+        str(run_idx + 1),  # run_idx as 2nd argument (was payload_size)
+        str(len(hosts)),   # num_hosts
         ws_dir,
         scenario,
-        hosts_str,  # Pass actual host list as 7th argument
+        hosts_str,  # Pass actual host list
     ]
     result = subprocess.run(
         cmd,
@@ -125,14 +98,13 @@ def aggregate_total_latency(
     base_log_dir,
     result_parent_dir,
     prefix,
-    payload_size,
     num_trials,
     hosts,
-    period_ms=100,
-    eval_time=60,
     ws_dir="performance_ws",
     scenario="latest",
 ):
+    # Note: payload_size is determined by run.sh defaults (typically 64B)
+    payload_size = 64  # Read from run.sh defaults
     latest_dir = f"{prefix}_{payload_size}B"
     log_parent = os.path.abspath(base_log_dir)
     src_log_dir = os.path.join(log_parent, latest_dir)
@@ -430,30 +402,23 @@ def read_monitor_metrics(path):
 
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser()
-    parser.add_argument("--hosts", type=int, default=3,
-                        help="使用するホスト数 (デフォルト: 3)")
-    parser.add_argument("--trials", type=int, default=10,
-                        help="1ペイロードサイズあたりの試行回数 (デフォルト: 10)")
-    parser.add_argument(
-        "--payload",
-        type=parse_payloads,
-        default=default_payload_sizes,
-        help="ペイロードサイズをカンマ区切りで指定 (例: \"64,256\")",
-    )
+    parser = argparse.ArgumentParser(
+        description="Run performance tests using run.sh defaults")
+    parser.add_argument("--trials", type=int, default=3,
+                        help="試行回数 (デフォルト: 3)")
     parser.add_argument("--docker", action="store_true",
                         help="Dockerを使用する場合は指定")
     parser.add_argument(
         "--ws-dir",
         type=str,
         default="performance_ws",
-        help="実行スクリプト生成先のベースディレクトリ (デフォルト: performance_ws)",
+        help="ワークスペースディレクトリ (デフォルト: performance_ws)",
     )
     parser.add_argument(
         "--scenario",
         type=str,
         default="latest",
-        help="使用するシナリオディレクトリ名 (デフォルト: latest)",
+        help="シナリオディレクトリ名 (デフォルト: latest)",
     )
     args = parser.parse_args()
 
@@ -475,17 +440,16 @@ if __name__ == "__main__":
             repo_root, "manager_scripts", "start_scripts.py")
         prefix = "raw"
 
-    # Resolve actual host list from metadata
+    # Resolve actual host list from metadata (metadata.txt is authoritative)
     try:
         hosts = resolve_host_list(
-            args.ws_dir, args.scenario, mode="docker" if args.docker else "raw", num_hosts=args.hosts
+            args.ws_dir, args.scenario, mode="docker" if args.docker else "raw"
         )
     except (FileNotFoundError, ValueError) as e:
         print(f"ERROR: {e}", file=sys.stderr)
         sys.exit(1)
     print(f"Using hosts: {hosts}")
-
-    payload_sizes = args.payload
+    print(f"Note: payload_size, period_ms, eval_time are determined by run.sh defaults")
     for payload_size in payload_sizes:
         print(f"=== Payload size: {payload_size}B ===")
         for run_idx in range(args.trials):
@@ -505,14 +469,18 @@ if __name__ == "__main__":
             payload_size,
             args.trials,
             hosts,
+            period_ms=period_ms,
+            eval_time=eval_time,
             ws_dir=args.ws_dir,
             scenario=args.scenario,
         )
     print("All tests and aggregation complete.")
 
     # --- ここから全ペイロードサイズの集計CSVをまとめる処理 ---
+    # Since we're only running one payload size (64B default from run.sh), this is simplified
     summary_rows = []
     header = None
+    payload_sizes = [64]  # run.sh default
     for payload_size in payload_sizes:
         latest_dir = f"{prefix}_{payload_size}B"
         csv_path = os.path.join(
