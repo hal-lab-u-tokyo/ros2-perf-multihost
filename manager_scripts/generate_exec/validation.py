@@ -29,6 +29,23 @@ def require_non_empty_string(entry, key, context):
     return value
 
 
+def _is_valid_identifier(value):
+    """Check if value is a valid ROS-compatible identifier.
+    
+    Allows alphanumerics, underscores, and hyphens; no spaces or shell metacharacters.
+    """
+    import re
+    return bool(re.match(r"^[A-Za-z0-9_-]+$", value))
+
+
+def _is_valid_host_name(value):
+    """Check if value is a safe hostname (subset of identifier).
+    
+    Allows alphanumerics, underscores, and hyphens; prevents path traversal and shell injection.
+    """
+    return _is_valid_identifier(value)
+
+
 def ensure_only_allowed_keys(entry, allowed_keys, context):
     """Reject unknown keys to catch topology JSON typos early."""
     unknown_keys = sorted(set(entry.keys()) - set(allowed_keys))
@@ -81,7 +98,11 @@ def validate_publisher_entries(pub_entries, context):
             {"topic_name", "payload_size", "period_ms"},
             pub_context,
         )
-        require_non_empty_string(pub, "topic_name", pub_context)
+        topic_name_str = require_non_empty_string(pub, "topic_name", pub_context)
+        if not _is_valid_identifier(topic_name_str):
+            raise ValueError(
+                f"{pub_context}: 'topic_name' must be a valid ROS identifier (alphanumerics, underscores, hyphens; no spaces or special characters)"
+            )
         require_positive_int(pub, "payload_size", pub_context)
         require_positive_int(pub, "period_ms", pub_context)
 
@@ -96,7 +117,11 @@ def validate_subscriber_entries(sub_entries, context):
         if not isinstance(sub, dict):
             raise ValueError(f"{sub_context}: must be an object")
         ensure_only_allowed_keys(sub, {"topic_name"}, sub_context)
-        require_non_empty_string(sub, "topic_name", sub_context)
+        topic_name_str = require_non_empty_string(sub, "topic_name", sub_context)
+        if not _is_valid_identifier(topic_name_str):
+            raise ValueError(
+                f"{sub_context}: 'topic_name' must be a valid ROS identifier (alphanumerics, underscores, hyphens; no spaces or special characters)"
+            )
 
 
 def normalize_intermediate_entries(intermediate_value, node_name):
@@ -146,7 +171,11 @@ def validate_topology_json_schema(json_content):
         if not isinstance(host, dict):
             raise ValueError(f"{host_context}: must be an object")
         ensure_only_allowed_keys(host, {"host_name", "nodes"}, host_context)
-        require_non_empty_string(host, "host_name", host_context)
+        host_name_str = require_non_empty_string(host, "host_name", host_context)
+        if not _is_valid_host_name(host_name_str):
+            raise ValueError(
+                f"{host_context}: 'host_name' must contain only alphanumerics, underscores, and hyphens (no spaces, slashes, or special characters)"
+            )
 
         if "nodes" not in host:
             raise ValueError(f"{host_context}: 'nodes' is required")
@@ -165,7 +194,11 @@ def validate_topology_json_schema(json_content):
                 {"node_name", "publisher", "subscriber", "intermediate"},
                 node_context,
             )
-            require_non_empty_string(node, "node_name", node_context)
+            node_name_str = require_non_empty_string(node, "node_name", node_context)
+            if not _is_valid_identifier(node_name_str):
+                raise ValueError(
+                    f"{node_context}: 'node_name' must be a valid ROS identifier (alphanumerics, underscores, hyphens; no spaces or special characters)"
+                )
 
             has_role = any(
                 role in node for role in ("publisher", "subscriber", "intermediate")
