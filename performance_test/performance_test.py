@@ -70,22 +70,33 @@ def resolve_host_list(ws_dir, scenario, mode="raw", num_hosts=None):
     return hosts
 
 
-def run_test(run_idx, start_scripts_py, hosts, ws_dir, scenario):
+def run_test(run_idx, start_scripts_py, hosts, ws_dir, scenario, payload_size=None, period_ms=None, eval_time=None):
     print(f"=== Run trial={run_idx + 1} ===")
     # Convert host list to comma-separated string for passing to start_*_scripts.py
     hosts_str = ",".join(hosts)
     cmd = [
         "python3",
         start_scripts_py,
-        str(run_idx + 1),  # run_idx as 2nd argument (was payload_size)
+        str(run_idx + 1),  # run_idx as 2nd argument
         str(len(hosts)),   # num_hosts
         ws_dir,
         scenario,
         hosts_str,  # Pass actual host list
     ]
+
+    # Build environment with optional test parameters
+    env = os.environ.copy()
+    if payload_size is not None:
+        env["PAYLOAD_SIZE"] = str(payload_size)
+    if period_ms is not None:
+        env["PERIOD_MS"] = str(period_ms)
+    if eval_time is not None:
+        env["EVAL_TIME"] = str(eval_time)
+
     result = subprocess.run(
         cmd,
         text=True,
+        env=env,
     )
     print(result)
     if result.returncode != 0:
@@ -98,13 +109,12 @@ def aggregate_total_latency(
     base_log_dir,
     result_parent_dir,
     prefix,
+    payload_size,
     num_trials,
     hosts,
     ws_dir="performance_ws",
     scenario="latest",
 ):
-    # Note: payload_size is determined by run.sh defaults (typically 64B)
-    payload_size = 64  # Read from run.sh defaults
     latest_dir = f"{prefix}_{payload_size}B"
     log_parent = os.path.abspath(base_log_dir)
     src_log_dir = os.path.join(log_parent, latest_dir)
@@ -406,6 +416,12 @@ if __name__ == "__main__":
         description="Run performance tests using run.sh defaults")
     parser.add_argument("--trials", type=int, default=3,
                         help="試行回数 (デフォルト: 3)")
+    parser.add_argument("--payload-size", type=int, default=None,
+                        help="ペイロードサイズ (バイト、未指定の場合は run.sh のデフォルト: 64)")
+    parser.add_argument("--period-ms", type=int, default=None,
+                        help="測定間隔 (ミリ秒、未指定の場合は run.sh のデフォルト: 100)")
+    parser.add_argument("--eval-time", type=int, default=None,
+                        help="評価時間 (秒、未指定の場合は run.sh のデフォルト: 60)")
     parser.add_argument("--docker", action="store_true",
                         help="Dockerを使用する場合は指定")
     parser.add_argument(
@@ -477,10 +493,9 @@ if __name__ == "__main__":
     print("All tests and aggregation complete.")
 
     # --- ここから全ペイロードサイズの集計CSVをまとめる処理 ---
-    # Since we're only running one payload size (64B default from run.sh), this is simplified
     summary_rows = []
     header = None
-    payload_sizes = [64]  # run.sh default
+    payload_sizes = [payload_size]  # Use the payload_size from CLI or default
     for payload_size in payload_sizes:
         latest_dir = f"{prefix}_{payload_size}B"
         csv_path = os.path.join(
