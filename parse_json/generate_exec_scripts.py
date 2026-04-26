@@ -60,8 +60,15 @@ def _read_existing_json_path(run_dir):
     return None
 
 
-def _confirm_overwrite(output_dir, existing_json_path=None, new_json_path=None):
+def _confirm_overwrite(output_dir, force=False, existing_json_path=None, new_json_path=None):
     """既存の exec_scripts を上書きするか確認する"""
+    if force:
+        return True
+    if not sys.stdin.isatty():
+        raise SystemExit(
+            f"Error: '{output_dir}' already exists and stdin is not a TTY. "
+            "Use --force to overwrite without confirmation."
+        )
     msg = f"'{output_dir}' already exists."
     if (
         existing_json_path is not None
@@ -94,7 +101,7 @@ def _update_latest_symlink(base_dir, target_name):
     os.symlink(target_name, latest_link)
 
 
-def resolve_output_paths(json_path, rmw, ws_dir):
+def resolve_output_paths(json_path, rmw, ws_dir, force=False):
     """出力先ディレクトリと latest エイリアスを解決・更新する"""
     project_root = os.getcwd()
     perf_ws_dir = os.path.join(project_root, ws_dir)
@@ -107,7 +114,7 @@ def resolve_output_paths(json_path, rmw, ws_dir):
 
     if os.path.isdir(output_dir):
         existing_json_path = _read_existing_json_path(run_dir)
-        if not _confirm_overwrite(output_dir, existing_json_path, json_path):
+        if not _confirm_overwrite(output_dir, force=force, existing_json_path=existing_json_path, new_json_path=json_path):
             raise SystemExit("Canceled by user. No files were generated.")
         _clear_directory_contents(output_dir)
     else:
@@ -436,7 +443,7 @@ def generate_compose_per_host(json_content, rmw, output_dir, project_root):
             f.write("\n".join(lines) + "\n")
 
 
-def _run_script_common_prefix(lines):
+def _run_script_common_prefix(lines, rel_root):
     """runスクリプト共通の前半を追加する"""
     lines.extend(
         [
@@ -446,8 +453,8 @@ def _run_script_common_prefix(lines):
             'SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"',
             'RUN_ROOT_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"',
             'RUN_DIR_NAME="$(basename "$RUN_ROOT_DIR")"',
-            '# プロジェクトルート: このスクリプトは performance_ws/<run>/exec_scripts/ 以下に生成される',
-            'PROJECT_ROOT="$(cd "$SCRIPT_DIR/../../.." && pwd)"',
+            f'# プロジェクトルート: exec_scripts/ からの相対パスは生成時に確定済み ({rel_root})',
+            f'PROJECT_ROOT="$(cd "$SCRIPT_DIR/{rel_root}" && pwd)"',
             'LOCAL_UID="${LOCAL_UID:-$(id -u)}"',
             'LOCAL_GID="${LOCAL_GID:-$(id -g)}"',
             'PAYLOAD_SIZE="${PAYLOAD_SIZE:-64}"',
@@ -472,14 +479,15 @@ def _run_script_common_prefix(lines):
     )
 
 
-def generate_host_run_scripts(json_content, output_dir):
-    """host*_run.sh: 各ホスト用composeを起動するラッパースクリプトを生成する"""
+def generate_host_run_scripts(json_content, output_dir, project_root):
+    """host*_run.sh: 各ホスト用composeを起動するラッパスクリプトを生成する"""
+    rel_root = os.path.relpath(project_root, output_dir)
     for host_dict in json_content["hosts"]:
         host_name = host_dict["host_name"]
         script_path = os.path.join(output_dir, f"{host_name}_run.sh")
         compose_file = f"$SCRIPT_DIR/{host_name}_compose.yaml"
         lines = []
-        _run_script_common_prefix(lines)
+        _run_script_common_prefix(lines, rel_root)
         lines.extend(
             [
                 f'COMPOSE_FILE="{compose_file}"',
@@ -504,14 +512,15 @@ def generate_host_run_scripts(json_content, output_dir):
         os.chmod(script_path, 0o755)
 
 
-def generate_local_run_script(json_content, rmw, output_dir):
+def generate_local_run_script(json_content, rmw, output_dir, project_root):
     """local_run.sh: 作業PC検証用のlocal_compose.yamlを使って全サービスを起動するスクリプト"""
     hosts = json_content["hosts"]
     host_services = " ".join(f"service_{h['host_name']}" for h in hosts)
+    rel_root = os.path.relpath(project_root, output_dir)
 
     script_path = os.path.join(output_dir, "local_run.sh")
     lines = []
-    _run_script_common_prefix(lines)
+    _run_script_common_prefix(lines, rel_root)
     lines.extend(
         [
             'COMPOSE_FILE="$SCRIPT_DIR/local_compose.yaml"',
@@ -694,6 +703,11 @@ if __name__ == "__main__":
         help=f"Base directory for generated artifacts (default: {DEFAULT_PERF_WS_DIR})",
     )
     parser.add_argument(
+        "--force",
+        action="store_true",
+        help="Overwrite existing output directory without confirmation",
+    )
+    parser.add_argument(
         "--rmw",
         type=str,
         default="fastdds",
@@ -705,7 +719,7 @@ if __name__ == "__main__":
     PERF_WS_DIR = args.ws_dir
 
     project_root, output_dir, run_dir_name = resolve_output_paths(
-        args.json_path, args.rmw, args.ws_dir
+        args.json_path, args.rmw, args.ws_dir, force=args.force
     )
 
     with open(args.json_path, "r") as f:
@@ -714,8 +728,8 @@ if __name__ == "__main__":
     generate_exec_scripts(json_content, args.rmw, output_dir)
     generate_compose(json_content, args.rmw, output_dir, project_root)
     generate_compose_per_host(json_content, args.rmw, output_dir, project_root)
-    generate_host_run_scripts(json_content, output_dir)
-    generate_local_run_script(json_content, args.rmw, output_dir)
+    generate_host_run_scripts(json_content, output_dir, project_root)
+    generate_local_run_script(json_content, args.rmw, output_dir, project_root)
     generate_metadata_file(
         json_content,
         args.json_path,

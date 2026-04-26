@@ -103,7 +103,7 @@ docker pull ghcr.io/hal-lab-u-tokyo/ros2-perf-multihost:latest
 プロジェクトルートから実行します。
 
 ```bash
-python3 parse_json/generate_exec_scripts.py <topology.json> [--rmw <rmw>] [--ws-dir <dir>]
+python3 parse_json/generate_exec_scripts.py <topology.json> [--rmw <rmw>] [--ws-dir <dir>] [--force]
 ```
 
 引数:
@@ -111,8 +111,9 @@ python3 parse_json/generate_exec_scripts.py <topology.json> [--rmw <rmw>] [--ws-
 - `<topology.json>`: トポロジー定義JSONファイルのパス
 - `--ws-dir`: 生成物のベースディレクトリ（デフォルト: `performance_ws`）
 - `--rmw`: RMW実装（`fastdds` / `zenoh` / `cyclonedds`、デフォルト: `fastdds`）
+- `--force`: 既存の出力ディレクトリを確認なしで上書きする（CI・スクリプト実行時に使用）
 
-出力先は `<ws-dir>/<JSONファイル名>-<rmw>/exec_scripts/` です。既に存在する場合は上書き確認を行い、`Yes` のときは `exec_scripts/*` を削除して再生成します。このとき、前回の生成に使ったJSONファイルのパス（`metadata.txt` の `json_path:` フィールド）と今回のパスが異なる場合（同名ファイルを別パスから指定した場合）は、追加の警告メッセージを表示します。`<ws-dir>/latest` は常に最新に生成されたディレクトリへのシンボリックリンクになります。
+出力先は `<ws-dir>/<JSONファイル名>-<rmw>/exec_scripts/` です。既に存在する場合は上書き確認を行い、`Yes` のときは `exec_scripts/*` を削除して再生成します。このとき、前回の生成に使ったJSONファイルのパス（`metadata.txt` の `json_path:` フィールド）と今回のパスが異なる場合（同名ファイルを別パスから指定した場合）は、追加の警告メッセージを表示します。stdin が TTY でない場合（CI・パイプ経由など）は確認プロンプトを出さずにエラー終了します。その場合は `--force` を使用してください。`<ws-dir>/latest` は常に最新に生成されたディレクトリへのシンボリックリンクになります。
 `performance_ws/` ディレクトリは自動生成されますが、リポジトリ管理からは `.gitignore` で除外しています。
 
 ```bash
