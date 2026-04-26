@@ -99,29 +99,29 @@ python3 generate_exec_scripts.py ../topology_example/simple.json --rmw fastdds -
 
 ### 生成されたスクリプトのオプション
 
-生成される `host*_exec.sh` / `host*_run.sh` スクリプトは、JSON で定義したデフォルト値から以下のオプションで上書きできます。`--eval-time` / `--period-ms` / `--payload-size` は、JSON で定義された値を実行時に一括で上書きし、トポロジー内の全ホストの対象ノード（Publisher / Intermediate）に適用されます。JSON スキーマについては [topology_example/README.md](./topology_example/README.md) を参照してください。
+生成される `host*_exec.sh` / `host*_run.sh` スクリプトは、以下の実行時オプションをサポートします。`--eval-time` / `--period-ms` / `--payload-size` は、起動対象の全ホストにある対象ノード（Publisher / Intermediate）へ一括適用されます。JSON スキーマについては [topology_example/README.md](./topology_example/README.md) を参照してください。
 
-| オプション | 短形式 | 説明 | 既定値（JSON から取得） |
+| オプション | 短形式 | 説明 | 既定値 |
 |---|---|---|---|
-| --eval-time | -t | 計測時間（秒） | JSON の `eval_time` または 60 |
-| --period-ms | -p | Publish 周期（ミリ秒） | JSON の `period_ms` または 100 |
-| --payload-size | -s | ペイロードサイズ（バイト） | JSON の `payload_size` または 64 |
+| --eval-time | -t | 計測時間（秒） | 60 |
+| --period-ms | -p | Publish 周期（ミリ秒） | 100 |
+| --payload-size | -s | ペイロードサイズ（バイト） | 64 |
 | --run-idx | -r | ランインデックス（ローカル実行時） | 1 |
 
 #### 実行例
 
 ```bash
-# JSON のデフォルト値を使用
+# デフォルト値を使用
 $ ./host1_exec.sh
 
-# JSON のデフォルト値を上書き
+# デフォルト値を上書き
 $ ./host1_run.sh --eval-time 120 --period-ms 50 --payload-size 256
 
 # 短形式
 $ ./host1_run.sh -t 120 -p 50 -s 256
 ```
 
-`--eval-time` / `--period-ms` / `--payload-size` は呼び出した `*_run.sh` 経由で起動される全ノードに対して、JSON の既定値を同じ値で上書きします（Subscriber は `--period-ms` / `--payload-size` を使用しません）。
+`--eval-time` / `--period-ms` / `--payload-size` は呼び出した `*_run.sh` 経由で起動される全ノードに対して、同じ値で一括適用されます（Subscriber は `--period-ms` / `--payload-size` を使用しません）。
 
 ### 共通Dockerイメージの取得（利用者向け）
 
@@ -179,8 +179,6 @@ python3 parse_json/generate_exec_scripts.py topology_example/simple.json --rmw z
 
 **2. test config** — テスト設定
 - `rmw`: 指定したRMW名
-- `eval_time`: 計測時間（秒）
-- `period_ms`: 送信周期（ms）
 - `qos_history` / `qos_depth` / `qos_reliability`: QoS設定
 
 **3. topology stats** — トポロジー統計

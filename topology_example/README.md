@@ -8,8 +8,6 @@
 
 | キー | 必須 | 型 | 既定値 | 説明 |
 |---|---|---|---|---|
-| eval_time | 任意 | number | 60 | 計測時間 (秒)。publisher/subscriber/intermediate に渡される。 |
-| period_ms | 任意 | number | 100 | publish 周期 (ms)。publisher/intermediate に渡される。 |
 | qos | 任意 | object | - | QoS 設定オブジェクト。未指定時は各項目に既定値。 |
 | hosts | 必須 | array | - | ホスト定義の配列。 |
 
@@ -64,15 +62,12 @@
 
 publisher / subscriber の配列要素は、上記と同じく topic_name が必須です。
 
-## 3. 現状の実装で未使用のキー
+## 3. 注意事項
 
-以下を JSON に書いても、現在の generate_exec_scripts.py では実行コマンド生成に使われません。
+使用する RMW は generate_exec_scripts.py 実行時のコマンドライン引数で指定します．
+JSON に書いても反映されません．
 
-- ルートの rmw（RMW はコマンドライン引数 --rmw で指定）
-
-`payload_size` / `period_ms` / `eval_time` は JSON で定義した値が既定値として使われます。
-`_run.sh` / `_exec.sh` 実行時に `--eval-time` / `--period-ms` / `--payload-size` を指定すると、その値で上書きできます。
-特に `--eval-time` / `--period-ms` / `--payload-size` は、JSON 既定値を一括で上書きして、起動対象の全ホストにある Publisher / Intermediate ノードへ反映されます（Subscriber は `--period-ms` / `--payload-size` の対象外）。
+`_run.sh` / `_exec.sh` 実行時に `--eval-time` / `--period-ms` / `--payload-size` を指定すると、その値が起動対象の全ホストにある Publisher / Intermediate ノードへ一括適用されます（Subscriber は `--period-ms` / `--payload-size` の対象外）。
 
 ## 4. 最小テンプレート
 
@@ -109,8 +104,6 @@ publisher / subscriber の配列要素は、上記と同じく topic_name が必
 
 ```json
 {
-  "eval_time": 60,
-  "period_ms": 100,
   "qos": {
     "history": "KEEP_LAST",
     "depth": 1,

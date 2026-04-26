@@ -24,6 +24,9 @@ ROS_WS_IN_CONTAINER = f"{PROJECT_ROOT_IN_CONTAINER}/ros2_node_impl_ws"
 IMAGE_NAME = "ghcr.io/hal-lab-u-tokyo/ros2-perf-multihost:latest"
 DEFAULT_PERF_WS_DIR = "performance_ws"
 PERF_WS_DIR = DEFAULT_PERF_WS_DIR
+DEFAULT_PAYLOAD_SIZE = 64
+DEFAULT_PERIOD_MS = 100
+DEFAULT_EVAL_TIME = 60
 
 
 def _normalize_ws_dir(ws_dir):
@@ -152,42 +155,6 @@ def _rmw_env_lines(rmw):
             "export RMW_IMPLEMENTATION=rmw_cyclonedds_cpp",
         ]
     return [f'# Unknown RMW "{rmw}", using default settings']
-
-
-def _iter_publisher_entries(json_content):
-    """publisher と intermediate.publisher のエントリを順に返す"""
-    for host_dict in json_content.get("hosts", []):
-        for node in host_dict.get("nodes", []):
-            for pub in node.get("publisher", []):
-                yield pub
-            for inter in node.get("intermediate", []):
-                for pub in inter.get("publisher", []):
-                    yield pub
-
-
-def _resolve_payload_size_default(json_content):
-    """PAYLOAD_SIZE の既定値を JSON から解決する"""
-    if "payload_size" in json_content:
-        return json_content["payload_size"]
-    for pub in _iter_publisher_entries(json_content):
-        if "payload_size" in pub:
-            return pub["payload_size"]
-    return 64
-
-
-def _resolve_period_ms_default(json_content):
-    """PERIOD_MS の既定値を JSON から解決する"""
-    if "period_ms" in json_content:
-        return json_content["period_ms"]
-    for pub in _iter_publisher_entries(json_content):
-        if "period_ms" in pub:
-            return pub["period_ms"]
-    return 100
-
-
-def _resolve_eval_time_default(json_content):
-    """EVAL_TIME の既定値を JSON から解決する"""
-    return json_content.get("eval_time", 60)
 
 
 def _append_host_script_prelude(
@@ -337,9 +304,9 @@ def generate_exec_scripts(json_content, rmw, output_dir):
     """各ホスト用のコンテナ内実行スクリプトを生成する"""
     os.makedirs(output_dir, exist_ok=True)
 
-    payload_size_default = _resolve_payload_size_default(json_content)
-    period_ms_default = _resolve_period_ms_default(json_content)
-    eval_time_default = _resolve_eval_time_default(json_content)
+    payload_size_default = DEFAULT_PAYLOAD_SIZE
+    period_ms_default = DEFAULT_PERIOD_MS
+    eval_time_default = DEFAULT_EVAL_TIME
 
     qos_config = json_content.get("qos", {})
     qos_history = qos_config.get("history", "KEEP_LAST")
@@ -478,9 +445,9 @@ def _append_zenohd_service(lines, project_root, output_dir):
 
 def generate_compose(json_content, rmw, output_dir, project_root):
     """開発PC検証用に、全ホストを含む local_compose.yaml を生成する"""
-    payload_size_default = _resolve_payload_size_default(json_content)
-    period_ms_default = _resolve_period_ms_default(json_content)
-    eval_time_default = _resolve_eval_time_default(json_content)
+    payload_size_default = DEFAULT_PAYLOAD_SIZE
+    period_ms_default = DEFAULT_PERIOD_MS
+    eval_time_default = DEFAULT_EVAL_TIME
     lines = ["services:"]
 
     for host_dict in json_content["hosts"]:
@@ -509,9 +476,9 @@ def generate_compose(json_content, rmw, output_dir, project_root):
 
 def generate_compose_per_host(json_content, rmw, output_dir, project_root):
     """実運用向けに、ホストごとの host*_compose.yaml を生成する"""
-    payload_size_default = _resolve_payload_size_default(json_content)
-    period_ms_default = _resolve_period_ms_default(json_content)
-    eval_time_default = _resolve_eval_time_default(json_content)
+    payload_size_default = DEFAULT_PAYLOAD_SIZE
+    period_ms_default = DEFAULT_PERIOD_MS
+    eval_time_default = DEFAULT_EVAL_TIME
     for host_dict in json_content["hosts"]:
         host_name = host_dict["host_name"]
         lines = ["services:"]
@@ -569,7 +536,7 @@ def _run_script_common_prefix(
             '  -h, --help                Show this help message and exit',
             '',
             'Notes:',
-            '  --eval-time, --period-ms and --payload-size override JSON defaults globally for this run,',
+            '  --eval-time, --period-ms and --payload-size override script defaults globally for this run,',
             '  and are applied to all Publisher/Intermediate nodes started via this script.',
             'EOF',
             '}',
@@ -617,9 +584,9 @@ def _run_script_common_prefix(
 def generate_host_run_scripts(json_content, output_dir, project_root):
     """host*_run.sh: 各ホスト用composeを起動するラッパスクリプトを生成する"""
     rel_root = os.path.relpath(project_root, output_dir)
-    payload_size_default = _resolve_payload_size_default(json_content)
-    period_ms_default = _resolve_period_ms_default(json_content)
-    eval_time_default = _resolve_eval_time_default(json_content)
+    payload_size_default = DEFAULT_PAYLOAD_SIZE
+    period_ms_default = DEFAULT_PERIOD_MS
+    eval_time_default = DEFAULT_EVAL_TIME
     for host_dict in json_content["hosts"]:
         host_name = host_dict["host_name"]
         script_path = os.path.join(output_dir, f"{host_name}_run.sh")
@@ -669,9 +636,9 @@ def generate_local_run_script(json_content, rmw, output_dir, project_root):
     _run_script_common_prefix(
         lines,
         rel_root,
-        _resolve_payload_size_default(json_content),
-        _resolve_period_ms_default(json_content),
-        _resolve_eval_time_default(json_content),
+        DEFAULT_PAYLOAD_SIZE,
+        DEFAULT_PERIOD_MS,
+        DEFAULT_EVAL_TIME,
     )
     lines.extend(
         [
@@ -806,10 +773,6 @@ def generate_metadata_file(
     node_count = len(all_nodes)
 
     qos = json_content.get("qos", {})
-    payload_size_default = _resolve_payload_size_default(json_content)
-    period_ms_default = _resolve_period_ms_default(json_content)
-    eval_time_default = _resolve_eval_time_default(json_content)
-
     timestamp = datetime.now().strftime("%Y-%d-%m_%H-%M-%S")
     sections = [
         [
@@ -824,9 +787,6 @@ def generate_metadata_file(
         [
             "# --- 2. test config ---",
             f"rmw: {rmw}",
-            f"payload_size: {payload_size_default}",
-            f"eval_time: {eval_time_default}",
-            f"period_ms: {period_ms_default}",
             f"qos_history: {qos.get('history', 'KEEP_LAST')}",
             f"qos_depth: {qos.get('depth', 1)}",
             f"qos_reliability: {qos.get('reliability', 'RELIABLE')}",
