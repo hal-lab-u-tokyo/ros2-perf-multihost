@@ -130,40 +130,38 @@ def start_script():
     body = request.get_json(silent=True) or {}
     payload_size = body.get("payload_size")
     run_idx = body.get("run_idx", 1)
-    period_ms = body.get("period_ms", 100)
-    eval_time = body.get("eval_time", 60)
-
-    if payload_size is None:
-        return jsonify({"error": "payload_size required"}), 400
+    period_ms = body.get("period_ms")
+    eval_time = body.get("eval_time")
 
     try:
-        payload_size = _to_int(payload_size, "payload_size")
         run_idx = _to_int(run_idx, "run_idx")
-        period_ms = _to_int(period_ms, "period_ms")
-        eval_time = _to_int(eval_time, "eval_time")
+        if payload_size is not None:
+            payload_size = _to_int(payload_size, "payload_size")
+        if period_ms is not None:
+            period_ms = _to_int(period_ms, "period_ms")
+        if eval_time is not None:
+            eval_time = _to_int(eval_time, "eval_time")
 
         ctx = _resolve_exec_context(body)
         resolved_host, script_path = _resolve_host_script(
             ctx["exec_dir"], ctx["hosts"], "exec.sh")
 
+        effective_payload_size = payload_size if payload_size is not None else 64
         log_dir = os.path.join(
             REPO_ROOT,
             "logs",
-            f"raw_{payload_size}B",
+            f"raw_{effective_payload_size}B",
             f"run{run_idx}",
         )
         os.makedirs(log_dir, exist_ok=True)
 
-        cmd = [
-            "bash",
-            script_path,
-            "--payload-size",
-            str(payload_size),
-            "--period-ms",
-            str(period_ms),
-            "--eval-time",
-            str(eval_time),
-        ]
+        cmd = ["bash", script_path]
+        if payload_size is not None:
+            cmd.extend(["--payload-size", str(payload_size)])
+        if period_ms is not None:
+            cmd.extend(["--period-ms", str(period_ms)])
+        if eval_time is not None:
+            cmd.extend(["--eval-time", str(eval_time)])
 
         env = os.environ.copy()
         env["LOG_DIR"] = log_dir
@@ -193,34 +191,30 @@ def start_docker():
     body = request.get_json(silent=True) or {}
     payload_size = body.get("payload_size")
     run_idx = body.get("run_idx", 1)
-    period_ms = body.get("period_ms", 100)
-    eval_time = body.get("eval_time", 60)
-
-    if payload_size is None:
-        return jsonify({"error": "payload_size required"}), 400
+    period_ms = body.get("period_ms")
+    eval_time = body.get("eval_time")
 
     try:
-        payload_size = _to_int(payload_size, "payload_size")
         run_idx = _to_int(run_idx, "run_idx")
-        period_ms = _to_int(period_ms, "period_ms")
-        eval_time = _to_int(eval_time, "eval_time")
+        if payload_size is not None:
+            payload_size = _to_int(payload_size, "payload_size")
+        if period_ms is not None:
+            period_ms = _to_int(period_ms, "period_ms")
+        if eval_time is not None:
+            eval_time = _to_int(eval_time, "eval_time")
 
         ctx = _resolve_exec_context(body)
         resolved_host, script_path = _resolve_host_script(
             ctx["exec_dir"], ctx["hosts"], "run.sh")
 
-        cmd = [
-            "bash",
-            script_path,
-            "--payload-size",
-            str(payload_size),
-            "--period-ms",
-            str(period_ms),
-            "--eval-time",
-            str(eval_time),
-            "--run-idx",
-            str(run_idx),
-        ]
+        cmd = ["bash", script_path]
+        if payload_size is not None:
+            cmd.extend(["--payload-size", str(payload_size)])
+        if period_ms is not None:
+            cmd.extend(["--period-ms", str(period_ms)])
+        if eval_time is not None:
+            cmd.extend(["--eval-time", str(eval_time)])
+        cmd.extend(["--run-idx", str(run_idx)])
 
         app.logger.info(
             "[start_docker] host=%s scenario=%s payload=%s run=%s script=%s",

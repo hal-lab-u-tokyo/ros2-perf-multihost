@@ -446,6 +446,13 @@ if __name__ == "__main__":
     )
     args = parser.parse_args()
 
+    # Forward optional overrides only when explicitly requested.
+    requested_payload_size = args.payload_size
+    payload_sizes = [
+        requested_payload_size if requested_payload_size is not None else 64]
+    period_ms = args.period_ms
+    eval_time = args.eval_time
+
     base_log_dir = "./logs"
     base_result_dir = "./results"
     os.makedirs(base_log_dir, exist_ok=True)
@@ -469,8 +476,8 @@ if __name__ == "__main__":
         sys.exit(1)
     print(f"Using hosts: {hosts}")
     print(f"Note: payload_size, period_ms, eval_time are determined by run.sh defaults")
-    for payload_size in payload_sizes:
-        print(f"=== Payload size: {payload_size}B ===")
+    for result_payload_size in payload_sizes:
+        print(f"=== Payload size: {result_payload_size}B ===")
         for run_idx in range(args.trials):
             run_test(
                 run_idx,
@@ -479,7 +486,7 @@ if __name__ == "__main__":
                 args.ws_dir,
                 args.scenario,
                 docker=args.docker,
-                payload_size=payload_size,
+                payload_size=requested_payload_size,
                 period_ms=period_ms,
                 eval_time=eval_time,
             )
@@ -488,7 +495,7 @@ if __name__ == "__main__":
             base_log_dir,
             base_result_dir,
             prefix,
-            payload_size,
+            result_payload_size,
             args.trials,
             hosts,
             period_ms=period_ms,
@@ -501,7 +508,6 @@ if __name__ == "__main__":
     # --- ここから全ペイロードサイズの集計CSVをまとめる処理 ---
     summary_rows = []
     header = None
-    payload_sizes = [payload_size]  # Use the payload_size from CLI or default
     for payload_size in payload_sizes:
         latest_dir = f"{prefix}_{payload_size}B"
         csv_path = os.path.join(
