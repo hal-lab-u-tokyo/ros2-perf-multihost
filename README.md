@@ -171,7 +171,7 @@ docker pull ghcr.io/hal-lab-u-tokyo/ros2-perf-multihost:latest
 
 ## RESTサーバの起動と自動性能評価
 
-マルチホスト構成では、各 Raspberry Pi 上で REST サーバ（実体は `manager_scripts.py`）を起動し、そこに対して制御スクリプトからリクエストを送ることでベンチマークを自動実行します。
+マルチホスト構成では、各 Raspberry Pi 上で REST サーバ（実体は `rest_server.py`）を起動し、そこに対して制御スクリプトからリクエストを送ることでベンチマークを自動実行します。
 
 1. 全ての Raspberry Pi で REST サーバを起動
 
@@ -186,7 +186,7 @@ chmod +x start_all_servers.sh
 
 このスクリプトは `HOSTS` 配列に列挙した各ホストへ SSH し、
 
-- `manager_scripts/manager_scripts.py` をバックグラウンド起動
+- `manager_scripts/rest_server.py` をバックグラウンド起動
 - ログを `/home/ubuntu/rest.log` に出力
 - ポート `5000` で REST サーバが応答するまで `nc` でヘルスチェック
 
@@ -217,5 +217,3 @@ RMWにZenohを利用する場合は，マネージャで下記を実行する必
 ```
 ./manager_scripts/start_zenoh_router.sh foreground 
 ```
-
----

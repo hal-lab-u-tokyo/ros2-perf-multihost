@@ -9,7 +9,7 @@ for host in "${HOSTS[@]}"; do
     echo "Stopping REST server on $host"
 
     # まず5000番ポートのLISTENプロセスを特定（優先: lsof、フォールバック: pgrep）
-    pids=$(ssh $SSH_OPTS "ubuntu@$host" 'lsof -t -iTCP:5000 -sTCP:LISTEN 2>/dev/null || pgrep -f "/home/ubuntu/ros2-perf-multihost/manager_scripts/manager_scripts.py" || true')
+    pids=$(ssh $SSH_OPTS "ubuntu@$host" 'lsof -t -iTCP:5000 -sTCP:LISTEN 2>/dev/null || pgrep -f "/home/ubuntu/ros2-perf-multihost/manager_scripts/rest_server.py" || true')
 
     if [ -z "$pids" ]; then
         echo "$host: no REST server process found."

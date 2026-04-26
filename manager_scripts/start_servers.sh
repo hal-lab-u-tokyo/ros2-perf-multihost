@@ -19,7 +19,7 @@ for host in "${HOSTS[@]}"; do
     PID=/home/ubuntu/rest.pid
     : > "$LOG"
     # Python を直接起動して完全デタッチ
-    python3 /home/ubuntu/ros2-perf-multihost/manager_scripts/manager_scripts.py \
+        python3 /home/ubuntu/ros2-perf-multihost/manager_scripts/rest_server.py \
       >>"$LOG" 2>&1 < /dev/null &
     echo $! > "$PID"
     echo STARTED
