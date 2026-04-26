@@ -71,7 +71,8 @@ publisher / subscriber の配列要素は、上記と同じく topic_name が必
 - ルートの rmw（RMW はコマンドライン引数 --rmw で指定）
 
 `payload_size` / `period_ms` / `eval_time` は JSON で定義した値が既定値として使われます。
-`_run.sh` / `_exec.sh` 実行時に `--payload-size` / `--period-ms` / `--eval-time` を指定すると、その値で上書きできます。
+`_run.sh` / `_exec.sh` 実行時に `--eval-time` / `--period-ms` / `--payload-size` を指定すると、その値で上書きできます。
+特に `--eval-time` / `--period-ms` / `--payload-size` は、JSON 既定値を一括で上書きして、起動対象の全ホストにある Publisher / Intermediate ノードへ反映されます（Subscriber は `--period-ms` / `--payload-size` の対象外）。
 
 ## 4. 最小テンプレート
 
