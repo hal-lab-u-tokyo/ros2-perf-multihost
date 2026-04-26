@@ -133,6 +133,8 @@ bash performance_ws/latest/exec_scripts/host1_exec.sh
 
 ### 実機デプロイ時（各ホスト上）
 
+事前に各ホストでリポジトリと Python 実行環境を同じパスに用意しておいてください。
+
 各ホストに `exec_scripts/` ディレクトリを配布し、ホスト対応のcompose定義で起動します。
 
 `manager_scripts/distribute_exec_scripts.sh` を使うと、`performance_ws/latest/metadata.txt` から
@@ -140,9 +142,7 @@ bash performance_ws/latest/exec_scripts/host1_exec.sh
 `host{N}_exec.sh`, `host{N}_run.sh`, `host{N}_compose.yaml` を配布できます。
 
 ```bash
-cd manager_scripts
-chmod +x distribute_exec_scripts.sh
-./distribute_exec_scripts.sh
+./manager_scripts/distribute_exec_scripts.sh
 ```
 
 コマンドライン引数で参照先を上書きできます。
@@ -175,31 +175,14 @@ docker pull ghcr.io/hal-lab-u-tokyo/ros2-perf-multihost:latest
 
 1. 全ての Raspberry Pi で REST サーバを起動
 
-`start_servers.sh` / `start_all_servers.sh` は使わず、各ホストへ SSH して `remote_hosts_scripts/rest_server.py` を直接起動します。
+各ホストへ SSH して `remote_hosts_scripts/rest_server.py` を直接起動します。
 
 ```bash
-cd /home/takasehideki/ros2/ros2-perf-multihost
-
-# metadata.txt から hosts を取得して順番に起動
-HOSTS=$(awk -F': ' '/^hosts:/{print $2}' performance_ws/latest/metadata.txt | tr ',' ' ')
-for host in $HOSTS; do
-	host=$(echo "$host" | xargs)
-	echo "Starting rest_server.py on ${host}"
-	ssh -o BatchMode=yes -o StrictHostKeyChecking=no -o ConnectTimeout=5 "ubuntu@${host}" \
-		'cd /home/ubuntu/ros2-perf-multihost && setsid nohup python3 remote_hosts_scripts/rest_server.py > /home/ubuntu/rest.log 2>&1 < /dev/null & echo $! > /home/ubuntu/rest.pid'
+ssh ubuntu@hostX
+cd ros2-perf-multihost
+python3 remote_hosts_scripts/rest_server.py
 done
 ```
-
-必要なら各ホストで REST サーバの疎通を確認してください。
-
-```bash
-for host in $HOSTS; do
-	host=$(echo "$host" | xargs)
-	nc -z -w 1 "$host" 5000 && echo "[$host] up" || echo "[$host] not ready"
-done
-```
-
-事前に各ホストでリポジトリと Python 実行環境を同じパスに用意しておいてください。
 
 2. ベンチマークスクリプト `performance_test.py` の実行
 
@@ -207,18 +190,17 @@ REST サーバ起動後、`performance_test/performance_test.py` を使って、
 このスクリプトは内部で `remote_hosts_scripts/start_exec_scripts.py` を呼び出し、実行対象ホストは `performance_ws/<scenario>/metadata.txt` の `hosts` から自動解決します。
 
 ```bash
-cd performance_test
-python3 performance_test.py --trials 10
+python3 performance_test/performance_test.py
 # ネイティブ実行に切り替える場合
-python3 performance_test.py --exec-policy native --trials 10
+python3 performance_test/performance_test.py --exec-policy native
 # パラメータを明示する場合
-python3 performance_test.py --payload-size 256 --period-ms 50 --eval-time 120
+python3 performance_test/performance_test.py --payload-size 256 --period-ms 50 --eval-time 120
 ```
 
 主な引数:
 
-- `--trials`: 各ペイロードサイズあたりの試行回数
 - `--exec-policy`: 実行方式を `docker` または `native` から指定（デフォルト: `docker`）
+- `--trials`: 各ペイロードサイズあたりの試行回数（デフォルト: `3`）
 - `--ws-dir`: 実行スクリプト生成先のベースディレクトリ（デフォルト: `performance_ws`）
 - `--scenario`: 使用するシナリオディレクトリ（デフォルト: `latest`）
 - `--payload-size`: ペイロードサイズを指定。未指定時は `*_run.sh` / `*_exec.sh` 側の既定値を使います
