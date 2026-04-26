@@ -1,22 +1,22 @@
-# docker ディレクトリ（開発者向け）
+# docker Directory for Developers
 
-このディレクトリは、利用者向けの実行環境ではなく、開発者が共通Dockerイメージをビルドして GitHub Packages (GHCR) に公開するための管理ディレクトリです。
+This directory is for maintainers who build the shared Docker image and publish it to GitHub Packages (GHCR). It is not part of the normal runtime workflow for end users.
 
-利用者はこのディレクトリで build する必要はありません．公開済みイメージを pull して使ってもらう運用想定です。
+Users are not expected to build the image from this directory. The intended workflow is to pull the published image instead.
 
-- 公開イメージ: [`ghcr.io/hal-lab-u-tokyo/ros2-perf-multihost:latest`](https://github.com/hal-lab-u-tokyo/ros2-perf-multihost/pkgs/container/ros2-perf-multihost)
+- Published image: [`ghcr.io/hal-lab-u-tokyo/ros2-perf-multihost:latest`](https://github.com/hal-lab-u-tokyo/ros2-perf-multihost/pkgs/container/ros2-perf-multihost)
 
-## GHCR ログイン
+## Log In to GHCR
 
 ```bash
 docker login ghcr.io -u <YOUR_GITHUB_USERNAME>
-### input "<YOUR_GITHUB_PAT>"
+# enter "<YOUR_GITHUB_PAT>" when prompted
 ```
 
-## ビルド
+## Build
 
-このディレクトリの `compose.yaml` は `linux/amd64` と `linux/arm64` を対象にしています。
-`Dockerfile` は build context の中身を `/workdir/ros2-perf-multihost/` にコピーする前提なので、build context はリポジトリルート（`..`）です。
+`compose.yaml` in this directory targets both `linux/amd64` and `linux/arm64`.
+The `Dockerfile` expects the build context to be copied into `/workdir/ros2-perf-multihost/`, so the build context must be the repository root (`..`).
 
 ```bash
 cd docker

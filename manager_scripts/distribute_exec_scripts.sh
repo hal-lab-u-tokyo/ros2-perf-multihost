@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# metadata.txt を参照して、各ホスト向け exec_scripts を配布する。
-# 前提:
-# - 各 host_name は SSH で名前解決できる
-# - リモート側に REMOTE_REPO_BASE が存在する
+# Distribute host-specific exec_scripts based on metadata.txt.
+# Assumptions:
+# - Each host_name is reachable over SSH by name
+# - REMOTE_REPO_BASE already exists on the remote host
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_DIR="$(cd "${SCRIPT_DIR}/.." && pwd)"

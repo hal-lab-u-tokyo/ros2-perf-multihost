@@ -1,13 +1,16 @@
 """
-ノード名を2つ（PubとSub）指定すれば、そのノードの間の通信性能を表示してくれる。
-1. 指定された2つのノードが本当につながっているかを判定
-2. ノード間のレイテンシを測定
-3. ノード間のスループットを測定
-4. 通信性能一覧をtxtファイルに書き出す
+Given two node names (Publisher and Subscriber), display the communication
+performance between them.
+1. Check whether the two specified nodes are actually connected.
+2. Measure latency between the nodes.
+3. Measure throughput between the nodes.
+4. Write a summary of communication performance to a text file.
 
-（本当はやりたいこと）
-2つのノード間に複数のルートがあるなら、それを洗い出す → 現状は末端のpubとsub間しか測定できない
-全てのルートに対して各評価指標を算出
+Intended future work:
+If multiple routes exist between the two nodes, enumerate them. The current
+implementation can only measure communication between the terminal Publisher
+and Subscriber.
+Compute each evaluation metric for every route.
 """
 
 import sys
@@ -15,12 +18,12 @@ import os
 import shutil
 import numpy as np
 
-# metadataから、2つのノードがつながっているかを判定
+# Determine from metadata whether the two nodes are connected.
 # cmd_args -> dict, dict, list[str]
 
 
 def check_connect(args):
-    # 結果格納用
+    # Storage for results.
     pub_topic_list = []
     sub_topic_list = []
 
@@ -34,7 +37,7 @@ def check_connect(args):
         for line in lines:
             if line.startswith("NodeType:"):
                 pub_node_type = line.split(":", 1)[1].strip().split(",")[
-                    0]  # ”Publisher", "Intermediate" など
+                    0]  # for example: "Publisher" or "Intermediate"
             if line.startswith("PayloadSize:"):
                 pub_payload_size_list = line.split(
                     ":", 1)[1].strip().split(",")
@@ -53,7 +56,7 @@ def check_connect(args):
 
         pub_topic_list = [topic for topic in topics if topic]
 
-        # pubのpayload_sizeとperiod_msをトピック名と結びつける
+        # Associate payload_size and period_ms with each topic name.
         pub_option_list = []
         for topic, payload_size, period_ms in zip(pub_topic_list, pub_payload_size_list, pub_period_ms_list):
             pub_option_list.append((topic, payload_size, period_ms))
@@ -76,10 +79,10 @@ def check_connect(args):
 
         sub_topic_list = [topic for topic in topics if topic]
 
-    # 共通のトピックのリスト
+    # List of common topics.
     common_topics = list(set(pub_topic_list) & set(sub_topic_list))
     if len(common_topics) > 0:
-        print(f"Connection Success! 共通のトピック: {common_topics}")
+        print(f"Connection Success! Common topics: {common_topics}")
     else:
         raise ValueError("Connection failed")
 
@@ -106,7 +109,7 @@ def check_connect(args):
     return pub_info, sub_info, common_topics
 
 
-# 2つのノードの共通トピックそれぞれに対し、ログファイルを取得し、辞書形式で保存
+# Retrieve log files for each common topic shared by the two nodes and store them as dictionaries.
 # dict, dict, list[str] -> dict, dict
 def get_logdata(pub_info, sub_info, topic_list):
     pub_node_name = pub_info["name"]
@@ -131,7 +134,7 @@ def get_logdata(pub_info, sub_info, topic_list):
                         pub_logdata[f"{topic}"].append(("EndTime", end_time))
 
                     if "Index:" in line and "Timestamp:" in line:
-                        # "Index:" と "Timestamp:" を分割して値を取得
+                        # Split out the values from "Index:" and "Timestamp:".
                         parts = line.split(", ")
                         index = int(parts[0].split(":")[1].strip())
                         timestamp = int(parts[1].split(":")[1].strip())
@@ -155,7 +158,7 @@ def get_logdata(pub_info, sub_info, topic_list):
                         pub_logdata[f"{topic}"].append(("EndTime", end_time))
 
                     if "Index:" in line and "Timestamp:" in line:
-                        # "Index:" と "Timestamp:" を分割して値を取得
+                        # Split out the values from "Index:" and "Timestamp:".
                         parts = line.split(", ")
                         index = int(parts[1].split(":")[1].strip())
                         timestamp = int(parts[2].split(":")[1].strip())
@@ -183,7 +186,7 @@ def get_logdata(pub_info, sub_info, topic_list):
                         sub_logdata[f"{topic}"].append(("EndTime", end_time))
 
                     if "Index:" in line and "Timestamp:" in line:
-                        # "Index:" と "Timestamp:" を分割して値を取得
+                        # Split out the values from "Index:" and "Timestamp:".
                         parts = line.split(", ")
                         index = int(parts[0].split(":")[1].strip())
                         timestamp = int(parts[1].split(":")[1].strip())
@@ -207,7 +210,7 @@ def get_logdata(pub_info, sub_info, topic_list):
                         sub_logdata[f"{topic}"].append(("EndTime", end_time))
 
                     if "Index:" in line and "Timestamp:" in line:
-                        # "Index:" と "Timestamp:" を分割して値を取得
+                        # Split out the values from "Index:" and "Timestamp:".
                         parts = line.split(", ")
                         index = int(parts[1].split(":")[1].strip())
                         timestamp = int(parts[2].split(":")[1].strip())
@@ -218,13 +221,13 @@ def get_logdata(pub_info, sub_info, topic_list):
 
     return pub_logdata, sub_logdata
 
-# Pubのタイムスタンプ一覧とSubのタイムスタンプ一覧を受け取り、その差の様々な統計データを算出し、latency_resultsフォルダにtxtとして出力
+# Take Publisher and Subscriber timestamp lists, compute latency statistics from their differences, and write them to the latency_results folder.
 
 
 def measure_latency(pub_logdata, sub_logdata, topic_list):
-    latency_results_for_all_topics = {}  # (index, latency)のペア
+    latency_results_for_all_topics = {}  # Pairs of (index, latency)
     loss_results_for_all_topics = {}  # loss[%]
-    latency_statics_for_all_topics = {}  # latencyの統計データ
+    latency_statics_for_all_topics = {}  # Latency statistics
 
     def calcurate_statics(latency_results_for_all_topics, topic):
         latency_list = []
@@ -259,23 +262,23 @@ def measure_latency(pub_logdata, sub_logdata, topic_list):
                               topic}"] if item[0] == "StartTime")
         sub_end_time = next(item[1] for item in sub_logdata[f"{
                             topic}"] if item[0] == "EndTime")
-        # StartTimeとEndTimeは用済なので消す
+        # Remove StartTime and EndTime entries after extracting them.
         pub_logdata[f"{topic}"] = [item for item in pub_logdata[f"{
             topic}"] if item[0] != "StartTime" and item[0] != "EndTime"]
         sub_logdata[f"{topic}"] = [item for item in sub_logdata[f"{
             topic}"] if item[0] != "StartTime" and item[0] != "EndTime"]
 
-        # この共通集合に入る時間帯が計測対象
+        # The overlapping time window is the measurement target.
         common_start_time = int(max(pub_start_time, sub_start_time))
         common_end_time = int(min(pub_end_time, sub_end_time))
 
-        # Start~Endの共通集合に入らないindexを除く
+        # Exclude indices that fall outside the overlapping time window.
         pub_indices = {item[0] for item in pub_logdata[f"{topic}"] if int(
             item[1]) >= common_start_time and int(item[1]) <= common_end_time}
         sub_indices = {item[0] for item in sub_logdata[f"{topic}"] if int(
             item[1]) >= common_start_time and int(item[1]) <= common_end_time}
 
-        # その上で片方にしか入っていないindexをlossとしてloss率を計算
+        # Then treat indices present on only one side as losses and compute the loss rate.
         los_index_count = len(set(pub_indices) - set(sub_indices)) + \
             len(set(pub_indices) - set(sub_indices))
 
@@ -296,7 +299,7 @@ def measure_latency(pub_logdata, sub_logdata, topic_list):
 
         latency_results_for_all_topics[f"{topic}"] = latency_results
 
-        # 統計情報を計算
+        # Compute statistics.
         latency_statics = calcurate_statics(
             latency_results_for_all_topics, topic)
         latency_statics_for_all_topics[f"{topic}"] = latency_statics
@@ -326,9 +329,9 @@ def measure_latency(pub_logdata, sub_logdata, topic_list):
 
 #     for topic in topic_list:
 #         payload_size = pub_info[f"{topic}"]["payload_size"]
-#         payload_size_bit = int(payload_size) * 8 # bitに直す
+#         payload_size_bit = int(payload_size) * 8 # convert to bits
 #         latency_statics = latency_statics_for_all_topics[f"{topic}"]
-#         sum_latency = latency_statics["sum"] * 0.001 # msをsに変換
+#         sum_latency = latency_statics["sum"] * 0.001 # convert milliseconds to seconds
 #         print(sum_latency)
 #         count_messages = latency_statics["count"]
 #         print(count_messages)

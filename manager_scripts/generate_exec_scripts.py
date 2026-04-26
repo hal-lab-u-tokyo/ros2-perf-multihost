@@ -1,12 +1,14 @@
 """
-JSONファイルを受け取り、docker/ 配下の共通Dockerfileで起動するコンテナ内で
-実行するホストごとの実行スクリプトとcompose.yaml、それらのローカルでの検証用ファイルを生成する。
+Read a topology JSON file and generate per-host execution scripts and compose
+files that run inside containers built from the shared Dockerfile under
+docker/. Also generate local verification files for running the same topology
+on a single development machine.
 
-使い方:
-    python3 parse_json/generate_exec_scripts.py <json_path> [--rmw <rmw>] [--ws-dir <dir>]
+Usage:
+    python3 manager_scripts/generate_exec_scripts.py <json_path> [--rmw <rmw>] [--ws-dir <dir>]
 
-例:
-    python3 parse_json/generate_exec_scripts.py topology_example/simple.json --rmw fastdds --ws-dir performance_ws
+Example:
+    python3 manager_scripts/generate_exec_scripts.py topology_example/simple.json --rmw fastdds --ws-dir performance_ws
 """
 
 import argparse
@@ -18,9 +20,10 @@ import sys
 from datetime import datetime
 
 
-# コンテナ内のプロジェクトルートと ROS 2 ワークスペース
+# Project root and ROS 2 workspace paths inside the container
 PROJECT_ROOT_IN_CONTAINER = "/workdir/ros2-perf-multihost"
 ROS_WS_IN_CONTAINER = f"{PROJECT_ROOT_IN_CONTAINER}/ros2_node_impl_ws"
+ZENOH_CONFIG_DIR_IN_CONTAINER = f"{ROS_WS_IN_CONTAINER}/zenoh_config"
 IMAGE_NAME = "ghcr.io/hal-lab-u-tokyo/ros2-perf-multihost:latest"
 DEFAULT_PERF_WS_DIR = "performance_ws"
 PERF_WS_DIR = DEFAULT_PERF_WS_DIR
@@ -30,7 +33,7 @@ DEFAULT_EVAL_TIME = 60
 
 
 def _normalize_ws_dir(ws_dir):
-    """--ws-dir の値を正規化して検証する"""
+    """Normalize and validate the value passed to --ws-dir."""
     normalized = os.path.normpath(ws_dir.strip())
     if not normalized or normalized == ".":
         raise argparse.ArgumentTypeError("--ws-dir cannot be empty or '.'.")
@@ -43,7 +46,7 @@ def _normalize_ws_dir(ws_dir):
 
 
 def _clear_directory_contents(path):
-    """ディレクトリ直下の内容をすべて削除する"""
+    """Delete everything directly under the given directory."""
     for name in os.listdir(path):
         target = os.path.join(path, name)
         if os.path.islink(target) or os.path.isfile(target):
@@ -53,20 +56,20 @@ def _clear_directory_contents(path):
 
 
 def _read_existing_json_path(run_dir):
-    """既存の run_dir に metadata.txt があれば json_path: フィールドを返す"""
+    """Return the json_path field from metadata.txt in run_dir if it exists."""
     metadata_path = os.path.join(run_dir, "metadata.txt")
     if not os.path.isfile(metadata_path):
         return None
     with open(metadata_path) as f:
         for line in f:
             if line.startswith("json_path:"):
-                # 正規化して返す
+                # Return a normalized path for reliable comparisons.
                 return os.path.normpath(line.split(":", 1)[1].strip())
     return None
 
 
 def _confirm_overwrite(output_dir, force=False, existing_json_path=None, new_json_path=None):
-    """既存の exec_scripts を上書きするか確認する"""
+    """Ask whether an existing exec_scripts directory should be overwritten."""
     if force:
         return True
     if not sys.stdin.isatty():
@@ -79,7 +82,7 @@ def _confirm_overwrite(output_dir, force=False, existing_json_path=None, new_jso
         existing_json_path is not None
         and new_json_path is not None
     ):
-        # 正規化して比較
+        # Compare normalized paths to avoid false mismatches.
         existing_normalized = os.path.normpath(existing_json_path)
         new_normalized = os.path.normpath(new_json_path)
         if existing_normalized != new_normalized:
@@ -99,7 +102,7 @@ def _confirm_overwrite(output_dir, force=False, existing_json_path=None, new_jso
 
 
 def _update_latest_symlink(base_dir, target_name):
-    """<ws-dir>/latest を target_name へ張り替える"""
+    """Update <ws-dir>/latest to point to target_name."""
     latest_link = os.path.join(base_dir, "latest")
     if os.path.lexists(latest_link):
         if os.path.islink(latest_link) or os.path.isfile(latest_link):
@@ -110,7 +113,7 @@ def _update_latest_symlink(base_dir, target_name):
 
 
 def resolve_output_paths(json_path, rmw, ws_dir, force=False):
-    """出力先ディレクトリと latest エイリアスを解決・更新する"""
+    """Resolve and prepare output directory paths and the latest alias."""
     project_root = os.getcwd()
     perf_ws_dir = os.path.join(project_root, ws_dir)
     os.makedirs(perf_ws_dir, exist_ok=True)
@@ -135,23 +138,23 @@ def resolve_output_paths(json_path, rmw, ws_dir, force=False):
 
 
 def _rmw_env_lines(rmw):
-    """RMW種別に応じた環境変数export行のリストを返す"""
+    """Return environment export lines for the selected RMW implementation."""
     if rmw == "zenoh":
         return [
-            "# RMW Zenoh設定",
+            "# RMW Zenoh settings",
             "export RMW_IMPLEMENTATION=rmw_zenoh_cpp",
             "export ZENOH_ROUTER_CHECK_ATTEMPTS=5",
             "export RUST_LOG=zenoh=warn,zenoh_transport=warn",
-            'export ZENOH_SESSION_CONFIG_URI="$PROJECT_ROOT/config/DEFAULT_RMW_ZENOH_SESSION_CONFIG.json5"',
+            'export ZENOH_SESSION_CONFIG_URI="$PROJECT_ROOT/ros2_node_impl_ws/zenoh_config/DEFAULT_RMW_ZENOH_SESSION_CONFIG.json5"',
         ]
     if rmw == "fastdds":
         return [
-            "# RMW Fast DDS設定",
+            "# RMW Fast DDS settings",
             "export RMW_IMPLEMENTATION=rmw_fastrtps_cpp",
         ]
     if rmw == "cyclonedds":
         return [
-            "# RMW Cyclone DDS設定",
+            "# RMW Cyclone DDS settings",
             "export RMW_IMPLEMENTATION=rmw_cyclonedds_cpp",
         ]
     return [f'# Unknown RMW "{rmw}", using default settings']
@@ -165,15 +168,15 @@ def _append_host_script_prelude(
     period_ms_default,
     eval_time_default,
 ):
-    """host*_exec.sh の共通前半を追加する"""
+    """Append the shared prelude used by host*_exec.sh."""
     lines.extend(
         [
             "#!/usr/bin/env bash",
             "set -euo pipefail",
             "",
-            '# プロジェクトルート: Docker では /workdir/ros2-perf-multihost、ネイティブではリポジトリルートを指定',
+            '# Project root: use /workdir/ros2-perf-multihost in Docker, or the repository root in native mode',
             f'PROJECT_ROOT="${{ROS2_PERF_WS:-{PROJECT_ROOT_IN_CONTAINER}}}"',
-            '# 集約した ROS 2 ノード実装ワークスペース',
+            '# Consolidated ROS 2 node implementation workspace',
             'ROS_WS="${ROS2_NODE_IMPL_WS:-$PROJECT_ROOT/ros2_node_impl_ws}"',
             "",
             f'PAYLOAD_SIZE="${{PAYLOAD_SIZE:-{payload_size_default}}}"',
@@ -199,8 +202,8 @@ def _append_host_script_prelude(
             'LOG_DIR="${LOG_DIR:?LOG_DIR is required. Use host*_run.sh or local_run.sh}"',
             'mkdir -p "$LOG_DIR"',
             "",
-            "# colcon の setup.sh は COLCON_CURRENT_PREFIX を事前定義なしで参照するため",
-            "# source の前後だけ -u を無効化する",
+            "# colcon setup.sh may reference COLCON_CURRENT_PREFIX before it is defined",
+            "# so disable -u only around the source command",
             "set +u",
             '. "$ROS_WS/install/setup.sh"',
             "set -u",
@@ -213,12 +216,12 @@ def _append_host_script_prelude(
         [
             "",
             "# host-level monitor (CPU/memory)",
-            'MONITOR_HOST_PY="$PROJECT_ROOT/performance_test/monitor_host.py"',
+            'MONITOR_HOST_PY="$PROJECT_ROOT/remote_hosts_scripts/monitor_psutil.py"',
             'if [ ! -f "$MONITOR_HOST_PY" ]; then',
-            '  MONITOR_HOST_PY="$ROS_WS/../performance_test/monitor_host.py"',
+            '  MONITOR_HOST_PY="$ROS_WS/../remote_hosts_scripts/monitor_psutil.py"',
             "fi",
             'if [ ! -f "$MONITOR_HOST_PY" ]; then',
-            '  echo "ERROR: monitor_host.py not found under $PROJECT_ROOT/performance_test" >&2',
+            '  echo "ERROR: monitor_psutil.py not found under $PROJECT_ROOT/remote_hosts_scripts" >&2',
             "  exit 1",
             "fi",
             f'python3 "$MONITOR_HOST_PY" 0.5 "$LOG_DIR/{host_name}_monitor_host.csv" &',
@@ -267,7 +270,7 @@ def _append_subscriber_block(lines, node_name, sub_list, qos_opts):
 
 
 def _normalize_intermediate_entries(intermediate_value, node_name):
-    """intermediate を array 形式で検証して返す"""
+    """Validate and return intermediate entries as an array."""
     if not isinstance(intermediate_value, list):
         raise ValueError(
             f"node '{node_name}': intermediate must be an array"
@@ -291,7 +294,7 @@ def _normalize_intermediate_entries(intermediate_value, node_name):
 
 
 def _collect_intermediate_topic_names(intermediate_entries):
-    """intermediate 配列から pub/sub トピック名を順序保持で重複除去して収集する"""
+    """Collect publisher and subscriber topic names from intermediate entries while preserving order and removing duplicates."""
     pub_topics = []
     sub_topics = []
     for entry in intermediate_entries:
@@ -319,7 +322,7 @@ def _append_intermediate_block(lines, node_name, pub_topics, sub_topics, qos_opt
 
 
 def _append_host_script_epilogue(lines, host_name):
-    """host*_exec.sh の共通後半を追加する"""
+    """Append the shared epilogue used by host*_exec.sh."""
     lines.extend(
         [
             "",
@@ -335,7 +338,7 @@ def _append_host_script_epilogue(lines, host_name):
 
 
 def generate_exec_scripts(json_content, rmw, output_dir):
-    """各ホスト用のコンテナ内実行スクリプトを生成する"""
+    """Generate per-host execution scripts that run inside containers."""
     os.makedirs(output_dir, exist_ok=True)
 
     payload_size_default = DEFAULT_PAYLOAD_SIZE
@@ -425,14 +428,14 @@ def _append_common_service(
     lines.append(
         f'      - "{rel_project_root}/{PERF_WS_DIR}:{PROJECT_ROOT_IN_CONTAINER}/{PERF_WS_DIR}"')
     lines.append(
-        f'      - "{rel_project_root}/config:{PROJECT_ROOT_IN_CONTAINER}/config:ro"')
+        f'      - "{rel_project_root}/ros2_node_impl_ws/zenoh_config:{ZENOH_CONFIG_DIR_IN_CONTAINER}:ro"')
     lines.append("    environment:")
     lines.append(f"      - ROS2_PERF_WS={PROJECT_ROOT_IN_CONTAINER}")
     lines.append(f"      - ROS2_NODE_IMPL_WS={ROS_WS_IN_CONTAINER}")
     if rmw == "zenoh":
         lines.append("      - RMW_IMPLEMENTATION=rmw_zenoh_cpp")
         lines.append(
-            f"      - ZENOH_SESSION_CONFIG_URI={PROJECT_ROOT_IN_CONTAINER}/config/DEFAULT_RMW_ZENOH_SESSION_CONFIG.json5"
+            f"      - ZENOH_SESSION_CONFIG_URI={ZENOH_CONFIG_DIR_IN_CONTAINER}/DEFAULT_RMW_ZENOH_SESSION_CONFIG.json5"
         )
         lines.append("      - RUST_LOG=zenoh=warn,zenoh_transport=warn")
     elif rmw == "fastdds":
@@ -453,7 +456,7 @@ def _append_common_service(
 
 
 def _append_zenohd_service(lines, project_root, output_dir):
-    """zenoh利用時のみ追加する中央ルーターサービス"""
+    """Append the central router service used only for Zenoh."""
     rel_project_root = os.path.relpath(project_root, output_dir)
     lines.append("  service_zenohd:")
     lines.append(f"    image: {IMAGE_NAME}")
@@ -463,13 +466,13 @@ def _append_zenohd_service(lines, project_root, output_dir):
     lines.append(
         f'      - "{rel_project_root}/{PERF_WS_DIR}:{PROJECT_ROOT_IN_CONTAINER}/{PERF_WS_DIR}"')
     lines.append(
-        f'      - "{rel_project_root}/config:{PROJECT_ROOT_IN_CONTAINER}/config:ro"')
+        f'      - "{rel_project_root}/ros2_node_impl_ws/zenoh_config:{ZENOH_CONFIG_DIR_IN_CONTAINER}:ro"')
     lines.append("    environment:")
     lines.append(f"      - ROS2_PERF_WS={PROJECT_ROOT_IN_CONTAINER}")
     lines.append(f"      - ROS2_NODE_IMPL_WS={ROS_WS_IN_CONTAINER}")
     lines.append("      - RMW_IMPLEMENTATION=rmw_zenoh_cpp")
     lines.append(
-        f"      - ZENOH_ROUTER_CONFIG_URI={PROJECT_ROOT_IN_CONTAINER}/config/DEFAULT_RMW_ZENOH_ROUTER_CONFIG.json5"
+        f"      - ZENOH_ROUTER_CONFIG_URI={ZENOH_CONFIG_DIR_IN_CONTAINER}/DEFAULT_RMW_ZENOH_ROUTER_CONFIG.json5"
     )
     lines.append("      - RUST_LOG=zenoh=warn,zenoh_transport=warn")
     lines.append("    healthcheck:")
@@ -480,12 +483,12 @@ def _append_zenohd_service(lines, project_root, output_dir):
     lines.append("      timeout: 1s")
     lines.append("      retries: 30")
     lines.append(
-        f"    command: [ \"/bin/bash\", \"{PROJECT_ROOT_IN_CONTAINER}/manager_scripts/start_zenoh_router.sh\", \"foreground\" ]"
+        f"    command: [ \"/bin/bash\", \"{PROJECT_ROOT_IN_CONTAINER}/manager_scripts/operate_zenoh_router.sh\", \"foreground\" ]"
     )
 
 
 def generate_compose(json_content, rmw, output_dir, project_root):
-    """開発PC検証用に、全ホストを含む local_compose.yaml を生成する"""
+    """Generate local_compose.yaml for validation on a development machine."""
     payload_size_default = DEFAULT_PAYLOAD_SIZE
     period_ms_default = DEFAULT_PERIOD_MS
     eval_time_default = DEFAULT_EVAL_TIME
@@ -516,7 +519,7 @@ def generate_compose(json_content, rmw, output_dir, project_root):
 
 
 def generate_compose_per_host(json_content, rmw, output_dir, project_root):
-    """実運用向けに、ホストごとの host*_compose.yaml を生成する"""
+    """Generate one host-specific host*_compose.yaml file per host."""
     payload_size_default = DEFAULT_PAYLOAD_SIZE
     period_ms_default = DEFAULT_PERIOD_MS
     eval_time_default = DEFAULT_EVAL_TIME
@@ -547,7 +550,7 @@ def _run_script_common_prefix(
     period_ms_default,
     eval_time_default,
 ):
-    """runスクリプト共通の前半を追加する"""
+    """Append the shared prelude used by run scripts."""
     lines.extend(
         [
             "#!/usr/bin/env bash",
@@ -556,7 +559,7 @@ def _run_script_common_prefix(
             'SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"',
             'RUN_ROOT_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"',
             'RUN_DIR_NAME="$(basename "$RUN_ROOT_DIR")"',
-            f'# プロジェクトルート: exec_scripts/ からの相対パスは生成時に確定済み ({rel_root})',
+            f'# Project root: the relative path from exec_scripts/ is fixed at generation time ({rel_root})',
             f'PROJECT_ROOT="$(cd "$SCRIPT_DIR/{rel_root}" && pwd)"',
             'LOCAL_UID="${LOCAL_UID:-$(id -u)}"',
             'LOCAL_GID="${LOCAL_GID:-$(id -g)}"',
@@ -623,7 +626,7 @@ def _run_script_common_prefix(
 
 
 def generate_host_run_scripts(json_content, output_dir, project_root):
-    """host*_run.sh: 各ホスト用composeを起動するラッパスクリプトを生成する"""
+    """Generate host*_run.sh wrapper scripts for host-specific Compose files."""
     rel_root = os.path.relpath(project_root, output_dir)
     payload_size_default = DEFAULT_PAYLOAD_SIZE
     period_ms_default = DEFAULT_PERIOD_MS
@@ -667,7 +670,7 @@ def generate_host_run_scripts(json_content, output_dir, project_root):
 
 
 def generate_local_run_script(json_content, rmw, output_dir, project_root):
-    """local_run.sh: 作業PC検証用のlocal_compose.yamlを使って全サービスを起動するスクリプト"""
+    """Generate local_run.sh to start all services using local_compose.yaml."""
     hosts = json_content["hosts"]
     host_services = " ".join(f"service_{h['host_name']}" for h in hosts)
     rel_root = os.path.relpath(project_root, output_dir)
@@ -752,7 +755,7 @@ def generate_local_run_script(json_content, rmw, output_dir, project_root):
 
 
 def _collect_metadata_node_names(json_content):
-    """metadata.txt 用に host / publisher / subscriber / intermediate ノード名とトピック数を収集する"""
+    """Collect host names, node names, and topic counts for metadata.txt."""
     host_names = []
     publisher_names = []
     subscriber_names = []
@@ -786,14 +789,14 @@ def _collect_metadata_node_names(json_content):
 
 
 def _unique_in_order(items):
-    """順序を保ったまま重複除去する"""
+    """Remove duplicates while preserving the original order."""
     return list(dict.fromkeys(items))
 
 
 def generate_metadata_file(
     json_content, json_path, rmw, ws_dir, project_root, scenario_dir
 ):
-    """<ws-dir>/latest/metadata.txt を生成する"""
+    """Generate <ws-dir>/latest/metadata.txt."""
     latest_dir = os.path.join(project_root, ws_dir, "latest")
     metadata_path = os.path.join(latest_dir, "metadata.txt")
 
@@ -890,7 +893,7 @@ if __name__ == "__main__":
     with open(args.json_path, "r") as f:
         json_content = json.load(f)
 
-    # 一時ディレクトリに生成してから成功後にスワップする
+    # Generate into a temporary directory first, then swap it in after success.
     tmp_dir = output_dir + ".tmp"
     if os.path.exists(tmp_dir):
         shutil.rmtree(tmp_dir)
@@ -905,7 +908,7 @@ if __name__ == "__main__":
         generate_local_run_script(
             json_content, args.rmw, tmp_dir, project_root)
 
-        # 生成成功 → 既存と swap
+        # Generation succeeded; replace the existing directory atomically.
         if overwrite:
             _clear_directory_contents(output_dir)
             shutil.rmtree(output_dir)

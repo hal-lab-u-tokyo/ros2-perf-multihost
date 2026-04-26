@@ -1,77 +1,75 @@
-# topology JSON 設定リファレンス
+# Topology JSON Reference
 
-このディレクトリの JSON は、以下の自動生成スクリプトで実行スクリプトへ変換されます。
+JSON files in this directory are converted into execution scripts by the following generator:
 
-- parse_json/generate_exec_scripts.py
+- manager_scripts/generate_exec_scripts.py
 
-## 1. ルートキー
+## 1. Root Keys
 
-| キー | 必須 | 型 | 既定値 | 説明 |
+| Key | Required | Type | Default | Description |
 |---|---|---|---|---|
-| qos | 任意 | object | - | QoS 設定オブジェクト。未指定時は各項目に既定値。 |
-| hosts | 必須 | array | - | ホスト定義の配列。 |
+| qos | Optional | object | - | QoS configuration object. If omitted, each field uses its default value. |
+| hosts | Required | array | - | Array of host definitions. |
 
-### qos オブジェクト
+### `qos` Object
 
-| キー | 必須 | 型 | 既定値 | 説明 |
+| Key | Required | Type | Default | Description |
 |---|---|---|---|---|
-| history | 任意 | string | KEEP_LAST | QoS history。 |
-| depth | 任意 | number | 1 | QoS depth。history が KEEP_LAST のときのみ有効で、KEEP_ALL の場合は無視される。 |
-| reliability | 任意 | string | RELIABLE | QoS reliability。 |
+| history | Optional | string | KEEP_LAST | QoS history policy. |
+| depth | Optional | number | 1 | QoS depth. Effective only when `history` is `KEEP_LAST`; ignored for `KEEP_ALL`. |
+| reliability | Optional | string | RELIABLE | QoS reliability policy. |
 
-## 2. hosts 配下
+## 2. Under `hosts`
 
-### host エントリ
+### Host Entry
 
-| キー | 必須 | 型 | 説明 |
+| Key | Required | Type | Description |
 |---|---|---|---|
-| host_name | 必須 | string | 生成されるファイル名のベースになるホスト名。 |
-| nodes | 必須 | array | ノード定義の配列。 |
+| host_name | Required | string | Host name used as the base name of generated files. |
+| nodes | Required | array | Array of node definitions. |
 
-### node エントリ
+### Node Entry
 
-| キー | 必須 | 型 | 説明 |
+| Key | Required | Type | Description |
 |---|---|---|---|
-| node_name | 必須 | string | ROS ノード名。 |
-| publisher | 条件付き必須 | array | Publisher として動かす場合に指定。 |
-| subscriber | 条件付き必須 | array | Subscriber として動かす場合に指定。 |
-| intermediate | 条件付き必須 | array | Intermediate として動かす場合に指定。 |
+| node_name | Required | string | ROS node name. |
+| publisher | Conditionally required | array | Set this when the node should act as a Publisher. |
+| subscriber | Conditionally required | array | Set this when the node should act as a Subscriber. |
+| intermediate | Conditionally required | array | Set this when the node should act as an Intermediate node. |
 
-補足:
-- 1つの node に publisher / subscriber / intermediate を複数併用することは可能です。
-- intermediate は配列で定義できますが、同一 node エントリ内では 1 つの node_name を共有するため、配列要素は 1 つの intermediate_node 起動に統合されます。
-- 複数の intermediate を独立した ROS ノード/別プロセスとして実行したい場合は、intermediate 配列を増やすのではなく、node_name が一意になるよう別の nodes エントリとして定義してください。
+Notes:
+- A single `node` entry can combine `publisher`, `subscriber`, and `intermediate` roles.
+- `intermediate` can be defined as an array, but all elements in the same `node` entry share one `node_name`, so they are merged into a single `intermediate_node` process.
+- If you want to run multiple Intermediate nodes as separate ROS nodes or separate processes, do not add more elements to the `intermediate` array. Instead, define separate `nodes` entries with unique `node_name` values.
 
-### publisher 配列要素
+### Elements of the `publisher` Array
 
-| キー | 必須 | 型 | 説明 |
+| Key | Required | Type | Description |
 |---|---|---|---|
-| topic_name | 必須 | string | Publish するトピック名。 |
+| topic_name | Required | string | Topic name to publish. |
 
-### subscriber 配列要素
+### Elements of the `subscriber` Array
 
-| キー | 必須 | 型 | 説明 |
+| Key | Required | Type | Description |
 |---|---|---|---|
-| topic_name | 必須 | string | Subscribe するトピック名。 |
+| topic_name | Required | string | Topic name to subscribe to. |
 
-### intermediate
+### `intermediate`
 
-| キー | 必須 | 型 | 説明 |
+| Key | Required | Type | Description |
 |---|---|---|---|
-| publisher | 必須 | array | 中継先 publish 用 topic 定義。 |
-| subscriber | 必須 | array | 中継元 subscribe 用 topic 定義。 |
+| publisher | Required | array | Topic definitions for republished output topics. |
+| subscriber | Required | array | Topic definitions for subscribed input topics. |
 
-intermediate の配列要素は、上記の publisher / subscriber を持つオブジェクトです。
-publisher / subscriber の配列要素は、上記と同じく topic_name が必須です。
+Each element of the `intermediate` array is an object that contains the `publisher` and `subscriber` arrays shown above. Elements inside those arrays use the same `topic_name` field described above.
 
-## 3. 注意事項
+## 3. Notes
 
-使用する RMW は generate_exec_scripts.py 実行時のコマンドライン引数で指定します．
-JSON に書いても反映されません．
+The RMW implementation is selected with the command-line arguments to `generate_exec_scripts.py`. Defining it in the JSON file has no effect.
 
-`_run.sh` / `_exec.sh` 実行時に `--eval-time` / `--period-ms` / `--payload-size` を指定すると、その値が起動対象の全ホストにある Publisher / Intermediate ノードへ一括適用されます（Subscriber は `--period-ms` / `--payload-size` の対象外）。
+If you pass `--eval-time`, `--period-ms`, or `--payload-size` to `_run.sh` or `_exec.sh`, those values are applied to all Publisher and Intermediate nodes across the launched hosts. Subscriber nodes do not use `--period-ms` or `--payload-size`.
 
-## 4. 最小テンプレート
+## 4. Minimal Template
 
 ```json
 {
@@ -102,7 +100,7 @@ JSON に書いても反映されません．
 }
 ```
 
-## 5. 推奨テンプレート
+## 5. Recommended Template
 
 ```json
 {

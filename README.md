@@ -1,234 +1,208 @@
-# ROS 2分散システムの通信機能に対するスケーラビリティ評価手法
+# Scalability Evaluation Method for ROS 2 Distributed Communication
 
-ROS 2 ノード実装を集約したネストしたワークスペースについては [ros2_node_impl_ws/README.md](./ros2_node_impl_ws/README.md) を参照してください。
+For the nested workspace that contains the ROS 2 node implementations used in this repository, see [ros2_node_impl_ws/README.md](./ros2_node_impl_ws/README.md).
 
+## Generating Execution Scripts with a Shared Docker Image
 
-## 共通Dockerイメージを使った実行スクリプト生成
+Instead of generating and building a Dockerfile for each topology, this repository reuses a single shared Docker image and generates only topology-specific execution scripts and Compose definitions.
 
-トポロジーごとにDockerfileを生成・ビルドする代わりに、共通の1つのDockerイメージを使い回し、トポロジーに応じた実行スクリプトとcompose定義だけを生成するアプローチです。
+### Generate Execution Scripts
 
-### 実行スクリプトの生成
-
-JSON トポロジーファイルから実行スクリプト（`host*_exec.sh`, `host*_run.sh`）と Docker Compose ファイルを生成します。
+Generate execution scripts (`host*_exec.sh`, `host*_run.sh`) and Docker Compose files from a JSON topology file.
 
 ```bash
-cd parse_json
+cd manager_scripts
 python3 generate_exec_scripts.py ../topology_example/simple.json --rmw fastdds --ws-dir performance_ws
 ```
 
-### 生成されたスクリプトのオプション
+### Options Supported by Generated Scripts
 
-生成される `host*_run.sh` / `local_run.sh` は、以下の実行時オプションをサポートします。`--eval-time` は起動対象の全ノード（Publisher / Subscriber / Intermediate）へ、`--period-ms` / `--payload-size` は Publisher / Intermediate ノードへ一括適用されます。`--run-idx` は `host*_run.sh` / `local_run.sh` でのみ有効です。JSON スキーマについては [topology_example/README.md](./topology_example/README.md) を参照してください。
+Generated `host*_run.sh` and `local_run.sh` scripts support the runtime options below. `--eval-time` is applied to every launched node (Publisher / Subscriber / Intermediate). `--period-ms` and `--payload-size` are applied to Publisher and Intermediate nodes only. `--run-idx` is available only on `host*_run.sh` and `local_run.sh`. For the JSON schema, see [topology_example/README.md](./topology_example/README.md).
 
-| オプション | 短形式 | 説明 | 既定値 |
+| Option | Short | Description | Default |
 |---|---|---|---|
-| --eval-time | -t | 計測時間（秒） | 60 |
-| --period-ms | -p | Publish 周期（ミリ秒） | 100 |
-| --payload-size | -s | ペイロードサイズ（バイト） | 64 |
-| --run-idx | -r | ランインデックス（ローカル実行時） | 1 |
+| --eval-time | -t | Evaluation time in seconds | 60 |
+| --period-ms | -p | Publish period in milliseconds | 100 |
+| --payload-size | -s | Payload size in bytes | 64 |
+| --run-idx | -r | Run index for local execution | 1 |
 
-#### 実行例
+#### Examples
 
 ```bash
-# デフォルト値を使用
-$ ./host1_exec.sh
+# Use default values
+./host1_exec.sh
 
-# デフォルト値を上書き
-$ ./host1_run.sh --eval-time 120 --period-ms 50 --payload-size 256
+# Override defaults
+./host1_run.sh --eval-time 120 --period-ms 50 --payload-size 256
 
-# 短形式
-$ ./host1_run.sh -t 120 -p 50 -s 256
+# Short options
+./host1_run.sh -t 120 -p 50 -s 256
 ```
 
-`--eval-time` は呼び出した `*_run.sh` / `local_run.sh` 経由で起動される全ノードに一括適用されます。`--period-ms` / `--payload-size` は Publisher / Intermediate のみに適用されます（Subscriber は使用しません）。
+`--eval-time` is applied to all nodes launched through `*_run.sh` or `local_run.sh`. `--period-ms` and `--payload-size` apply only to Publisher and Intermediate nodes; Subscriber nodes do not use them.
 
-### 共通Dockerイメージの取得（利用者向け）
+### Pull the Shared Docker Image
 
 ```bash
 docker pull ghcr.io/hal-lab-u-tokyo/ros2-perf-multihost:latest
 ```
 
-公開済みの GitHub Packages イメージ [`ghcr.io/hal-lab-u-tokyo/ros2-perf-multihost:latest`](https://github.com/hal-lab-u-tokyo/ros2-perf-multihost/pkgs/container/ros2-perf-multihost) を利用します。
-自動生成される `local_compose.yaml` / `host{N}_compose.yaml` も同じイメージを参照します。
-イメージのビルド・push手順（開発者向け）は `docker/README.md` を参照してください。
+Use the published GitHub Packages image [`ghcr.io/hal-lab-u-tokyo/ros2-perf-multihost:latest`](https://github.com/hal-lab-u-tokyo/ros2-perf-multihost/pkgs/container/ros2-perf-multihost). Generated `local_compose.yaml` and `host{N}_compose.yaml` files also reference the same image. For image build and push steps, see `docker/README.md`.
 
-### 実行スクリプトの生成
-
-プロジェクトルートから実行します。
+### Generate Scripts from the Project Root
 
 ```bash
-python3 parse_json/generate_exec_scripts.py <topology.json> [--rmw <rmw>] [--ws-dir <dir>] [--force|-f]
+python3 manager_scripts/generate_exec_scripts.py <topology.json> [--rmw <rmw>] [--ws-dir <dir>] [--force|-f]
 ```
 
-引数:
+Arguments:
 
-- `<topology.json>`: トポロジー定義JSONファイルのパス
-- `--ws-dir`: 生成物のベースディレクトリ（デフォルト: `performance_ws`）
-- `--rmw`: RMW実装（`fastdds` / `zenoh` / `cyclonedds`、デフォルト: `fastdds`）
-- `--force` / `-f`: 既存の出力ディレクトリを確認なしで上書きする（CI・スクリプト実行時に使用）
+- `<topology.json>`: Path to the topology definition JSON file
+- `--ws-dir`: Base directory for generated artifacts (default: `performance_ws`)
+- `--rmw`: RMW implementation (`fastdds`, `zenoh`, or `cyclonedds`; default: `fastdds`)
+- `--force` / `-f`: Overwrite an existing output directory without confirmation; useful in CI or scripts
 
-出力先は `<ws-dir>/<JSONファイル名>-<rmw>/exec_scripts/` です。既に存在する場合は上書き確認を行い、`Yes` のときは `exec_scripts/*` を削除して再生成します。このとき、前回の生成に使ったJSONファイルのパス（`metadata.txt` の `json_path:` フィールド）と今回のパスが異なる場合（同名ファイルを別パスから指定した場合）は、追加の警告メッセージを表示します。stdin が TTY でない場合（CI・パイプ経由など）は確認プロンプトを出さずにエラー終了します。その場合は `--force` または `-f` を使用してください。`<ws-dir>/latest` は常に最新に生成されたディレクトリへのシンボリックリンクになります。
-デフォルトの `performance_ws/` ディレクトリは自動生成されますが、リポジトリ管理からは `.gitignore` で除外しています。
+Generated files are written to `<ws-dir>/<json-file-name>-<rmw>/exec_scripts/`. If the directory already exists, the script asks for confirmation before deleting `exec_scripts/*` and regenerating it. If the previously used JSON path recorded in `metadata.txt` under `json_path:` differs from the current one, an additional warning is shown. If stdin is not a TTY, the script exits with an error instead of prompting; use `--force` or `-f` in that case. `<ws-dir>/latest` is always updated to point at the most recently generated directory.
+
+The default `performance_ws/` directory is generated automatically and excluded from version control via `.gitignore`.
 
 ```bash
-# 例: zenoh で topology_example を使う場合
-python3 parse_json/generate_exec_scripts.py topology_example/simple.json --rmw zenoh
+# Example: use topology_example/simple.json with Zenoh
+python3 manager_scripts/generate_exec_scripts.py topology_example/simple.json --rmw zenoh
 ```
 
-生成されるファイル:
+Generated files:
 
-| ファイル | 用途 |
+| File | Purpose |
 |---|---|
-| `host{N}_run.sh` | 各ホスト向け compose を起動するラッパースクリプト（UID/GID 自動設定） |
-| `host{N}_compose.yaml` | 実機デプロイ用の各ホスト向けcompose定義 |
-| `host{N}_exec.sh` | 各ホストのコンテナ内（またはネイティブ）で実行するROSノード起動スクリプト |
-| `local_run.sh` | `local_compose.yaml` を使って全サービスを起動するラッパースクリプト（検証用） |
-| `local_compose.yaml` | 作業PC上で全サービスをまとめて起動するcompose定義（検証用） |
-| `metadata.txt` | 最新実行ディレクトリのメタ情報（入力JSON名、RMW、トポロジー統計など） |
+| `host{N}_run.sh` | Wrapper script that launches the host-specific Compose file with automatic UID/GID handling |
+| `host{N}_compose.yaml` | Host-specific Compose definition for real multi-host deployment |
+| `host{N}_exec.sh` | ROS node launch script executed inside the container or in a native environment on each host |
+| `local_run.sh` | Wrapper script for launching all services with `local_compose.yaml` on a single machine |
+| `local_compose.yaml` | Compose definition that launches all services on the local development machine |
+| `metadata.txt` | Metadata for the generated run directory, including input JSON, RMW, and topology statistics |
 
-`metadata.txt` は `<ws-dir>/latest/metadata.txt` に生成され、以下の情報がカテゴリ別に記録されます。
+`metadata.txt` is generated at `<ws-dir>/latest/metadata.txt` and records the following categories of information.
 
-**1. general info** — 全般情報
-- `command`: 実行したコマンド全文
-- `timestamp`: スクリプト実行日時（`YYYY-DD-MM_hh-mm-ss`）
-- `json`: 入力に指定したJSONファイル名
-- `json_path`: 指定したJSONファイルのパス
-- `ws_dir`: 出力ベースディレクトリ
-- `scenario_dir`: 生成した実行ディレクトリ名
+**1. general info**
+- `command`: Full command line used to run the generator
+- `timestamp`: Script execution time in `YYYY-DD-MM_hh-mm-ss` format
+- `json`: Input JSON file name
+- `json_path`: Input JSON file path
+- `ws_dir`: Output base directory
+- `scenario_dir`: Generated run directory name
 
-**2. test config** — テスト設定
-- `rmw`: 指定したRMW名
-- `qos_history` / `qos_depth` / `qos_reliability`: QoS設定
+**2. test config**
+- `rmw`: Selected RMW implementation
+- `qos_history` / `qos_depth` / `qos_reliability`: QoS settings
 
-**3. topology stats** — トポロジー統計
-- `host_count` / `node_count`: ホスト数・ノード数
-- `publisher_count` / `subscriber_count` / `intermediate_count`: 役割別ノード数
-- `topic_count`: ユニークトピック数
-- `hosts`: ホスト名一覧（例: `host1, host2`）
-- `publishers` / `subscribers` / `intermediates`: 役割別ノード名一覧
-- `topics`: トピック名一覧（アルファベット順）
+**3. topology stats**
+- `host_count` / `node_count`: Number of hosts and nodes
+- `publisher_count` / `subscriber_count` / `intermediate_count`: Node counts by role
+- `topic_count`: Number of unique topics
+- `hosts`: Host name list, for example `host1, host2`
+- `publishers` / `subscribers` / `intermediates`: Node name lists grouped by role
+- `topics`: Topic names in alphabetical order
 
-`host{N}_run.sh` / `local_run.sh` から起動される各ノードの `--log_dir` は、`exec_scripts/` の1つ上（= 実行ディレクトリ）配下の `results/YYYY-DD-MM_hh-mm-ss/exec_logs/raw_<payload_size>B/run<run_idx>/` になります。`results/latest` は最新ディレクトリへのシンボリックリンクとして更新されます。例: `performance_ws/latest/results/2026-26-04_13-21-45/exec_logs/raw_64B/run1/`。
+Each node launched from `host{N}_run.sh` or `local_run.sh` receives a `--log_dir` under `results/YYYY-DD-MM_hh-mm-ss/exec_logs/raw_<payload_size>B/run<run_idx>/` inside the generated run directory. `results/latest` is updated as a symbolic link to the latest run directory. Example: `performance_ws/latest/results/2026-26-04_13-21-45/exec_logs/raw_64B/run1/`.
 
-### 作業PC上での検証実行（Docker）
+### Local Verification with Docker
 
 ```bash
 bash performance_ws/latest/exec_scripts/local_run.sh
 ```
 
-`local_run.sh` は自動的に `LOCAL_UID=$(id -u)` と `LOCAL_GID=$(id -g)` を設定して `docker compose` を実行するため、bind mount 先に root 所有ファイルが作られにくくなります。
+`local_run.sh` automatically sets `LOCAL_UID=$(id -u)` and `LOCAL_GID=$(id -g)` before running `docker compose`, which helps avoid root-owned files on bind mounts.
 
-zenohの場合は先にzenoh routerを起動してからホストサービスを立ち上げ、完了後にrouterを自動停止します。
+When using Zenoh, the script starts the Zenoh router first, then launches the host services, and stops the router automatically afterward.
 
-### ネイティブ環境での実行
+### Native Execution
 
-Dockerを使わずネイティブのROS 2環境で実行する場合は、`ROS2_PERF_WS` にプロジェクトルートを設定します。
+To run in a native ROS 2 environment without Docker, set `ROS2_PERF_WS` to the project root.
 
 ```bash
 export ROS2_PERF_WS=$(pwd)
 bash performance_ws/latest/exec_scripts/host1_exec.sh
 ```
 
-未設定の場合はコンテナ内のデフォルトパス `/ros2_perf_ws` が使用されます。
+If it is unset, the script falls back to the container default path.
 
-### 実機デプロイ時（各ホスト上）
+### Real Multi-Host Deployment
 
-各ホストに `exec_scripts/` ディレクトリを配布し、ホスト対応のcompose定義で起動します。
+Prepare the repository and the required Python environment at the same path on each host in advance.
 
-`parse_json/distribute_exec_scripts.sh` を使うと、`performance_ws/latest/metadata.txt` から
-`hosts`, `ws_dir`, `scenario_dir` を自動で読み取り、各ホストへ対応する
-`host{N}_exec.sh`, `host{N}_run.sh`, `host{N}_compose.yaml` を配布できます。
+Distribute the generated `exec_scripts/` directory to each host, then start the host-specific Compose definition on that host.
+
+`manager_scripts/distribute_exec_scripts.sh` reads `hosts`, `ws_dir`, and `scenario_dir` from `performance_ws/latest/metadata.txt` and distributes the corresponding `host{N}_exec.sh`, `host{N}_run.sh`, and `host{N}_compose.yaml` files to each host automatically.
 
 ```bash
-cd parse_json
-chmod +x distribute_exec_scripts.sh
-./distribute_exec_scripts.sh
+./manager_scripts/distribute_exec_scripts.sh
 ```
 
-コマンドライン引数で参照先を上書きできます。
+You can override the target paths on the command line.
 
 ```bash
-./parse_json/distribute_exec_scripts.sh \
-	--scenario simple-cyclonedds \
-	--ws-dir performance_ws \
-	--remote-repo-base /home/ubuntu/ros2-perf-multihost
-```
-
-```bash
-./parse_json/distribute_exec_scripts.sh --help
+./manager_scripts/distribute_exec_scripts.sh \
+  --scenario simple-cyclonedds \
+  --ws-dir performance_ws \
+  --remote-repo-base /home/ubuntu/ros2-perf-multihost
 ```
 
 ```bash
-# host1 上で実行
+./manager_scripts/distribute_exec_scripts.sh --help
+```
+
+```bash
+# Run on host1
 bash performance_ws/latest/exec_scripts/host1_run.sh
 ```
 
-必要に応じて、各ホストで事前に以下を実行してイメージを取得してください。
+If needed, pull the image on each host in advance.
 
 ```bash
 docker pull ghcr.io/hal-lab-u-tokyo/ros2-perf-multihost:latest
 ```
 
-## RESTサーバの起動と自動性能評価
+## REST Server and Automated Performance Evaluation
 
-マルチホスト構成では、各 Raspberry Pi 上で REST サーバ（実体は `rest_server.py`）を起動し、そこに対して制御スクリプトからリクエストを送ることでベンチマークを自動実行します。
+In a multi-host setup, each Raspberry Pi runs a REST server implemented by `rest_server.py`. A controller script sends requests to those servers to automate benchmark execution.
 
-1. 全ての Raspberry Pi で REST サーバを起動
+1. Start the REST server on every Raspberry Pi.
 
-`start_servers.sh` / `start_all_servers.sh` は使わず、各ホストへ SSH して `manager_scripts/rest_server.py` を直接起動します。
-
-```bash
-cd /home/takasehideki/ros2/ros2-perf-multihost
-
-# metadata.txt から hosts を取得して順番に起動
-HOSTS=$(awk -F': ' '/^hosts:/{print $2}' performance_ws/latest/metadata.txt | tr ',' ' ')
-for host in $HOSTS; do
-	host=$(echo "$host" | xargs)
-	echo "Starting rest_server.py on ${host}"
-	ssh -o BatchMode=yes -o StrictHostKeyChecking=no -o ConnectTimeout=5 "ubuntu@${host}" \
-		'cd /home/ubuntu/ros2-perf-multihost && setsid nohup python3 manager_scripts/rest_server.py > /home/ubuntu/rest.log 2>&1 < /dev/null & echo $! > /home/ubuntu/rest.pid'
-done
-```
-
-必要なら各ホストで REST サーバの疎通を確認してください。
+SSH into each host and launch `remote_hosts_scripts/rest_server.py` directly.
 
 ```bash
-for host in $HOSTS; do
-	host=$(echo "$host" | xargs)
-	nc -z -w 1 "$host" 5000 && echo "[$host] up" || echo "[$host] not ready"
-done
+ssh ubuntu@hostX
+cd ros2-perf-multihost
+python3 remote_hosts_scripts/rest_server.py
 ```
 
-事前に各ホストでリポジトリと Python 実行環境を同じパスに用意しておいてください。
+2. Run the benchmark script `performance_test.py`.
 
-2. ベンチマークスクリプト `performance_test.py` の実行
-
-REST サーバ起動後、`performance_test/performance_test.py` を使って、ペイロードサイズ・試行回数・実行環境を指定して測定を行います。
-このスクリプトは内部で `manager_scripts/start_exec_scripts.py` を呼び出し、実行対象ホストは `performance_ws/<scenario>/metadata.txt` の `hosts` から自動解決します。
+After the REST servers are running, use `performance_test/performance_test.py` to execute measurements with the desired payload size, number of trials, and execution mode. Internally, it calls `remote_hosts_scripts/start_exec_scripts.py`, and the target hosts are resolved automatically from `performance_ws/<scenario>/metadata.txt`.
 
 ```bash
-cd performance_test
-python3 performance_test.py --trials 10
-# ネイティブ実行に切り替える場合
-python3 performance_test.py --exec-policy native --trials 10
-# パラメータを明示する場合
-python3 performance_test.py --payload-size 256 --period-ms 50 --eval-time 120
+python3 performance_test/performance_test.py
+# Switch to native execution
+python3 performance_test/performance_test.py --exec-policy native
+# Override runtime parameters explicitly
+python3 performance_test/performance_test.py --payload-size 256 --period-ms 50 --eval-time 120
 ```
 
-主な引数:
+Main arguments:
 
-- `--trials`: 各ペイロードサイズあたりの試行回数
-- `--exec-policy`: 実行方式を `docker` または `native` から指定（デフォルト: `docker`）
-- `--ws-dir`: 実行スクリプト生成先のベースディレクトリ（デフォルト: `performance_ws`）
-- `--scenario`: 使用するシナリオディレクトリ（デフォルト: `latest`）
-- `--payload-size`: ペイロードサイズを指定。未指定時は `*_run.sh` / `*_exec.sh` 側の既定値を使います
-- `--period-ms`: Publish 周期を指定。未指定時は `*_run.sh` / `*_exec.sh` 側の既定値を使います
-- `--eval-time`: 計測時間を指定。未指定時は `*_run.sh` / `*_exec.sh` 側の既定値を使います
+- `--exec-policy`: Execution mode, either `docker` or `native` (default: `docker`)
+- `--trials`: Number of trials per payload size (default: `3`)
+- `--ws-dir`: Base directory that contains generated execution scripts (default: `performance_ws`)
+- `--scenario`: Scenario directory to use (default: `latest`)
+- `--payload-size`: Override payload size; if omitted, the default from `*_run.sh` or `*_exec.sh` is used
+- `--period-ms`: Override publish period; if omitted, the default from `*_run.sh` or `*_exec.sh` is used
+- `--eval-time`: Override evaluation time; if omitted, the default from `*_run.sh` or `*_exec.sh` is used
 
-`performance_test.py` は各試行ごとに REST 経由でノード群を起動し、終了後に各ホストからログを `scp` で収集します。ログは `performance_test/logs` 以下に、集計結果（レイテンシ・スループット・ホスト使用率）は `performance_test/results` 以下に CSV 形式で保存されます。
+`performance_test.py` launches node groups via REST for each trial, then collects logs from each host with `scp`. Raw logs are stored under `performance_test/logs`, and aggregated CSV outputs for latency, throughput, and host usage are written under `performance_test/results`.
 
-RMWにZenohを利用する場合は，マネージャで下記を実行する必要があります．
+When using Zenoh as the RMW, start the router on the manager host before running the benchmark.
 
-```
-./manager_scripts/start_zenoh_router.sh foreground 
+```bash
+./manager_scripts/operate_zenoh_router.sh foreground
 ```

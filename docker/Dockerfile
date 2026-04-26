@@ -1,6 +1,6 @@
 FROM ros:jazzy-ros-base
 
-# ROS 2のワークスペースを構築するための依存関係をインストール
+# Install dependencies required to build the ROS 2 workspace
 RUN apt update && apt install -y \
   libcxxopts-dev \
   python3-psutil \
@@ -9,7 +9,7 @@ RUN apt update && apt install -y \
   && apt clean \
   && rm -rf /var/lib/apt/lists/*
 
-# ワークスペースを作成し、build context から本プロジェクトをコピーしてビルド
+# Create the workspace, copy this project from the build context, and build it
 RUN mkdir -p /workdir/ros2-perf-multihost
 COPY . /workdir/ros2-perf-multihost
 RUN cd /workdir/ros2-perf-multihost/ros2_node_impl_ws \

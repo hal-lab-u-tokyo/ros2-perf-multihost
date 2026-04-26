@@ -4,10 +4,10 @@ Supports both Docker and native execution modes.
 
 Usage:
   # Docker mode (sends /start_docker requests)
-        python3 start_exec_scripts.py --exec-policy docker --run-idx 1 --num-hosts 3 --ws-dir performance_ws --scenario latest --hosts-list host1,host2,host3
+      python3 start_exec_scripts.py --exec-policy docker --run-idx 1 --ws-dir performance_ws --scenario latest --hosts-list host1,host2,host3
 
   # Native mode (sends /start requests)
-        python3 start_exec_scripts.py --exec-policy native --run-idx 1 --num-hosts 3 --ws-dir performance_ws --scenario latest --hosts-list host1,host2,host3
+      python3 start_exec_scripts.py --exec-policy native --run-idx 1 --ws-dir performance_ws --scenario latest --hosts-list host1,host2,host3
 """
 
 import requests
@@ -30,13 +30,13 @@ def get_metadata_value(key, metadata_path):
     return None
 
 
-def resolve_host_list(ws_dir, scenario, num_hosts):
+def resolve_host_list(ws_dir, scenario):
     """Resolve host list from environment or metadata.txt."""
     # Check environment variable first
     env_hosts = os.environ.get("ROS2_PERF_HOSTS")
     if env_hosts:
         hosts = [h.strip() for h in env_hosts.split(",") if h.strip()]
-        return hosts[:num_hosts] if num_hosts else hosts
+        return hosts
 
     # Read from metadata.txt (required)
     metadata_path = os.path.join(ws_dir, scenario, "metadata.txt")
@@ -55,7 +55,7 @@ def resolve_host_list(ws_dir, scenario, num_hosts):
         )
 
     hosts = [h.strip() for h in metadata_hosts.split(",") if h.strip()]
-    return hosts[:num_hosts] if num_hosts else hosts
+    return hosts
 
 
 def main():
@@ -65,10 +65,10 @@ def main():
         epilog="""
 Examples:
   # Docker mode
-        python3 start_exec_scripts.py --exec-policy docker --run-idx 1 --num-hosts 3 --ws-dir performance_ws --scenario latest --hosts-list host1,host2,host3
+      python3 start_exec_scripts.py --exec-policy docker --run-idx 1 --ws-dir performance_ws --scenario latest --hosts-list host1,host2,host3
 
   # Native mode
-        python3 start_exec_scripts.py --exec-policy native --run-idx 1 --num-hosts 3 --ws-dir performance_ws --scenario latest --hosts-list host1,host2,host3
+      python3 start_exec_scripts.py --exec-policy native --run-idx 1 --ws-dir performance_ws --scenario latest --hosts-list host1,host2,host3
         """
     )
     parser.add_argument(
@@ -79,8 +79,6 @@ Examples:
     )
     parser.add_argument("--run-idx", type=int, required=True,
                         help="Run index (trial number)")
-    parser.add_argument("--num-hosts", type=int, required=True,
-                        help="Number of hosts to use from metadata")
     parser.add_argument("--ws-dir", default="performance_ws",
                         help="Workspace directory (default: performance_ws)")
     parser.add_argument("--scenario", default="latest",
@@ -91,7 +89,6 @@ Examples:
     args = parser.parse_args()
 
     run_idx = args.run_idx
-    num_hosts = args.num_hosts
     ws_dir = args.ws_dir
     scenario = args.scenario
     hosts_list = args.hosts_list
@@ -103,7 +100,7 @@ Examples:
     else:
         # Resolve from environment or metadata
         try:
-            hosts = resolve_host_list(ws_dir, scenario, num_hosts)
+            hosts = resolve_host_list(ws_dir, scenario)
         except (FileNotFoundError, ValueError) as e:
             print(f"ERROR: {e}", file=sys.stderr)
             sys.exit(1)
