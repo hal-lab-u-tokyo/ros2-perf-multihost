@@ -67,7 +67,7 @@ Each element of the `intermediate` array is an object that contains the `publish
 
 The RMW implementation is selected with the command-line arguments to `generate_exec_scripts.py`. Defining it in the JSON file has no effect.
 
-If you pass `--eval-time`, `--period-ms`, or `--payload-size` to `_run.sh` or `_exec.sh`, those values are applied to all Publisher and Intermediate nodes across the launched hosts. Subscriber nodes do not use `--period-ms` or `--payload-size`.
+`--eval-time` can be passed to `_run.sh` or `_exec.sh` to override duration. `payload_size` and `period_ms` are taken directly from Publisher/Intermediate entries in the topology JSON and are not overridden by runtime script options.
 
 ## 4. Minimal Template
 

@@ -49,8 +49,6 @@ def run_test(
     ws_dir,
     scenario,
     exec_policy="docker",
-    payload_size=None,
-    period_ms=None,
     eval_time=None,
 ):
     print(f"=== Run trial={run_idx + 1} ===")
@@ -72,10 +70,6 @@ def run_test(
     ]
 
     env = os.environ.copy()
-    if payload_size is not None:
-        env["PAYLOAD_SIZE"] = str(payload_size)
-    if period_ms is not None:
-        env["PERIOD_MS"] = str(period_ms)
     if eval_time is not None:
         env["EVAL_TIME"] = str(eval_time)
 

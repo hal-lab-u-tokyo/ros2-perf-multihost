@@ -109,9 +109,7 @@ Examples:
         print("ERROR: No hosts to process", file=sys.stderr)
         sys.exit(1)
 
-    # Read test parameters from environment only when explicitly provided.
-    payload_size = os.environ.get("PAYLOAD_SIZE")
-    period_ms = os.environ.get("PERIOD_MS")
+    # Read optional test parameters from environment.
     eval_time = os.environ.get("EVAL_TIME")
 
     # Determine endpoint and timeout based on mode
@@ -141,10 +139,6 @@ Examples:
                 "ws_dir": ws_dir,
                 "scenario": scenario,
             }
-            if payload_size is not None:
-                request_body["payload_size"] = payload_size
-            if period_ms is not None:
-                request_body["period_ms"] = period_ms
             if eval_time is not None:
                 request_body["eval_time"] = eval_time
 

@@ -128,17 +128,11 @@ def _run_script(cmd, env=None):
 @app.route("/start", methods=["POST"])
 def start_script():
     body = request.get_json(silent=True) or {}
-    payload_size = body.get("payload_size")
     run_idx = body.get("run_idx", 1)
-    period_ms = body.get("period_ms")
     eval_time = body.get("eval_time")
 
     try:
         run_idx = _to_int(run_idx, "run_idx")
-        if payload_size is not None:
-            payload_size = _to_int(payload_size, "payload_size")
-        if period_ms is not None:
-            period_ms = _to_int(period_ms, "period_ms")
         if eval_time is not None:
             eval_time = _to_int(eval_time, "eval_time")
 
@@ -146,7 +140,7 @@ def start_script():
         resolved_host, script_path = _resolve_host_script(
             ctx["exec_dir"], ctx["hosts"], "exec.sh")
 
-        effective_payload_size = payload_size if payload_size is not None else 64
+        effective_payload_size = 64
         log_dir = os.path.join(
             REPO_ROOT,
             "logs",
@@ -156,10 +150,6 @@ def start_script():
         os.makedirs(log_dir, exist_ok=True)
 
         cmd = ["bash", script_path]
-        if payload_size is not None:
-            cmd.extend(["--payload-size", str(payload_size)])
-        if period_ms is not None:
-            cmd.extend(["--period-ms", str(period_ms)])
         if eval_time is not None:
             cmd.extend(["--eval-time", str(eval_time)])
 
@@ -170,7 +160,7 @@ def start_script():
             "[start] host=%s scenario=%s payload=%s run=%s script=%s",
             resolved_host,
             ctx["scenario_dir"],
-            payload_size,
+            "json",
             run_idx,
             script_path,
         )
@@ -189,17 +179,11 @@ def start_script():
 @app.route("/start_docker", methods=["POST"])
 def start_docker():
     body = request.get_json(silent=True) or {}
-    payload_size = body.get("payload_size")
     run_idx = body.get("run_idx", 1)
-    period_ms = body.get("period_ms")
     eval_time = body.get("eval_time")
 
     try:
         run_idx = _to_int(run_idx, "run_idx")
-        if payload_size is not None:
-            payload_size = _to_int(payload_size, "payload_size")
-        if period_ms is not None:
-            period_ms = _to_int(period_ms, "period_ms")
         if eval_time is not None:
             eval_time = _to_int(eval_time, "eval_time")
 
@@ -208,10 +192,6 @@ def start_docker():
             ctx["exec_dir"], ctx["hosts"], "run.sh")
 
         cmd = ["bash", script_path]
-        if payload_size is not None:
-            cmd.extend(["--payload-size", str(payload_size)])
-        if period_ms is not None:
-            cmd.extend(["--period-ms", str(period_ms)])
         if eval_time is not None:
             cmd.extend(["--eval-time", str(eval_time)])
         cmd.extend(["--run-idx", str(run_idx)])
@@ -220,7 +200,7 @@ def start_docker():
             "[start_docker] host=%s scenario=%s payload=%s run=%s script=%s",
             resolved_host,
             ctx["scenario_dir"],
-            payload_size,
+            "json",
             run_idx,
             script_path,
         )

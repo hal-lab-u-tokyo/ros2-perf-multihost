@@ -32,6 +32,25 @@ DEFAULT_PERIOD_MS = 100
 DEFAULT_EVAL_TIME = 60
 
 
+def _json_default_int(json_content, key, fallback):
+    """Return an integer default from top-level JSON, or fallback."""
+    value = json_content.get(key, fallback)
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return fallback
+
+
+def _topic_numeric_field(topic_entry, key, json_content, fallback):
+    """Return a numeric topic field, falling back to top-level JSON then fallback."""
+    if key in topic_entry:
+        try:
+            return int(topic_entry[key])
+        except (TypeError, ValueError):
+            pass
+    return _json_default_int(json_content, key, fallback)
+
+
 def _normalize_ws_dir(ws_dir):
     """Normalize and validate the value passed to --ws-dir."""
     normalized = os.path.normpath(ws_dir.strip())
@@ -183,13 +202,9 @@ def _append_host_script_prelude(
             f'PERIOD_MS="${{PERIOD_MS:-{period_ms_default}}}"',
             f'EVAL_TIME="${{EVAL_TIME:-{eval_time_default}}}"',
             "",
-            "# allow runtime overrides via script options",
+            "# allow runtime override via script option",
             'while [[ $# -gt 0 ]]; do',
             '  case "$1" in',
-            '    --payload-size|-s)',
-            '      PAYLOAD_SIZE="$2"; shift 2;;',
-            '    --period-ms|-p)',
-            '      PERIOD_MS="$2"; shift 2;;',
             '    --eval-time|-t)',
             '      EVAL_TIME="$2"; shift 2;;',
             '    --)',
@@ -239,14 +254,25 @@ def _append_host_script_prelude(
     )
 
 
-def _append_publisher_block(lines, node_name, pub_list, qos_opts):
+def _append_publisher_block(lines, node_name, pub_list, qos_opts, json_content):
     topic_names = ",".join(p["topic_name"] for p in pub_list)
+    payload_sizes = [
+        _topic_numeric_field(
+            p, "payload_size", json_content, DEFAULT_PAYLOAD_SIZE)
+        for p in pub_list
+    ]
+    period_mses = [
+        _topic_numeric_field(p, "period_ms", json_content, DEFAULT_PERIOD_MS)
+        for p in pub_list
+    ]
+    payload_args = " ".join(f"--size {int(v)}" for v in payload_sizes)
+    period_args = " ".join(f"--period {int(v)}" for v in period_mses)
     lines.extend(
         [
             f"# {node_name} publisher",
             "( ros2 run ros2_perf_multihost_nodes publisher_node \\",
             f"  --node-name {node_name} --topic-names {topic_names} \\",
-            "  -s \"$PAYLOAD_SIZE\" -p \"$PERIOD_MS\" --eval-time \"$EVAL_TIME\" \\",
+            f"  {payload_args} {period_args} --eval-time \"$EVAL_TIME\" \\",
             f"  {qos_opts} --log-dir \"$LOG_DIR\" \\",
             ") & node_pids+=($!)",
             f'echo "Started {node_name} publisher at $(date +%Y-%m-%dT%H:%M:%S.%3N%z)"',
@@ -293,19 +319,36 @@ def _normalize_intermediate_entries(intermediate_value, node_name):
     return intermediate_value
 
 
-def _collect_intermediate_topic_names(intermediate_entries):
-    """Collect publisher and subscriber topic names from intermediate entries while preserving order and removing duplicates."""
-    pub_topics = []
+def _collect_intermediate_pub_sub(intermediate_entries):
+    """Collect publisher/subscriber topic definitions while preserving order and removing duplicates by topic name."""
+    pub_defs = []
     sub_topics = []
     for entry in intermediate_entries:
-        pub_topics.extend(p["topic_name"] for p in entry.get("publisher", []))
+        pub_defs.extend(entry.get("publisher", []))
         sub_topics.extend(s["topic_name"] for s in entry.get("subscriber", []))
-    pub_topics = list(dict.fromkeys(pub_topics))
+    pub_defs_by_topic = {}
+    for p in pub_defs:
+        topic_name = p["topic_name"]
+        if topic_name not in pub_defs_by_topic:
+            pub_defs_by_topic[topic_name] = p
+    pub_defs = list(pub_defs_by_topic.values())
     sub_topics = list(dict.fromkeys(sub_topics))
-    return pub_topics, sub_topics
+    return pub_defs, sub_topics
 
 
-def _append_intermediate_block(lines, node_name, pub_topics, sub_topics, qos_opts):
+def _append_intermediate_block(lines, node_name, pub_defs, sub_topics, qos_opts, json_content):
+    pub_topics = [p["topic_name"] for p in pub_defs]
+    payload_sizes = [
+        _topic_numeric_field(
+            p, "payload_size", json_content, DEFAULT_PAYLOAD_SIZE)
+        for p in pub_defs
+    ]
+    period_mses = [
+        _topic_numeric_field(p, "period_ms", json_content, DEFAULT_PERIOD_MS)
+        for p in pub_defs
+    ]
+    payload_args = " ".join(f"--size {int(v)}" for v in payload_sizes)
+    period_args = " ".join(f"--period {int(v)}" for v in period_mses)
     topic_names_pub = ",".join(pub_topics)
     topic_names_sub = ",".join(sub_topics)
     lines.extend(
@@ -313,7 +356,7 @@ def _append_intermediate_block(lines, node_name, pub_topics, sub_topics, qos_opt
             f"# {node_name} intermediate",
             "( ros2 run ros2_perf_multihost_nodes intermediate_node \\",
             f"  --node-name {node_name} --topic-names-pub {topic_names_pub} --topic-names-sub {topic_names_sub} \\",
-            "  -s \"$PAYLOAD_SIZE\" -p \"$PERIOD_MS\" --eval-time \"$EVAL_TIME\" \\",
+            f"  {payload_args} {period_args} --eval-time \"$EVAL_TIME\" \\",
             f"  {qos_opts} --log-dir \"$LOG_DIR\" \\",
             ") & node_pids+=($!)",
             f'echo "Started {node_name} intermediate at $(date +%Y-%m-%dT%H:%M:%S.%3N%z)"',
@@ -342,7 +385,8 @@ def generate_exec_scripts(json_content, rmw, output_dir):
     os.makedirs(output_dir, exist_ok=True)
 
     payload_size_default = DEFAULT_PAYLOAD_SIZE
-    period_ms_default = DEFAULT_PERIOD_MS
+    period_ms_default = _json_default_int(
+        json_content, "period_ms", DEFAULT_PERIOD_MS)
     eval_time_default = DEFAULT_EVAL_TIME
 
     qos_config = json_content.get("qos", {})
@@ -376,6 +420,7 @@ def generate_exec_scripts(json_content, rmw, output_dir):
                     node_name,
                     node["publisher"],
                     qos_opts,
+                    json_content,
                 )
             if node.get("subscriber"):
                 _append_subscriber_block(
@@ -388,15 +433,16 @@ def generate_exec_scripts(json_content, rmw, output_dir):
                 intermediate_entries = _normalize_intermediate_entries(
                     node["intermediate"], node_name
                 )
-                pub_topics, sub_topics = _collect_intermediate_topic_names(
+                pub_defs, sub_topics = _collect_intermediate_pub_sub(
                     intermediate_entries
                 )
                 _append_intermediate_block(
                     lines,
                     node_name,
-                    pub_topics,
+                    pub_defs,
                     sub_topics,
                     qos_opts,
+                    json_content,
                 )
 
         _append_host_script_epilogue(lines, host_name)
@@ -490,7 +536,8 @@ def _append_zenohd_service(lines, project_root, output_dir):
 def generate_compose(json_content, rmw, output_dir, project_root):
     """Generate local_compose.yaml for validation on a development machine."""
     payload_size_default = DEFAULT_PAYLOAD_SIZE
-    period_ms_default = DEFAULT_PERIOD_MS
+    period_ms_default = _json_default_int(
+        json_content, "period_ms", DEFAULT_PERIOD_MS)
     eval_time_default = DEFAULT_EVAL_TIME
     lines = ["services:"]
 
@@ -521,7 +568,8 @@ def generate_compose(json_content, rmw, output_dir, project_root):
 def generate_compose_per_host(json_content, rmw, output_dir, project_root):
     """Generate one host-specific host*_compose.yaml file per host."""
     payload_size_default = DEFAULT_PAYLOAD_SIZE
-    period_ms_default = DEFAULT_PERIOD_MS
+    period_ms_default = _json_default_int(
+        json_content, "period_ms", DEFAULT_PERIOD_MS)
     eval_time_default = DEFAULT_EVAL_TIME
     for host_dict in json_content["hosts"]:
         host_name = host_dict["host_name"]
@@ -574,14 +622,12 @@ def _run_script_common_prefix(
             '',
             'Options:',
             '  -t, --eval-time SEC       Evaluation duration in seconds (default: $EVAL_TIME)',
-            '  -p, --period-ms MS        Publish period in milliseconds (default: $PERIOD_MS)',
-            '  -s, --payload-size BYTES  Payload size in bytes (default: $PAYLOAD_SIZE)',
             '  -r, --run-idx N           Run index (default: $RUN_IDX)',
             '  -h, --help                Show this help message and exit',
             '',
             'Notes:',
             '  --eval-time is applied to all nodes started via this script.',
-            '  --period-ms and --payload-size are applied to Publisher/Intermediate nodes only.',
+            '  Payload size and period are taken from topology JSON values.',
             'EOF',
             '}',
             "",
@@ -590,10 +636,6 @@ def _run_script_common_prefix(
             '  case "$1" in',
             '    --eval-time|-t)',
             '      EVAL_TIME="$2"; shift 2;;',
-            '    --period-ms|-p)',
-            '      PERIOD_MS="$2"; shift 2;;',
-            '    --payload-size|-s)',
-            '      PAYLOAD_SIZE="$2"; shift 2;;',
             '    --run-idx|-r)',
             '      RUN_IDX="$2"; shift 2;;',
             '    --help|-h)',
@@ -629,7 +671,8 @@ def generate_host_run_scripts(json_content, output_dir, project_root):
     """Generate host*_run.sh wrapper scripts for host-specific Compose files."""
     rel_root = os.path.relpath(project_root, output_dir)
     payload_size_default = DEFAULT_PAYLOAD_SIZE
-    period_ms_default = DEFAULT_PERIOD_MS
+    period_ms_default = _json_default_int(
+        json_content, "period_ms", DEFAULT_PERIOD_MS)
     eval_time_default = DEFAULT_EVAL_TIME
     for host_dict in json_content["hosts"]:
         host_name = host_dict["host_name"]
@@ -681,7 +724,7 @@ def generate_local_run_script(json_content, rmw, output_dir, project_root):
         lines,
         rel_root,
         DEFAULT_PAYLOAD_SIZE,
-        DEFAULT_PERIOD_MS,
+        _json_default_int(json_content, "period_ms", DEFAULT_PERIOD_MS),
         DEFAULT_EVAL_TIME,
     )
     lines.extend(
