@@ -41,7 +41,7 @@
 
 補足:
 - 1つの node に publisher / subscriber / intermediate を複数併用することは可能です。
-- ただし intermediate は配列の先頭要素 only を実行に使用します。
+- intermediate は配列で定義し、全要素を実行・集計の両方で処理します。
 
 ### publisher 配列要素
 
@@ -55,13 +55,14 @@
 |---|---|---|---|
 | topic_name | 必須 | string | Subscribe するトピック名。 |
 
-### intermediate 配列要素
+### intermediate
 
 | キー | 必須 | 型 | 説明 |
 |---|---|---|---|
 | publisher | 必須 | array | 中継先 publish 用 topic 定義。 |
 | subscriber | 必須 | array | 中継元 subscribe 用 topic 定義。 |
 
+intermediate の配列要素は、上記の publisher / subscriber を持つオブジェクトです。
 publisher / subscriber の配列要素は、上記と同じく topic_name が必須です。
 
 ## 3. 現状の実装で未使用のキー

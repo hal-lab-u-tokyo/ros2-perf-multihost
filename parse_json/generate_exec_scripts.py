@@ -238,9 +238,33 @@ def _append_subscriber_block(lines, node_name, sub_list, eval_time, qos_opts):
     )
 
 
-def _append_intermediate_block(lines, node_name, intermediate_list, period_ms, eval_time, qos_opts):
-    pub_list = intermediate_list[0]["publisher"]
-    sub_list = intermediate_list[0]["subscriber"]
+def _normalize_intermediate_entries(intermediate_value, node_name):
+    """intermediate を array 形式で検証して返す"""
+    if not isinstance(intermediate_value, list):
+        raise ValueError(
+            f"node '{node_name}': intermediate must be an array"
+        )
+    if not intermediate_value:
+        raise ValueError(
+            f"node '{node_name}': intermediate cannot be empty"
+        )
+
+    for idx, entry in enumerate(intermediate_value):
+        if not isinstance(entry, dict):
+            raise ValueError(
+                f"node '{node_name}': intermediate[{idx}] must be an object"
+            )
+        if "publisher" not in entry or "subscriber" not in entry:
+            raise ValueError(
+                f"node '{node_name}': intermediate[{idx}] must include both publisher and subscriber"
+            )
+
+    return intermediate_value
+
+
+def _append_intermediate_block(lines, node_name, intermediate_entry, period_ms, eval_time, qos_opts):
+    pub_list = intermediate_entry["publisher"]
+    sub_list = intermediate_entry["subscriber"]
     topic_names_pub = ",".join(p["topic_name"] for p in pub_list)
     topic_names_sub = ",".join(s["topic_name"] for s in sub_list)
     lines.extend(
@@ -315,14 +339,18 @@ def generate_exec_scripts(json_content, rmw, output_dir):
                     qos_opts,
                 )
             if node.get("intermediate"):
-                _append_intermediate_block(
-                    lines,
-                    node_name,
-                    node["intermediate"],
-                    period_ms,
-                    eval_time,
-                    qos_opts,
+                intermediate_entries = _normalize_intermediate_entries(
+                    node["intermediate"], node_name
                 )
+                for intermediate_entry in intermediate_entries:
+                    _append_intermediate_block(
+                        lines,
+                        node_name,
+                        intermediate_entry,
+                        period_ms,
+                        eval_time,
+                        qos_opts,
+                    )
 
         _append_host_script_epilogue(lines, host_name)
 
@@ -615,10 +643,13 @@ def _collect_metadata_node_names(json_content):
                     topic_names.add(s["topic_name"])
             if node.get("intermediate"):
                 intermediate_names.append(node_name)
-                for entry in node["intermediate"]:
-                    for p in entry.get("publisher", []):
+                intermediate_entries = _normalize_intermediate_entries(
+                    node["intermediate"], node_name
+                )
+                for intermediate_entry in intermediate_entries:
+                    for p in intermediate_entry.get("publisher", []):
                         topic_names.add(p["topic_name"])
-                    for s in entry.get("subscriber", []):
+                    for s in intermediate_entry.get("subscriber", []):
                         topic_names.add(s["topic_name"])
 
     return host_names, publisher_names, subscriber_names, intermediate_names, topic_names
