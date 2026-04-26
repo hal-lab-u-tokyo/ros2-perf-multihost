@@ -21,6 +21,7 @@ from datetime import datetime
 # コンテナ内のプロジェクトルートと ROS 2 ワークスペース
 PROJECT_ROOT_IN_CONTAINER = "/workdir/ros2-perf-multihost"
 ROS_WS_IN_CONTAINER = f"{PROJECT_ROOT_IN_CONTAINER}/ros2_node_impl_ws"
+ZENOH_CONFIG_DIR_IN_CONTAINER = f"{ROS_WS_IN_CONTAINER}/zenoh_config"
 IMAGE_NAME = "ghcr.io/hal-lab-u-tokyo/ros2-perf-multihost:latest"
 DEFAULT_PERF_WS_DIR = "performance_ws"
 PERF_WS_DIR = DEFAULT_PERF_WS_DIR
@@ -142,7 +143,7 @@ def _rmw_env_lines(rmw):
             "export RMW_IMPLEMENTATION=rmw_zenoh_cpp",
             "export ZENOH_ROUTER_CHECK_ATTEMPTS=5",
             "export RUST_LOG=zenoh=warn,zenoh_transport=warn",
-            'export ZENOH_SESSION_CONFIG_URI="$PROJECT_ROOT/config/DEFAULT_RMW_ZENOH_SESSION_CONFIG.json5"',
+            'export ZENOH_SESSION_CONFIG_URI="$PROJECT_ROOT/ros2_node_impl_ws/zenoh_config/DEFAULT_RMW_ZENOH_SESSION_CONFIG.json5"',
         ]
     if rmw == "fastdds":
         return [
@@ -425,14 +426,14 @@ def _append_common_service(
     lines.append(
         f'      - "{rel_project_root}/{PERF_WS_DIR}:{PROJECT_ROOT_IN_CONTAINER}/{PERF_WS_DIR}"')
     lines.append(
-        f'      - "{rel_project_root}/config:{PROJECT_ROOT_IN_CONTAINER}/config:ro"')
+        f'      - "{rel_project_root}/ros2_node_impl_ws/zenoh_config:{ZENOH_CONFIG_DIR_IN_CONTAINER}:ro"')
     lines.append("    environment:")
     lines.append(f"      - ROS2_PERF_WS={PROJECT_ROOT_IN_CONTAINER}")
     lines.append(f"      - ROS2_NODE_IMPL_WS={ROS_WS_IN_CONTAINER}")
     if rmw == "zenoh":
         lines.append("      - RMW_IMPLEMENTATION=rmw_zenoh_cpp")
         lines.append(
-            f"      - ZENOH_SESSION_CONFIG_URI={PROJECT_ROOT_IN_CONTAINER}/config/DEFAULT_RMW_ZENOH_SESSION_CONFIG.json5"
+            f"      - ZENOH_SESSION_CONFIG_URI={ZENOH_CONFIG_DIR_IN_CONTAINER}/DEFAULT_RMW_ZENOH_SESSION_CONFIG.json5"
         )
         lines.append("      - RUST_LOG=zenoh=warn,zenoh_transport=warn")
     elif rmw == "fastdds":
@@ -463,13 +464,13 @@ def _append_zenohd_service(lines, project_root, output_dir):
     lines.append(
         f'      - "{rel_project_root}/{PERF_WS_DIR}:{PROJECT_ROOT_IN_CONTAINER}/{PERF_WS_DIR}"')
     lines.append(
-        f'      - "{rel_project_root}/config:{PROJECT_ROOT_IN_CONTAINER}/config:ro"')
+        f'      - "{rel_project_root}/ros2_node_impl_ws/zenoh_config:{ZENOH_CONFIG_DIR_IN_CONTAINER}:ro"')
     lines.append("    environment:")
     lines.append(f"      - ROS2_PERF_WS={PROJECT_ROOT_IN_CONTAINER}")
     lines.append(f"      - ROS2_NODE_IMPL_WS={ROS_WS_IN_CONTAINER}")
     lines.append("      - RMW_IMPLEMENTATION=rmw_zenoh_cpp")
     lines.append(
-        f"      - ZENOH_ROUTER_CONFIG_URI={PROJECT_ROOT_IN_CONTAINER}/config/DEFAULT_RMW_ZENOH_ROUTER_CONFIG.json5"
+        f"      - ZENOH_ROUTER_CONFIG_URI={ZENOH_CONFIG_DIR_IN_CONTAINER}/DEFAULT_RMW_ZENOH_ROUTER_CONFIG.json5"
     )
     lines.append("      - RUST_LOG=zenoh=warn,zenoh_transport=warn")
     lines.append("    healthcheck:")

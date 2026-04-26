@@ -3,9 +3,11 @@ set -eo pipefail
 
 # 設定
 # TODO: 必要に応じて編集
-CONFIG_DEFAULT="${PWD}/config/DEFAULT_RMW_ZENOH_ROUTER_CONFIG.json5"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REPO_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
+CONFIG_DEFAULT="${REPO_ROOT}/ros2_node_impl_ws/zenoh_config/DEFAULT_RMW_ZENOH_ROUTER_CONFIG.json5"
 CONFIG="${ZENOH_ROUTER_CONFIG_URI:-$CONFIG_DEFAULT}"
-LOG_DIR="${PWD}/logs"
+LOG_DIR="${REPO_ROOT}/logs"
 PID_FILE="$LOG_DIR/zenoh_router.pid"
 OUT_FILE="$LOG_DIR/zenoh_router.out"
 PORT="${ZENOH_PORT:-7447}"
