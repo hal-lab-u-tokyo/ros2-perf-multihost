@@ -10,7 +10,6 @@ JSONファイルを受け取り、docker/ 配下の共通Dockerfileで起動す�
 """
 
 import argparse
-import hashlib
 import json
 import os
 import shutil
@@ -49,12 +48,34 @@ def _clear_directory_contents(path):
             shutil.rmtree(target)
 
 
-def _confirm_overwrite(output_dir):
+def _read_existing_json_path(run_dir):
+    """既存の run_dir に metadata.txt があれば json_path: フィールドを返す"""
+    metadata_path = os.path.join(run_dir, "metadata.txt")
+    if not os.path.isfile(metadata_path):
+        return None
+    with open(metadata_path) as f:
+        for line in f:
+            if line.startswith("json_path:"):
+                return line.split(":", 1)[1].strip()
+    return None
+
+
+def _confirm_overwrite(output_dir, existing_json_path=None, new_json_path=None):
     """既存の exec_scripts を上書きするか確認する"""
+    msg = f"'{output_dir}' already exists."
+    if (
+        existing_json_path is not None
+        and new_json_path is not None
+        and existing_json_path != new_json_path
+    ):
+        msg += (
+            f"\n  WARNING: The existing scripts were generated from '{existing_json_path}',"
+            f"\n           but the current input is '{new_json_path}'."
+            f"\n  Same filename, different path -- are you sure you want to overwrite?"
+        )
+    msg += " Overwrite generated files? [y/N]: "
     while True:
-        answer = input(
-            f"'{output_dir}' already exists. Overwrite generated files? [y/N]: "
-        ).strip().lower()
+        answer = input(msg).strip().lower()
         if answer in ("y", "yes"):
             return True
         if answer in ("", "n", "no"):
@@ -85,7 +106,8 @@ def resolve_output_paths(json_path, rmw, ws_dir):
     output_dir = os.path.join(run_dir, "exec_scripts")
 
     if os.path.isdir(output_dir):
-        if not _confirm_overwrite(output_dir):
+        existing_json_path = _read_existing_json_path(run_dir)
+        if not _confirm_overwrite(output_dir, existing_json_path, json_path):
             raise SystemExit("Canceled by user. No files were generated.")
         _clear_directory_contents(output_dir)
     else:
@@ -598,9 +620,6 @@ def generate_metadata_file(
     latest_dir = os.path.join(project_root, ws_dir, "latest")
     metadata_path = os.path.join(latest_dir, "metadata.txt")
 
-    with open(json_path, "rb") as f:
-        json_md5 = hashlib.md5(f.read()).hexdigest()
-
     (
         host_names,
         publisher_names,
@@ -628,7 +647,6 @@ def generate_metadata_file(
             "# --- 1. identification ---",
             f"timestamp: {timestamp}",
             f"json: {os.path.basename(json_path)}",
-            f"hash_md5: {json_md5}",
         ],
         [
             "# --- 2. reproducibility ---",

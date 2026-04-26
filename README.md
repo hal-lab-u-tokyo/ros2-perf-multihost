@@ -112,7 +112,7 @@ python3 parse_json/generate_exec_scripts.py <topology.json> [--rmw <rmw>] [--ws-
 - `--ws-dir`: 生成物のベースディレクトリ（デフォルト: `performance_ws`）
 - `--rmw`: RMW実装（`fastdds` / `zenoh` / `cyclonedds`、デフォルト: `fastdds`）
 
-出力先は `<ws-dir>/<JSONファイル名>-<rmw>/exec_scripts/` です。既に存在する場合は上書き確認を行い、`Yes` のときは `exec_scripts/*` を削除して再生成します。`<ws-dir>/latest` は常に最新に生成されたディレクトリへのシンボリックリンクになります。
+出力先は `<ws-dir>/<JSONファイル名>-<rmw>/exec_scripts/` です。既に存在する場合は上書き確認を行い、`Yes` のときは `exec_scripts/*` を削除して再生成します。このとき、前回の生成に使ったJSONファイルのパス（`metadata.txt` の `json_path:` フィールド）と今回のパスが異なる場合（同名ファイルを別パスから指定した場合）は、追加の警告メッセージを表示します。`<ws-dir>/latest` は常に最新に生成されたディレクトリへのシンボリックリンクになります。
 `performance_ws/` ディレクトリは自動生成されますが、リポジトリ管理からは `.gitignore` で除外しています。
 
 ```bash
@@ -136,7 +136,6 @@ python3 parse_json/generate_exec_scripts.py topology_example/simple.json --rmw z
 **1. identification** — 識別情報
 - `timestamp`: スクリプト実行日時（`YYYY-DD-MM_hh-mm-ss`）
 - `json`: 入力に指定したJSONファイル名
-- `hash_md5`: JSONファイルのMD5ハッシュ
 
 **2. reproducibility** — 再現性
 - `command`: 実行したコマンド全文
