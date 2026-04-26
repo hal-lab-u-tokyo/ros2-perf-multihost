@@ -877,6 +877,52 @@ def _collect_metadata_node_names(json_content):
     return host_names, publisher_names, subscriber_names, intermediate_names, topic_names
 
 
+def _collect_topic_runtime_config(json_content):
+    """Collect topic -> payload/period/publisher_count from topology."""
+    topic_cfg = {}
+
+    def add_publisher_topic(entry, context):
+        topic = entry.get("topic_name")
+        if not topic:
+            raise ValueError(f"{context}: missing topic_name")
+        payload_size = _require_positive_int(entry, "payload_size", context)
+        period_ms = _require_positive_int(entry, "period_ms", context)
+
+        cfg = topic_cfg.setdefault(
+            topic,
+            {
+                "payload_size": payload_size,
+                "period_ms": period_ms,
+                "publisher_count": 0,
+            },
+        )
+        if cfg["payload_size"] != payload_size or cfg["period_ms"] != period_ms:
+            raise ValueError(
+                f"Inconsistent payload/period for topic '{topic}' in topology JSON"
+            )
+        cfg["publisher_count"] += 1
+
+    for host in json_content.get("hosts", []):
+        for node in host.get("nodes", []):
+            node_name = node.get("node_name", "?")
+            for pub_idx, pub in enumerate(node.get("publisher", []) or []):
+                add_publisher_topic(
+                    pub, f"node '{node_name}' publisher[{pub_idx}]")
+
+            if "intermediate" in node:
+                intermediate_entries = _normalize_intermediate_entries(
+                    node["intermediate"], node_name
+                )
+                for entry_idx, inter in enumerate(intermediate_entries):
+                    for pub_idx, pub in enumerate(inter.get("publisher", []) or []):
+                        add_publisher_topic(
+                            pub,
+                            f"node '{node_name}' intermediate[{entry_idx}] publisher[{pub_idx}]",
+                        )
+
+    return topic_cfg
+
+
 def _unique_in_order(items):
     """Remove duplicates while preserving the original order."""
     return list(dict.fromkeys(items))
@@ -900,6 +946,7 @@ def generate_metadata_file(
     publisher_names = _unique_in_order(publisher_names)
     subscriber_names = _unique_in_order(subscriber_names)
     intermediate_names = _unique_in_order(intermediate_names)
+    topic_runtime_cfg = _collect_topic_runtime_config(json_content)
 
     all_nodes = [
         node
@@ -940,6 +987,10 @@ def generate_metadata_file(
             f"subscribers: {', '.join(subscriber_names)}",
             f"intermediates: {', '.join(intermediate_names)}",
             f"topics: {', '.join(sorted(topic_names))}",
+            (
+                "topic_runtime_json: "
+                f"{json.dumps(topic_runtime_cfg, separators=(',', ':'), sort_keys=True)}"
+            ),
         ],
     ]
 

@@ -101,6 +101,7 @@ Generated files:
 - `hosts`: Host name list, for example `host1, host2`
 - `publishers` / `subscribers` / `intermediates`: Node name lists grouped by role
 - `topics`: Topic names in alphabetical order
+- `topic_runtime_json`: Per-topic runtime config used for analysis (`payload_size`, `period_ms`, `publisher_count`)
 
 Each node launched from `host{N}_run.sh` or `local_run.sh` receives a `--log_dir` under `results/YYYY-MM-DD_hh-mm-ss/exec_logs/trial<trial_idx>/` inside the generated run directory. `results/latest` is updated as a symbolic link to the active run directory. Example: `performance_ws/latest/results/2026-04-26_13-21-45/exec_logs/trial1/`.
 

@@ -1,11 +1,86 @@
 import csv
+import json
 import os
 import subprocess
 import sys
 
 import numpy as np
 
-from throughput_calc import calc_throughput
+
+def _read_metadata_value(metadata_path, key):
+    """Return the raw value for `key:` from metadata.txt, or None."""
+    if not os.path.exists(metadata_path):
+        return None
+    with open(metadata_path, "r") as f:
+        for line in f:
+            if line.startswith(f"{key}:"):
+                return line.split(":", 1)[1].strip()
+    return None
+
+
+def _parse_all_latency_losses(all_latency_path):
+    """Parse all_latency.txt rows into (topic, loss_count)."""
+    rows = []
+    if not os.path.exists(all_latency_path):
+        return rows
+    with open(all_latency_path, "r") as f:
+        lines = f.readlines()
+    for line in lines[2:]:
+        parts = line.strip().split()
+        if len(parts) < 3:
+            continue
+        topic = parts[1]
+        try:
+            loss_count = float(parts[2])
+        except ValueError:
+            continue
+        rows.append((topic, loss_count))
+    return rows
+
+
+def _collect_topic_runtime_config(ws_dir, scenario):
+    """Load topic-level period/payload/publisher_count from metadata.txt."""
+    metadata_path = os.path.join(ws_dir, scenario, "metadata.txt")
+    runtime_json = _read_metadata_value(metadata_path, "topic_runtime_json")
+    if not runtime_json:
+        raise ValueError(
+            f"Missing 'topic_runtime_json' in metadata: {metadata_path}. "
+            "Regenerate scripts with manager_scripts/generate_exec_scripts.py."
+        )
+
+    try:
+        loaded = json.loads(runtime_json)
+    except json.JSONDecodeError as exc:
+        raise ValueError(
+            f"Invalid 'topic_runtime_json' in metadata: {metadata_path}"
+        ) from exc
+
+    topic_cfg = {}
+    for topic, cfg in loaded.items():
+        try:
+            payload_size = int(cfg["payload_size"])
+            period_ms = int(cfg["period_ms"])
+            publisher_count = int(cfg["publisher_count"])
+        except (KeyError, TypeError, ValueError) as exc:
+            raise ValueError(
+                f"Invalid config for topic '{topic}' in topic_runtime_json"
+            ) from exc
+        if payload_size <= 0 or period_ms <= 0 or publisher_count <= 0:
+            raise ValueError(
+                f"Non-positive payload/period/publisher_count for topic '{topic}'"
+            )
+        topic_cfg[topic] = {
+            "payload_size": payload_size,
+            "period_ms": period_ms,
+            "publisher_count": publisher_count,
+        }
+
+    if not topic_cfg:
+        raise ValueError(
+            f"Empty 'topic_runtime_json' in metadata: {metadata_path}"
+        )
+
+    return topic_cfg
 
 
 def read_monitor_metrics(path):
@@ -52,16 +127,15 @@ def aggregate_total_latency(
     csv_dir,
     num_trials,
     hosts,
-    period_ms=None,
     eval_time=None,
-    payload_size_for_throughput=64,
+    ws_dir="performance_ws",
+    scenario="latest",
 ):
-    if period_ms is None:
-        period_ms = 100
     if eval_time is None:
         eval_time = 60
 
     trial_dir = csv_dir
+    topic_runtime_cfg = _collect_topic_runtime_config(ws_dir, scenario)
 
     analyzer_script = os.path.join(os.path.dirname(__file__), "all_latency.py")
     try:
@@ -113,22 +187,22 @@ def aggregate_total_latency(
         print(f"  Aggregated trial{trial_idx + 1} from {total_path}")
         print(f"    Values: {values}")
 
-        total_loss = float(values[0])
         all_latency_path = os.path.join(trial_results_dir, "all_latency.txt")
-        topics = 0
-        if os.path.exists(all_latency_path):
-            with open(all_latency_path, "r") as af:
-                alines = af.readlines()
-                topic_set = set()
-                for line in alines[2:]:
-                    parts = line.split()
-                    if len(parts) >= 2:
-                        topic_set.add(parts[1])
-                topics = len(topic_set)
 
-        sent = int(eval_time * 1000 / period_ms) * topics
-        bps, mbps = calc_throughput(
-            total_loss, sent, payload_size_for_throughput, eval_time)
+        total_received_bytes = 0.0
+        for topic_name, topic_loss in _parse_all_latency_losses(all_latency_path):
+            cfg = topic_runtime_cfg.get(topic_name)
+            if not cfg:
+                raise ValueError(
+                    f"Topic '{topic_name}' in {all_latency_path} is missing from topic_runtime_json"
+                )
+            sent_per_pub = int(eval_time * 1000 / cfg["period_ms"])
+            sent = sent_per_pub * cfg["publisher_count"]
+            received = max(sent - topic_loss, 0)
+            total_received_bytes += received * cfg["payload_size"]
+
+        bps = total_received_bytes / eval_time if eval_time > 0 else 0.0
+        mbps = bps / 1_000_000
         throughput_rows.append([f"trial{trial_idx + 1}", bps, mbps])
         all_throughputs_bps.append(bps)
         all_throughputs_mbps.append(mbps)

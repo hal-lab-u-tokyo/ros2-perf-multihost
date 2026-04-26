@@ -111,5 +111,7 @@ if __name__ == "__main__":
         args.trials,
         hosts,
         eval_time=eval_time,
+        ws_dir=args.ws_dir,
+        scenario=args.scenario,
     )
     print("All tests and aggregation complete.")
