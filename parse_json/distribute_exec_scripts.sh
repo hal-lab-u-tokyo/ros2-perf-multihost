@@ -141,33 +141,68 @@ echo "hosts         : ${HOSTS[*]}"
 echo "local_exec_dir: ${LOCAL_EXEC_DIR}"
 echo "remote_exec_dir: ${REMOTE_EXEC_DIR}"
 
+failed_hosts=()
+
 for host in "${HOSTS[@]}"; do
     host_exec="${host}_exec.sh"
     host_run="${host}_run.sh"
     host_compose="${host}_compose.yaml"
 
     echo "=== Validating local files for ${host} ==="
+    local_files_ok=true
     for file in "${host_exec}" "${host_run}" "${host_compose}"; do
         if [[ ! -f "${LOCAL_EXEC_DIR}/${file}" ]]; then
             echo "ERROR: missing local file: ${LOCAL_EXEC_DIR}/${file}" >&2
-            exit 1
+            failed_hosts+=("${host}")
+            local_files_ok=false
+            break
         fi
     done
+    
+    if [[ "${local_files_ok}" != "true" ]]; then
+        continue
+    fi
 
     echo "=== Copying exec scripts to ${host} ==="
-    ssh "${host}" "mkdir -p '${REMOTE_EXEC_DIR}'"
+    
+    # Create remote directory
+    if ! ssh "${host}" "mkdir -p '${REMOTE_EXEC_DIR}'" 2>/dev/null; then
+        echo "ERROR: Failed to create directory on ${host}" >&2
+        failed_hosts+=("${host}")
+        continue
+    fi
 
-    scp \
+    # Copy exec scripts
+    if ! scp \
         "${LOCAL_EXEC_DIR}/${host_exec}" \
         "${LOCAL_EXEC_DIR}/${host_run}" \
         "${LOCAL_EXEC_DIR}/${host_compose}" \
-        "${host}:${REMOTE_EXEC_DIR}/"
+        "${host}:${REMOTE_EXEC_DIR}/" 2>/dev/null; then
+        echo "ERROR: Failed to copy scripts to ${host}" >&2
+        failed_hosts+=("${host}")
+        continue
+    fi
 
-    # 参照しやすいよう metadata も同梱
-    scp "${LOCAL_RUN_DIR}/metadata.txt" "${host}:${REMOTE_RUN_DIR}/metadata.txt"
+    # Copy metadata
+    if ! scp "${LOCAL_RUN_DIR}/metadata.txt" "${host}:${REMOTE_RUN_DIR}/metadata.txt" 2>/dev/null; then
+        echo "ERROR: Failed to copy metadata to ${host}" >&2
+        failed_hosts+=("${host}")
+        continue
+    fi
 
-    ssh "${host}" "chmod +x '${REMOTE_EXEC_DIR}/${host_exec}' '${REMOTE_EXEC_DIR}/${host_run}'"
+    # Set execute permissions
+    if ! ssh "${host}" "chmod +x '${REMOTE_EXEC_DIR}/${host_exec}' '${REMOTE_EXEC_DIR}/${host_run}'" 2>/dev/null; then
+        echo "ERROR: Failed to set permissions on ${host}" >&2
+        failed_hosts+=("${host}")
+        continue
+    fi
+    
     echo "=== Done for ${host} ==="
 done
 
-echo "=== All host-specific exec scripts distributed ==="
+echo "=== Distribution complete ==="
+
+if [[ ${#failed_hosts[@]} -gt 0 ]]; then
+    echo "ERROR: ${#failed_hosts[@]} host(s) failed: ${failed_hosts[*]}" >&2
+    exit 1
+fi

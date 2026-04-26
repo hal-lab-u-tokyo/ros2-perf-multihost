@@ -79,7 +79,17 @@ while [[ $# -gt 0 ]]; do
 done
 
 # Get hosts from metadata
-mapfile -t HOSTS < <(resolve_hosts "${WS_DIR}" "${SCENARIO}")
+if ! mapfile -t HOSTS < <(resolve_hosts "${WS_DIR}" "${SCENARIO}"); then
+    echo "ERROR: Failed to resolve hosts from metadata" >&2
+    exit 1
+fi
+
+if [[ ${#HOSTS[@]} -eq 0 ]]; then
+    echo "ERROR: No hosts found in metadata" >&2
+    exit 1
+fi
+
+echo "Found ${#HOSTS[@]} host(s): ${HOSTS[*]}"
 
 # macOS(BSD) nc なら -G、GNU nc なら -w
 if nc -h 2>&1 | grep -qi 'OpenBSD'; then

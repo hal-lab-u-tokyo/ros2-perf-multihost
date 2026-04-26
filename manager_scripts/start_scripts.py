@@ -61,8 +61,19 @@ def main():
         # Host list passed from performance_test.py (comma-separated)
         hosts = [h.strip() for h in sys.argv[6].split(",") if h.strip()]
     else:
-        # Resolve from environment, metadata, or defaults
-        hosts = resolve_host_list(ws_dir, scenario, num_hosts)
+        # Resolve from environment or metadata
+        try:
+            hosts = resolve_host_list(ws_dir, scenario, num_hosts)
+        except (FileNotFoundError, ValueError) as e:
+            print(f"ERROR: {e}", file=sys.stderr)
+            sys.exit(1)
+
+    if not hosts:
+        print("ERROR: No hosts to process", file=sys.stderr)
+        sys.exit(1)
+
+    failed_hosts = []
+    lock = threading.Lock()
 
     def start(host):
         try:
@@ -76,9 +87,17 @@ def main():
                 },
                 timeout=100,
             )
-            print(f"{host}: {r.status_code} {r.text}")
+            if r.status_code < 200 or r.status_code >= 300:
+                print(
+                    f"{host}: ERROR status code {r.status_code}: {r.text}", file=sys.stderr)
+                with lock:
+                    failed_hosts.append(host)
+            else:
+                print(f"{host}: {r.status_code} {r.text}")
         except Exception as e:
-            print(f"{host}: error {e}")
+            print(f"{host}: ERROR {e}", file=sys.stderr)
+            with lock:
+                failed_hosts.append(host)
 
     threads = []
     for host in hosts:
@@ -89,6 +108,7 @@ def main():
     for t in threads:
         t.join()
 
-
-if __name__ == "__main__":
-    main()
+    if failed_hosts:
+        print(
+            f"ERROR: {len(failed_hosts)}/{len(hosts)} hosts failed: {', '.join(failed_hosts)}", file=sys.stderr)
+        sys.exit(1)

@@ -1,5 +1,6 @@
 import os
 import subprocess
+import sys
 import time
 import csv
 import numpy as np
@@ -468,10 +469,14 @@ if __name__ == "__main__":
         start_scripts_py = "../manager_scripts/start_scripts.py"
         prefix = "raw"
 
-    # Resolve actual host list from metadata or defaults
-    hosts = resolve_host_list(
-        args.ws_dir, args.scenario, mode="docker" if args.docker else "raw", num_hosts=args.hosts
-    )
+    # Resolve actual host list from metadata
+    try:
+        hosts = resolve_host_list(
+            args.ws_dir, args.scenario, mode="docker" if args.docker else "raw", num_hosts=args.hosts
+        )
+    except (FileNotFoundError, ValueError) as e:
+        print(f"ERROR: {e}", file=sys.stderr)
+        sys.exit(1)
     print(f"Using hosts: {hosts}")
 
     payload_sizes = args.payload
