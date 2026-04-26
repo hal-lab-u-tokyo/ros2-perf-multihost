@@ -131,6 +131,7 @@ fi
 
 REMOTE_RUN_DIR="${REMOTE_REPO_BASE}/${WS_DIR}/${SCENARIO_DIR}"
 REMOTE_EXEC_DIR="${REMOTE_RUN_DIR}/exec_scripts"
+REMOTE_ALIAS_DIR="${REMOTE_REPO_BASE}/${WS_DIR}/${SCENARIO_INPUT}"
 
 echo "=== Metadata ==="
 echo "metadata_path : ${METADATA_PATH}"
@@ -140,6 +141,9 @@ echo "scenario_dir  : ${SCENARIO_DIR}"
 echo "hosts         : ${HOSTS[*]}"
 echo "local_exec_dir: ${LOCAL_EXEC_DIR}"
 echo "remote_exec_dir: ${REMOTE_EXEC_DIR}"
+if [[ "${SCENARIO_INPUT}" != "${SCENARIO_DIR}" ]]; then
+    echo "remote_alias_dir: ${REMOTE_ALIAS_DIR} -> ${REMOTE_RUN_DIR}"
+fi
 
 failed_hosts=()
 
@@ -195,6 +199,17 @@ for host in "${HOSTS[@]}"; do
         echo "ERROR: Failed to set permissions on ${host}" >&2
         failed_hosts+=("${host}")
         continue
+    fi
+
+    if [[ "${SCENARIO_INPUT}" != "${SCENARIO_DIR}" ]]; then
+        remote_alias_parent="$(dirname "${REMOTE_ALIAS_DIR}")"
+        remote_alias_name="$(basename "${REMOTE_ALIAS_DIR}")"
+        remote_target_name="$(basename "${REMOTE_RUN_DIR}")"
+        if ! ssh "${host}" "cd '${remote_alias_parent}' && ln -sfn '${remote_target_name}' '${remote_alias_name}'" 2>/dev/null; then
+            echo "ERROR: Failed to update alias ${REMOTE_ALIAS_DIR} on ${host}" >&2
+            failed_hosts+=("${host}")
+            continue
+        fi
     fi
     
     echo "=== Done for ${host} ==="
