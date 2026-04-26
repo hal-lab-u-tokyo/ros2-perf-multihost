@@ -133,24 +133,22 @@ python3 parse_json/generate_exec_scripts.py topology_example/simple.json --rmw z
 
 `metadata.txt` は `<ws-dir>/latest/metadata.txt` に生成され、以下の情報がカテゴリ別に記録されます。
 
-**1. identification** — 識別情報
+**1. general info** — 全般情報
+- `command`: 実行したコマンド全文
 - `timestamp`: スクリプト実行日時（`YYYY-DD-MM_hh-mm-ss`）
 - `json`: 入力に指定したJSONファイル名
-
-**2. reproducibility** — 再現性
-- `command`: 実行したコマンド全文
 - `json_path`: 指定したJSONファイルのパス
 - `ws_dir`: 出力ベースディレクトリ
-- `run_dir`: 生成した実行ディレクトリ名
+- `scenario_dir`: 生成した実行ディレクトリ名
 
-**3. test config** — テスト設定
+**2. test config** — テスト設定
 - `rmw`: 指定したRMW名
 - `eval_time`: 計測時間（秒）
 - `period_ms`: 送信周期（ms）
 - `payload_default`: デフォルトのペイロードサイズ（バイト）
 - `qos_history` / `qos_depth` / `qos_reliability`: QoS設定
 
-**4. topology stats** — トポロジー統計
+**3. topology stats** — トポロジー統計
 - `host_count` / `node_count`: ホスト数・ノード数
 - `publisher_count` / `subscriber_count` / `intermediate_count`: 役割別ノード数
 - `topic_count`: ユニークトピック数

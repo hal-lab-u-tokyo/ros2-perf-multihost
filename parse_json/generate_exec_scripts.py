@@ -644,19 +644,16 @@ def generate_metadata_file(
     timestamp = datetime.now().strftime("%Y-%d-%m_%H-%M-%S")
     sections = [
         [
-            "# --- 1. identification ---",
+            "# --- 1. general info ---",
+            f"command: {' '.join(sys.argv)}",
             f"timestamp: {timestamp}",
             f"json: {os.path.basename(json_path)}",
-        ],
-        [
-            "# --- 2. reproducibility ---",
-            f"command: {' '.join(sys.argv)}",
             f"json_path: {json_path}",
             f"ws_dir: {ws_dir}",
-            f"run_dir: {run_dir_name}",
+            f"scenario_dir: {run_dir_name}",
         ],
         [
-            "# --- 3. test config ---",
+            "# --- 2. test config ---",
             f"rmw: {rmw}",
             f"eval_time: {json_content.get('eval_time', 60)}",
             f"period_ms: {json_content.get('period_ms', 100)}",
@@ -666,7 +663,7 @@ def generate_metadata_file(
             f"qos_reliability: {qos.get('reliability', 'RELIABLE')}",
         ],
         [
-            "# --- 4. topology stats ---",
+            "# --- 3. topology stats ---",
             f"host_count: {len(host_names)}",
             f"node_count: {node_count}",
             f"publisher_count: {len(publisher_names)}",
