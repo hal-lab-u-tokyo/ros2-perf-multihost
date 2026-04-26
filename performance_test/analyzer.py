@@ -48,9 +48,8 @@ def read_monitor_metrics(path):
 
 
 def aggregate_total_latency(
-    base_log_dir,
-    result_parent_dir,
-    prefix,
+    log_dir,
+    csv_dir,
     num_trials,
     hosts,
     period_ms=None,
@@ -62,9 +61,7 @@ def aggregate_total_latency(
     if eval_time is None:
         eval_time = 60
 
-    latest_dir = prefix
-    trial_dir = os.path.join(result_parent_dir, latest_dir)
-    log_dir = os.path.join(base_log_dir, latest_dir)
+    trial_dir = csv_dir
 
     analyzer_script = os.path.join(os.path.dirname(__file__), "all_latency.py")
     try:
@@ -177,8 +174,8 @@ def aggregate_total_latency(
         writer.writerows(throughput_rows)
     print(f"  Aggregated throughput CSV saved: {throughput_csv_path}")
 
-    host_runs_usage_rows = []
-    src_log_dir = os.path.join(os.path.abspath(base_log_dir), latest_dir)
+    host_trials_usage_rows = []
+    src_log_dir = os.path.abspath(log_dir)
 
     for trial_idx in range(num_trials):
         trial_log_dir = os.path.join(src_log_dir, f"trial{trial_idx + 1}")
@@ -187,7 +184,7 @@ def aggregate_total_latency(
                 trial_log_dir, f"{host}_monitor_host.csv")
             metrics = read_monitor_metrics(monitor_path)
             if metrics:
-                host_runs_usage_rows.append(
+                host_trials_usage_rows.append(
                     [
                         host,
                         f"trial{trial_idx + 1}",
@@ -202,9 +199,10 @@ def aggregate_total_latency(
                     ]
                 )
 
-    if host_runs_usage_rows:
-        host_runs_usage_csv = os.path.join(trial_dir, "host_runs_usage.csv")
-        with open(host_runs_usage_csv, "w", newline="") as f:
+    if host_trials_usage_rows:
+        host_trials_usage_csv = os.path.join(
+            trial_dir, "host_trials_usage.csv")
+        with open(host_trials_usage_csv, "w", newline="") as f:
             writer = csv.writer(f)
             writer.writerow(
                 [
@@ -220,12 +218,12 @@ def aggregate_total_latency(
                     "samples",
                 ]
             )
-            writer.writerows(host_runs_usage_rows)
-        print(f"  Per-host trial usage CSV saved: {host_runs_usage_csv}")
+            writer.writerows(host_trials_usage_rows)
+        print(f"  Per-host trial usage CSV saved: {host_trials_usage_csv}")
 
     host_summary_rows = []
     for host in hosts:
-        rows_for_host = [r for r in host_runs_usage_rows if r[0] == host]
+        rows_for_host = [r for r in host_trials_usage_rows if r[0] == host]
         if not rows_for_host:
             continue
 

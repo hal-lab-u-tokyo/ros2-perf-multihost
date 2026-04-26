@@ -113,16 +113,14 @@ def prepare_run(
 
 
 def collect_logs(
-    base_log_dir,
-    prefix,
+    local_logs_dir,
     num_trials,
     hosts,
     ws_dir="performance_ws",
     scenario="latest",
 ):
-    """Collect trial logs from remote hosts into local log directory."""
-    latest_dir = prefix
-    src_log_dir = os.path.join(os.path.abspath(base_log_dir), latest_dir)
+    """Collect trial logs from remote hosts into a local logs directory."""
+    src_log_dir = os.path.abspath(local_logs_dir)
 
     for trial_idx in range(num_trials):
         trial_log_dir = os.path.join(src_log_dir, f"trial{trial_idx + 1}")

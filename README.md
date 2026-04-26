@@ -195,7 +195,7 @@ Main arguments:
 - `--scenario`: Scenario directory to use (default: `latest`)
 - `--eval-time`: Override evaluation time; if omitted, the default from `*_run.sh` or `*_exec.sh` is used
 
-`performance_test.py` launches node groups via REST for each trial, then collects logs from each host with `scp`. Raw logs are stored under `performance_test/logs`, and aggregated CSV outputs for latency, throughput, and host usage are written under `performance_test/results`.
+`performance_test.py` launches node groups via REST for each trial, then collects logs from each host with `scp`. On prepare, the manager creates `<ws-dir>/<scenario>/results/<session_timestamp>/` and updates `<ws-dir>/<scenario>/results/latest` to point to it. Trial logs are collected under `<ws-dir>/<scenario>/results/latest/logs/trial<N>/`, and aggregated outputs (for example `total_latency.csv`, `throughput.csv`, `host_trials_usage.csv`, `host_usage_summary.csv`) are written under `<ws-dir>/<scenario>/results/latest/csv/`.
 
 When using Zenoh as the RMW, start the router on the manager host before running the benchmark.
 
