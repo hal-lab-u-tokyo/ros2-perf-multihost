@@ -262,11 +262,21 @@ def _normalize_intermediate_entries(intermediate_value, node_name):
     return intermediate_value
 
 
-def _append_intermediate_block(lines, node_name, intermediate_entry, period_ms, eval_time, qos_opts):
-    pub_list = intermediate_entry["publisher"]
-    sub_list = intermediate_entry["subscriber"]
-    topic_names_pub = ",".join(p["topic_name"] for p in pub_list)
-    topic_names_sub = ",".join(s["topic_name"] for s in sub_list)
+def _collect_intermediate_topic_names(intermediate_entries):
+    """intermediate 配列から pub/sub トピック名を順序保持で重複除去して収集する"""
+    pub_topics = []
+    sub_topics = []
+    for entry in intermediate_entries:
+        pub_topics.extend(p["topic_name"] for p in entry.get("publisher", []))
+        sub_topics.extend(s["topic_name"] for s in entry.get("subscriber", []))
+    pub_topics = list(dict.fromkeys(pub_topics))
+    sub_topics = list(dict.fromkeys(sub_topics))
+    return pub_topics, sub_topics
+
+
+def _append_intermediate_block(lines, node_name, pub_topics, sub_topics, period_ms, eval_time, qos_opts):
+    topic_names_pub = ",".join(pub_topics)
+    topic_names_sub = ",".join(sub_topics)
     lines.extend(
         [
             f"# {node_name} intermediate",
@@ -338,19 +348,22 @@ def generate_exec_scripts(json_content, rmw, output_dir):
                     eval_time,
                     qos_opts,
                 )
-            if node.get("intermediate"):
+            if "intermediate" in node:
                 intermediate_entries = _normalize_intermediate_entries(
                     node["intermediate"], node_name
                 )
-                for intermediate_entry in intermediate_entries:
-                    _append_intermediate_block(
-                        lines,
-                        node_name,
-                        intermediate_entry,
-                        period_ms,
-                        eval_time,
-                        qos_opts,
-                    )
+                pub_topics, sub_topics = _collect_intermediate_topic_names(
+                    intermediate_entries
+                )
+                _append_intermediate_block(
+                    lines,
+                    node_name,
+                    pub_topics,
+                    sub_topics,
+                    period_ms,
+                    eval_time,
+                    qos_opts,
+                )
 
         _append_host_script_epilogue(lines, host_name)
 
@@ -641,7 +654,7 @@ def _collect_metadata_node_names(json_content):
                 subscriber_names.append(node_name)
                 for s in node["subscriber"]:
                     topic_names.add(s["topic_name"])
-            if node.get("intermediate"):
+            if "intermediate" in node:
                 intermediate_names.append(node_name)
                 intermediate_entries = _normalize_intermediate_entries(
                     node["intermediate"], node_name

@@ -41,7 +41,8 @@
 
 補足:
 - 1つの node に publisher / subscriber / intermediate を複数併用することは可能です。
-- intermediate は配列で定義し、全要素を実行・集計の両方で処理します。
+- intermediate は配列で定義できますが、同一 node エントリ内では 1 つの node_name を共有するため、配列要素は 1 つの intermediate_node 起動に統合されます。
+- 複数の intermediate を独立した ROS ノード/別プロセスとして実行したい場合は、intermediate 配列を増やすのではなく、node_name が一意になるよう別の nodes エントリとして定義してください。
 
 ### publisher 配列要素
 
