@@ -72,9 +72,10 @@ publisher / subscriber の配列要素は、上記と同じく topic_name が必
 - 各 publisher エントリ内の payload_size
 - intermediate 内の publisher / subscriber 配下を含む各トピック定義内の payload_size
 - 各 publisher エントリ内の period_ms
-- ルートの rmw (RMW はコマンドライン引数 --rmw で指定)
+- ルートの rmw（RMW は JSON ではなく、generate_exec_scripts.py 実行時の --rmw 引数で指定する仕様）
 
 実行時の payload size は JSON 内の payload_size ではなく、環境変数 PAYLOAD_SIZE (既定 64) のみで決まります。
+RMW も同様に JSON からは読み取られず、--rmw で与えた値（既定: fastdds）が使われます。
 
 ## 4. 最小テンプレート
 
