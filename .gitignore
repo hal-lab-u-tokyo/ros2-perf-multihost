@@ -1,14 +1,17 @@
+# Local VS Code workspace settings.
+.vscode/
+
+# Python bytecode caches.
+__pycache__/
+
+# Root-level colcon builds are not the intended workflow, but ignore their artifacts just in case.
 build/
 install/
 log/
-__pycache__/
-*.log
-*.log.remote
-logs/
 
-.vscode/
-compose.yml
-Dockerfiles/
-host_scripts/
+# Generated logs and results from performance test scripts.
 performance_test/logs/
 performance_test/results/
+
+# Generated artifacts for the default performance workspace.
+performance_ws/

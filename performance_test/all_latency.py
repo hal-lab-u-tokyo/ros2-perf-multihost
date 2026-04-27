@@ -87,7 +87,7 @@ def cal_all_latency(all_node_info, logs_folder_path):
                     logdata_list.append(("EndTime", end_time))
 
                 if "Index:" in line and "Timestamp:" in line:
-                    # "Index:" と "Timestamp:" を分割して値を取得
+                    # Split out the values from "Index:" and "Timestamp:".
                     parts = line.split(", ")
                     if type == "Publisher":  # Publisher log / Index: Timestamp:
                         index = int(parts[0].split(":")[1].strip())
@@ -165,7 +165,7 @@ def cal_all_latency(all_node_info, logs_folder_path):
                             item[1] for item in sub_logdata_list if item[0] == "StartTime")
                         sub_end_time = next(
                             item[1] for item in sub_logdata_list if item[0] == "EndTime")
-                        # StartTimeとEndTimeは用済なので消す
+                        # Remove StartTime and EndTime entries after extracting them.
                         pub_logdata_list = [
                             item for item in pub_logdata_list if item[0] != "StartTime" and item[0] != "EndTime"
                         ]
@@ -173,12 +173,12 @@ def cal_all_latency(all_node_info, logs_folder_path):
                             item for item in sub_logdata_list if item[0] != "StartTime" and item[0] != "EndTime"
                         ]
 
-                        # この共通集合に入る時間帯が計測対象
+                        # The overlapping time window is the measurement target.
                         common_start_time = int(
                             max(pub_start_time, sub_start_time)) + warmup_ns
                         common_end_time = int(min(pub_end_time, sub_end_time))
 
-                        # 共通時間帯が成立しない場合は警告してスキップ
+                        # Warn and skip if no overlapping time window exists.
                         if common_start_time >= common_end_time:
                             print(
                                 f"[WARN] No common time window: node={
@@ -190,7 +190,7 @@ def cal_all_latency(all_node_info, logs_folder_path):
                             )
                             continue
 
-                        # Start~Endの共通集合に入らないindexを除く
+                        # Exclude indices that fall outside the overlapping time window.
                         pub_indices = {
                             item[0]
                             for item in pub_logdata_list
@@ -202,7 +202,7 @@ def cal_all_latency(all_node_info, logs_folder_path):
                             if int(item[1]) >= common_start_time and int(item[1]) <= common_end_time
                         }
 
-                        # pubまたはsubの片方にしか入っていないindexをlossとしてlossをcount
+                        # Count indices present on only one side as losses.
                         loss_index_count = len(
                             set(pub_indices) - set(sub_indices)) + len(set(sub_indices) - set(pub_indices))
                         loss += loss_index_count
@@ -327,7 +327,7 @@ def write_total_latency(sub_all_node_statics, all_latency_results, result_dir):
 
 
 def process_log_directory(log_dir_name, logs_base_path, results_base_path):
-    """指定されたログディレクトリを解析し、結果を保存する"""
+    """Analyze the specified log directory and save the results."""
     logs_folder_path = os.path.join(logs_base_path, log_dir_name)
     result_dir = os.path.join(results_base_path, log_dir_name)
 
@@ -335,10 +335,10 @@ def process_log_directory(log_dir_name, logs_base_path, results_base_path):
     print(f"  Logs path: {logs_folder_path}")
     print(f"  Results path: {result_dir}")
 
-    # 結果ディレクトリを作成
+    # Create the result directory.
     os.makedirs(result_dir, exist_ok=True)
 
-    # 解析実行
+    # Run the analysis.
     all_node_info = get_node_and_topics(logs_folder_path)
     print(f"  Nodes found: {[n['name'] for n in all_node_info]}")
 
@@ -362,15 +362,15 @@ if __name__ == "__main__":
     logs_base_path = args.logs
     results_base_path = args.results
 
-    # resultsディレクトリがなければ作成
+    # Create the results directory if it does not exist.
     os.makedirs(results_base_path, exist_ok=True)
 
-    # logsディレクトリが存在しない場合は終了
+    # Exit if the logs directory does not exist.
     if not os.path.exists(logs_base_path):
         print(f"Error: Logs directory '{logs_base_path}' does not exist.")
         exit(1)
 
-    # logsディレクトリ内のディレクトリを取得
+    # Collect subdirectories under the logs directory.
     log_dirs = [d for d in os.listdir(logs_base_path) if os.path.isdir(
         os.path.join(logs_base_path, d))]
 
@@ -378,12 +378,12 @@ if __name__ == "__main__":
         print(f"No directories found in '{logs_base_path}'.")
         exit(0)
 
-    # 既に解析済みの結果ディレクトリを取得
+    # Collect result directories that have already been processed.
     existing_results = set()
     if os.path.exists(results_base_path):
         existing_results = set(os.listdir(results_base_path))
 
-    # 未解析のログディレクトリを処理
+    # Process only log directories that have not been analyzed yet.
     pending_dirs = [d for d in log_dirs if d not in existing_results]
 
     if not pending_dirs:
@@ -396,7 +396,7 @@ if __name__ == "__main__":
         print(f"  - {d}")
     print()
 
-    # 各ログディレクトリを処理
+    # Process each pending log directory.
     for log_dir_name in sorted(pending_dirs):
         try:
             process_log_directory(
