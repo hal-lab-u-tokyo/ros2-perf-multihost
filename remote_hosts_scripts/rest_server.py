@@ -2,6 +2,7 @@ from flask import Flask, jsonify, request
 from datetime import datetime
 import logging
 import os
+import shutil
 import socket
 import subprocess
 import sys
@@ -40,14 +41,37 @@ def _parse_simple_metadata(path):
     return data
 
 
+def _sanitize_relative_path(value, name):
+    candidate = str(value).strip()
+    if not candidate:
+        raise ValueError(f"{name} cannot be empty")
+    normalized = os.path.normpath(candidate)
+    if os.path.isabs(normalized):
+        raise ValueError(f"{name} must be a relative path")
+    if normalized == ".." or normalized.startswith(".." + os.sep):
+        raise ValueError(f"{name} cannot contain '..'")
+    return normalized
+
+
+def _join_under_repo(*parts):
+    repo_root_abs = os.path.abspath(REPO_ROOT)
+    joined_abs = os.path.abspath(os.path.join(repo_root_abs, *parts))
+    if os.path.commonpath([repo_root_abs, joined_abs]) != repo_root_abs:
+        raise ValueError("resolved path escapes REPO_ROOT")
+    return joined_abs
+
+
 def _resolve_exec_context(request_json):
     request_json = request_json or {}
-    ws_dir_input = str(request_json.get("ws_dir", DEFAULT_WS_DIR)).strip()
-    scenario_input = str(request_json.get(
-        "scenario", DEFAULT_SCENARIO)).strip()
+    ws_dir_input = _sanitize_relative_path(
+        request_json.get("ws_dir", DEFAULT_WS_DIR), "ws_dir"
+    )
+    scenario_input = _sanitize_relative_path(
+        request_json.get("scenario", DEFAULT_SCENARIO), "scenario"
+    )
 
-    metadata_path = os.path.join(
-        REPO_ROOT, ws_dir_input, scenario_input, "metadata.txt")
+    metadata_path = _join_under_repo(
+        ws_dir_input, scenario_input, "metadata.txt")
     if not os.path.isfile(metadata_path):
         raise FileNotFoundError(f"metadata file not found: {metadata_path}")
 
@@ -58,7 +82,7 @@ def _resolve_exec_context(request_json):
         raise ValueError(
             f"metadata is missing ws_dir/scenario_dir: {metadata_path}")
 
-    exec_dir = os.path.join(REPO_ROOT, ws_dir, scenario_dir, "exec_scripts")
+    exec_dir = _join_under_repo(ws_dir, scenario_dir, "exec_scripts")
     if not os.path.isdir(exec_dir):
         raise FileNotFoundError(
             f"exec_scripts directory not found: {exec_dir}")
@@ -140,7 +164,7 @@ def _prepare_results_timestamp(ctx):
         if os.path.islink(latest_link) or os.path.isfile(latest_link):
             os.remove(latest_link)
         elif os.path.isdir(latest_link):
-            os.rmdir(latest_link)
+            shutil.rmtree(latest_link)
     os.symlink(run_timestamp, latest_link)
 
     return run_timestamp
