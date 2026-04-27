@@ -254,19 +254,29 @@ def measure_latency(pub_logdata, sub_logdata, topic_list):
     os.makedirs("results", exist_ok=True)
 
     for topic in topic_list:
-        pub_start_time = next(item[1] for item in pub_logdata[f"{
-                              topic}"] if item[0] == "StartTime")
-        pub_end_time = next(item[1] for item in pub_logdata[f"{
-                            topic}"] if item[0] == "EndTime")
-        sub_start_time = next(item[1] for item in sub_logdata[f"{
-                              topic}"] if item[0] == "StartTime")
-        sub_end_time = next(item[1] for item in sub_logdata[f"{
-                            topic}"] if item[0] == "EndTime")
+        pub_start_time = next(
+            item[1] for item in pub_logdata[f"{topic}"] if item[0] == "StartTime"
+        )
+        pub_end_time = next(
+            item[1] for item in pub_logdata[f"{topic}"] if item[0] == "EndTime"
+        )
+        sub_start_time = next(
+            item[1] for item in sub_logdata[f"{topic}"] if item[0] == "StartTime"
+        )
+        sub_end_time = next(
+            item[1] for item in sub_logdata[f"{topic}"] if item[0] == "EndTime"
+        )
         # Remove StartTime and EndTime entries after extracting them.
-        pub_logdata[f"{topic}"] = [item for item in pub_logdata[f"{
-            topic}"] if item[0] != "StartTime" and item[0] != "EndTime"]
-        sub_logdata[f"{topic}"] = [item for item in sub_logdata[f"{
-            topic}"] if item[0] != "StartTime" and item[0] != "EndTime"]
+        pub_logdata[f"{topic}"] = [
+            item
+            for item in pub_logdata[f"{topic}"]
+            if item[0] != "StartTime" and item[0] != "EndTime"
+        ]
+        sub_logdata[f"{topic}"] = [
+            item
+            for item in sub_logdata[f"{topic}"]
+            if item[0] != "StartTime" and item[0] != "EndTime"
+        ]
 
         # The overlapping time window is the measurement target.
         common_start_time = int(max(pub_start_time, sub_start_time))
