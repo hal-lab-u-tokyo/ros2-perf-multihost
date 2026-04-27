@@ -166,6 +166,13 @@ docker pull ghcr.io/hal-lab-u-tokyo/ros2-perf-multihost:latest
 
 In a multi-host setup, each Raspberry Pi runs a REST server implemented by `rest_server.py`. A controller script sends requests to those servers to automate benchmark execution.
 
+Install the required Python packages with apt before starting the REST workflow.
+
+```bash
+sudo apt update
+sudo apt install -y python3-flask python3-requests
+```
+
 1. Start the REST server on every Raspberry Pi.
 
 SSH into each host and launch `remote_hosts_scripts/rest_server.py` directly.
