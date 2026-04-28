@@ -260,17 +260,19 @@ python3 performance_test/performance_test.py
 python3 performance_test/performance_test.py --exec-policy native
 # Run single-machine local compose (calls exec_scripts/local_run.sh directly)
 python3 performance_test/performance_test.py --exec-policy local
+# Same as above, using short options
+python3 performance_test/performance_test.py -p local -t 5 -e 60
 # Override eval-time explicitly
 python3 performance_test/performance_test.py --eval-time 60
 ```
 
 Main arguments:
 
-- `--exec-policy`: Execution mode, one of `docker`, `native`, or `local` (default: `docker`)
-- `--trials`: Number of trials (default: `3`)
-- `--ws-dir`: Base directory that contains generated execution scripts (default: `performance_ws`)
-- `--scenario`: Scenario directory to use (default: `latest`)
-- `--eval-time`: Override evaluation time; if omitted, the default from `*_run.sh` or `*_exec.sh` is used
+- `--exec-policy` (`-p`): Execution mode, one of `docker`, `native`, or `local` (default: `docker`)
+- `--trials` (`-t`): Number of trials (default: `3`)
+- `--ws-dir` (`-w`): Base directory that contains generated execution scripts (default: `performance_ws`)
+- `--scenario` (`-s`): Scenario directory to use (default: `latest`)
+- `--eval-time` (`-e`): Override evaluation time; if omitted, the default from `*_run.sh` or `*_exec.sh` is used
 
 When using Zenoh as the RMW, start the router on the manager host before running the benchmark.
 
