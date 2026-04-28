@@ -12,23 +12,26 @@ from runner import collect_logs, prepare_run, resolve_host_list, run_test
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(
         description="Run performance tests using run.sh defaults")
-    parser.add_argument("--trials", type=int, default=3,
+    parser.add_argument("-t", "--trials", type=int, default=3,
                         help="Number of trials (default: 3)")
-    parser.add_argument("--eval-time", type=int, default=None,
+    parser.add_argument("-e", "--eval-time", type=int, default=None,
                         help="Evaluation duration in seconds; if omitted, use the run.sh default (60)")
     parser.add_argument(
+        "-p",
         "--exec-policy",
-        choices=["docker", "native"],
+        choices=["docker", "native", "local"],
         default="docker",
-        help="Execution mode (default: docker)",
+        help="Execution mode (default: docker). local runs exec_scripts/local_run.sh on this machine",
     )
     parser.add_argument(
+        "-w",
         "--ws-dir",
         type=str,
         default="performance_ws",
         help="Workspace directory (default: performance_ws)",
     )
     parser.add_argument(
+        "-s",
         "--scenario",
         type=str,
         default="latest",
@@ -83,6 +86,7 @@ if __name__ == "__main__":
         args.ws_dir,
         args.scenario,
         exec_policy=args.exec_policy,
+        run_timestamp=local_timestamp,
     )
 
     for trial_idx in range(args.trials):
@@ -94,6 +98,7 @@ if __name__ == "__main__":
             args.scenario,
             exec_policy=args.exec_policy,
             eval_time=eval_time,
+            run_timestamp=local_timestamp,
         )
         time.sleep(10)
 
@@ -103,6 +108,8 @@ if __name__ == "__main__":
         hosts,
         ws_dir=args.ws_dir,
         scenario=args.scenario,
+        exec_policy=args.exec_policy,
+        run_timestamp=local_timestamp,
     )
 
     aggregate_total_latency(
