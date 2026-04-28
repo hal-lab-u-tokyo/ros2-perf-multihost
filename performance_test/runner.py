@@ -77,7 +77,9 @@ def run_test(
         result = subprocess.run(cmd, text=True, env=env)
         print(result)
         if result.returncode != 0:
-            print(f"run_test failed: rc={result.returncode}")
+            raise RuntimeError(
+                f"run_test failed for local execution: rc={result.returncode}, cmd={cmd}"
+            )
         return
 
     hosts_str = ",".join(hosts)
@@ -107,7 +109,10 @@ def run_test(
     )
     print(result)
     if result.returncode != 0:
-        print(f"run_test failed: rc={result.returncode}")
+        raise RuntimeError(
+            f"run_test failed for exec_policy={exec_policy}: "
+            f"rc={result.returncode}, cmd={cmd}"
+        )
 
 
 def prepare_run(
@@ -120,9 +125,12 @@ def prepare_run(
 ):
     """Initialize run timestamp/latest on all hosts before trial loop."""
     if exec_policy == "local":
-        # local_run.sh handles timestamp/latest, but we fix timestamp per benchmark run.
-        if run_timestamp:
-            print(f"Using fixed local RUN_TIMESTAMP={run_timestamp}")
+        if not run_timestamp:
+            raise ValueError(
+                "run_timestamp is required when exec_policy='local' to keep "
+                "all trials under the same results/<timestamp>/... tree"
+            )
+        print(f"Using fixed local RUN_TIMESTAMP={run_timestamp}")
         return
 
     hosts_str = ",".join(hosts)
