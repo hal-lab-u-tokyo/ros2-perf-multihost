@@ -1,4 +1,5 @@
 import os
+import shutil
 import subprocess
 import sys
 
@@ -50,8 +51,34 @@ def run_test(
     scenario,
     exec_policy="docker",
     eval_time=None,
+    run_timestamp=None,
 ):
     print(f"=== Run trial={trial_idx + 1} ===")
+
+    if exec_policy == "local":
+        local_run_sh = os.path.join(
+            ws_dir, scenario, "exec_scripts", "local_run.sh")
+        if not os.path.exists(local_run_sh):
+            raise FileNotFoundError(f"local_run.sh not found: {local_run_sh}")
+
+        cmd = [
+            "bash",
+            local_run_sh,
+            "--trial-idx",
+            str(trial_idx + 1),
+        ]
+        if eval_time is not None:
+            cmd.extend(["--eval-time", str(eval_time)])
+
+        env = os.environ.copy()
+        if run_timestamp:
+            env["RUN_TIMESTAMP"] = str(run_timestamp)
+
+        result = subprocess.run(cmd, text=True, env=env)
+        print(result)
+        if result.returncode != 0:
+            print(f"run_test failed: rc={result.returncode}")
+        return
 
     hosts_str = ",".join(hosts)
     cmd = [
@@ -89,8 +116,15 @@ def prepare_run(
     ws_dir,
     scenario,
     exec_policy="docker",
+    run_timestamp=None,
 ):
     """Initialize run timestamp/latest on all hosts before trial loop."""
+    if exec_policy == "local":
+        # local_run.sh handles timestamp/latest, but we fix timestamp per benchmark run.
+        if run_timestamp:
+            print(f"Using fixed local RUN_TIMESTAMP={run_timestamp}")
+        return
+
     hosts_str = ",".join(hosts)
     cmd = [
         sys.executable,
@@ -118,9 +152,48 @@ def collect_logs(
     hosts,
     ws_dir="performance_ws",
     scenario="latest",
+    exec_policy="docker",
+    run_timestamp=None,
 ):
     """Collect trial logs from remote hosts into a local logs directory."""
     src_log_dir = os.path.abspath(local_logs_dir)
+
+    if exec_policy == "local":
+        if not run_timestamp:
+            raise ValueError(
+                "run_timestamp is required when exec_policy=local")
+
+        scenario_root = os.path.join(ws_dir, scenario)
+        local_exec_logs_root = os.path.join(
+            scenario_root,
+            "results",
+            str(run_timestamp),
+            "exec_logs",
+        )
+
+        for trial_idx in range(num_trials):
+            trial_name = f"trial{trial_idx + 1}"
+            trial_log_dir = os.path.join(src_log_dir, trial_name)
+            os.makedirs(trial_log_dir, exist_ok=True)
+
+            src_trial_dir = os.path.join(local_exec_logs_root, trial_name)
+            if not os.path.isdir(src_trial_dir):
+                raise FileNotFoundError(
+                    f"Local trial log directory not found: {src_trial_dir}"
+                )
+
+            for entry in os.listdir(src_trial_dir):
+                src = os.path.join(src_trial_dir, entry)
+                dst = os.path.join(trial_log_dir, entry)
+                if os.path.isdir(src):
+                    if os.path.exists(dst):
+                        shutil.rmtree(dst)
+                    shutil.copytree(src, dst)
+                else:
+                    shutil.copy2(src, dst)
+
+            print(f"Copied local logs: {src_trial_dir} -> {trial_log_dir}")
+        return
 
     for trial_idx in range(num_trials):
         trial_log_dir = os.path.join(src_log_dir, f"trial{trial_idx + 1}")

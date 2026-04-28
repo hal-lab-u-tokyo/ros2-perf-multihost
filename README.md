@@ -258,13 +258,15 @@ After the REST servers are running, use `performance_test/performance_test.py` t
 python3 performance_test/performance_test.py
 # Switch to native execution
 python3 performance_test/performance_test.py --exec-policy native
+# Run single-machine local compose (calls exec_scripts/local_run.sh directly)
+python3 performance_test/performance_test.py --exec-policy local
 # Override eval-time explicitly
 python3 performance_test/performance_test.py --eval-time 60
 ```
 
 Main arguments:
 
-- `--exec-policy`: Execution mode, either `docker` or `native` (default: `docker`)
+- `--exec-policy`: Execution mode, one of `docker`, `native`, or `local` (default: `docker`)
 - `--trials`: Number of trials (default: `3`)
 - `--ws-dir`: Base directory that contains generated execution scripts (default: `performance_ws`)
 - `--scenario`: Scenario directory to use (default: `latest`)
@@ -279,6 +281,8 @@ When using Zenoh as the RMW, start the router on the manager host before running
 ### Results and Output Files
 
 `performance_test.py` launches node groups via REST for each trial, then collects logs from each host with `scp`.
+
+With `--exec-policy local`, `performance_test.py` does not use REST. It executes `<ws-dir>/<scenario>/exec_scripts/local_run.sh` on the manager machine for each trial and copies logs from the local `results/<timestamp>/exec_logs/` directory.
 
 On prepare, the manager creates `<ws-dir>/<scenario>/results/<session_timestamp>/` and updates `<ws-dir>/<scenario>/results/latest` to point to it.
 

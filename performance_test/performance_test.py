@@ -18,9 +18,9 @@ if __name__ == "__main__":
                         help="Evaluation duration in seconds; if omitted, use the run.sh default (60)")
     parser.add_argument(
         "--exec-policy",
-        choices=["docker", "native"],
+        choices=["docker", "native", "local"],
         default="docker",
-        help="Execution mode (default: docker)",
+        help="Execution mode (default: docker). local runs exec_scripts/local_run.sh on this machine",
     )
     parser.add_argument(
         "--ws-dir",
@@ -83,6 +83,7 @@ if __name__ == "__main__":
         args.ws_dir,
         args.scenario,
         exec_policy=args.exec_policy,
+        run_timestamp=local_timestamp,
     )
 
     for trial_idx in range(args.trials):
@@ -94,6 +95,7 @@ if __name__ == "__main__":
             args.scenario,
             exec_policy=args.exec_policy,
             eval_time=eval_time,
+            run_timestamp=local_timestamp,
         )
         time.sleep(10)
 
@@ -103,6 +105,8 @@ if __name__ == "__main__":
         hosts,
         ws_dir=args.ws_dir,
         scenario=args.scenario,
+        exec_policy=args.exec_policy,
+        run_timestamp=local_timestamp,
     )
 
     aggregate_total_latency(
