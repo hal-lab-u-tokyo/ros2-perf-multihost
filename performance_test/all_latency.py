@@ -352,7 +352,15 @@ def process_log_directory(log_dir_name, logs_base_path, results_base_path):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(
-        description="Process log directories and save latency results.")
+        description="Process log directories and save latency results.",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        usage="%(prog)s [--logs|-l DIR] [--results|-r DIR] [--help|-h]",
+        epilog="""
+Examples:
+  python3 performance_test/all_latency.py --logs ./logs --results ./results
+  short: python3 performance_test/all_latency.py -l ./logs -r ./results
+""",
+    )
     parser.add_argument("-l", "--logs", type=str, default="./logs",
                         help="Base path for logs")
     parser.add_argument("-r", "--results", type=str,

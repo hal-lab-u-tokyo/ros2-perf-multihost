@@ -32,7 +32,17 @@ DEFAULT_EVAL_TIME = 60
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(
-        description="Generate Docker execution scripts and compose files from a JSON topology"
+        description="Generate Docker execution scripts and compose files from a JSON topology",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        usage=(
+            "%(prog)s <topology.json> [--ws-dir|-w <dir>] [--force|-f] "
+            "[--rmw|-m <rmw>] [--help|-h]"
+        ),
+        epilog="""
+Examples:
+  python3 manager_scripts/generate_exec_scripts.py topology_example/simple.json --rmw fastdds --ws-dir performance_ws
+  short: python3 manager_scripts/generate_exec_scripts.py topology_example/simple.json -m fastdds -w performance_ws
+""",
     )
     parser.add_argument("json_path", help="Path to the input JSON file")
     parser.add_argument(

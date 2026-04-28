@@ -11,7 +11,19 @@ from runner import collect_logs, prepare_run, resolve_host_list, run_test
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(
-        description="Run performance tests using run.sh defaults")
+        description="Run performance tests using run.sh defaults",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        usage=(
+            "%(prog)s [--trials|-t N] [--eval-time|-e SEC] "
+            "[--exec-policy|-p {docker,native,local}] [--ws-dir|-w DIR] "
+            "[--scenario|-s NAME] [--help|-h]"
+        ),
+        epilog="""
+Examples:
+  python3 performance_test/performance_test.py --exec-policy local --trials 5 --eval-time 60
+  short: python3 performance_test/performance_test.py -p local -t 5 -e 60
+""",
+    )
     parser.add_argument("-t", "--trials", type=int, default=3,
                         help="Number of trials (default: 3)")
     parser.add_argument("-e", "--eval-time", type=int, default=None,
