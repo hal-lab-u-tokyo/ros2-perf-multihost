@@ -100,14 +100,14 @@ When using Zenoh, the script starts the Zenoh router first, then launches the ho
 Generate execution scripts (`host*_exec.sh`, `host*_run.sh`) and Docker Compose files from a JSON topology file.
 
 ```bash
-python3 manager_scripts/generate_exec_scripts.py <topology.json> [--rmw <rmw>] [--ws-dir <dir>] [--force|-f]
+python3 manager_scripts/generate_exec_scripts.py <topology.json> [--rmw|-m <rmw>] [--ws-dir|-w <dir>] [--force|-f]
 ```
 
 Arguments:
 
 - `<topology.json>`: Path to the topology definition JSON file
-- `--ws-dir`: Base directory for generated artifacts (default: `performance_ws`)
-- `--rmw`: RMW implementation (`fastdds`, `zenoh`, or `cyclonedds`; default: `fastdds`)
+- `--ws-dir` / `-w`: Base directory for generated artifacts (default: `performance_ws`)
+- `--rmw` / `-m`: RMW implementation (`fastdds`, `zenoh`, or `cyclonedds`; default: `fastdds`)
 - `--force` / `-f`: Overwrite an existing output directory without confirmation; useful in CI or scripts
 
 Generated files are written to `<ws-dir>/<json-file-name>-<rmw>/exec_scripts/`. If the directory already exists, the script asks for confirmation before deleting `exec_scripts/*` and regenerating it. If the previously used JSON path recorded in `metadata.txt` under `json_path:` differs from the current one, an additional warning is shown. If stdin is not a TTY, the script exits with an error instead of prompting; use `--force` or `-f` in that case. `<ws-dir>/latest` is always updated to point at the most recently generated directory.

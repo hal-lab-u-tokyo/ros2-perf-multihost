@@ -3,11 +3,15 @@ Unified script to start test execution on all hosts.
 Supports both Docker and native execution modes.
 
 Usage:
+    python3 start_exec_scripts.py [--exec-policy|-p {docker,native}] [--trial-idx|-r N] [--prepare-run] [--ws-dir|-w DIR] [--scenario|-s NAME] [--hosts-list|-l HOSTS] [--help|-h]
+
   # Docker mode (sends /start_docker requests)
       python3 start_exec_scripts.py --exec-policy docker --trial-idx 1 --ws-dir performance_ws --scenario latest --hosts-list host1,host2,host3
+      short: python3 start_exec_scripts.py -p docker -r 1 -w performance_ws -s latest -l host1,host2,host3
 
   # Native mode (sends /start requests)
       python3 start_exec_scripts.py --exec-policy native --trial-idx 1 --ws-dir performance_ws --scenario latest --hosts-list host1,host2,host3
+      short: python3 start_exec_scripts.py -p native -r 1 -w performance_ws -s latest -l host1,host2,host3
 """
 
 import requests
@@ -62,33 +66,41 @@ def main():
     parser = argparse.ArgumentParser(
         description="Start test execution on all hosts (Docker or native)",
         formatter_class=argparse.RawDescriptionHelpFormatter,
+        usage=(
+            "%(prog)s [--exec-policy|-p {docker,native}] [--trial-idx|-r N] "
+            "[--prepare-run] [--ws-dir|-w DIR] [--scenario|-s NAME] "
+            "[--hosts-list|-l HOSTS] [--help|-h]"
+        ),
         epilog="""
 Examples:
   # Docker mode
-            python3 start_exec_scripts.py --exec-policy docker --trial-idx 1 --ws-dir performance_ws --scenario latest --hosts-list host1,host2,host3
+  python3 start_exec_scripts.py --exec-policy docker --trial-idx 1 --ws-dir performance_ws --scenario latest --hosts-list host1,host2,host3
+  short: python3 start_exec_scripts.py -p docker -r 1 -w performance_ws -s latest -l host1,host2,host3
 
   # Native mode
-            python3 start_exec_scripts.py --exec-policy native --trial-idx 1 --ws-dir performance_ws --scenario latest --hosts-list host1,host2,host3
+  python3 start_exec_scripts.py --exec-policy native --trial-idx 1 --ws-dir performance_ws --scenario latest --hosts-list host1,host2,host3
+  short: python3 start_exec_scripts.py -p native -r 1 -w performance_ws -s latest -l host1,host2,host3
         """
     )
     parser.add_argument(
+        "-p",
         "--exec-policy",
         choices=["docker", "native"],
         default="docker",
         help="Execution mode. docker sends /start_docker, native sends /start (default: docker)",
     )
-    parser.add_argument("--trial-idx", type=int, default=1,
+    parser.add_argument("-r", "--trial-idx", type=int, default=1,
                         help="Trial index")
     parser.add_argument(
         "--prepare-run",
         action="store_true",
         help="Prepare run timestamp/latest on all hosts before trials",
     )
-    parser.add_argument("--ws-dir", default="performance_ws",
+    parser.add_argument("-w", "--ws-dir", default="performance_ws",
                         help="Workspace directory (default: performance_ws)")
-    parser.add_argument("--scenario", default="latest",
+    parser.add_argument("-s", "--scenario", default="latest",
                         help="Scenario directory name (default: latest)")
-    parser.add_argument("--hosts-list", default=None,
+    parser.add_argument("-l", "--hosts-list", default=None,
                         help="Comma-separated list of hosts (optional; if not provided, resolved from metadata)")
 
     args = parser.parse_args()

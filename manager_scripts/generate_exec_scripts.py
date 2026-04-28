@@ -32,10 +32,21 @@ DEFAULT_EVAL_TIME = 60
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(
-        description="Generate Docker execution scripts and compose files from a JSON topology"
+        description="Generate Docker execution scripts and compose files from a JSON topology",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        usage=(
+            "%(prog)s <topology.json> [--ws-dir|-w <dir>] [--force|-f] "
+            "[--rmw|-m <rmw>] [--help|-h]"
+        ),
+        epilog="""
+Examples:
+  python3 manager_scripts/generate_exec_scripts.py topology_example/simple.json --rmw fastdds --ws-dir performance_ws
+  short: python3 manager_scripts/generate_exec_scripts.py topology_example/simple.json -m fastdds -w performance_ws
+""",
     )
     parser.add_argument("json_path", help="Path to the input JSON file")
     parser.add_argument(
+        "-w",
         "--ws-dir",
         type=normalize_ws_dir,
         default=DEFAULT_PERF_WS_DIR,
@@ -48,6 +59,7 @@ if __name__ == "__main__":
         help="Overwrite existing output directory without confirmation",
     )
     parser.add_argument(
+        "-m",
         "--rmw",
         type=str,
         default="fastdds",
@@ -82,10 +94,12 @@ if __name__ == "__main__":
 
     try:
         generate_exec_scripts(json_content, args.rmw, tmp_dir, settings)
-        generate_compose(json_content, args.rmw, tmp_dir, project_root, settings)
+        generate_compose(json_content, args.rmw,
+                         tmp_dir, project_root, settings)
         generate_compose_per_host(
             json_content, args.rmw, tmp_dir, project_root, settings)
-        generate_host_run_scripts(json_content, tmp_dir, project_root, settings)
+        generate_host_run_scripts(
+            json_content, tmp_dir, project_root, settings)
         generate_local_run_script(
             json_content, args.rmw, tmp_dir, project_root, settings)
 
