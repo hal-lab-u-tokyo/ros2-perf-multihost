@@ -1,45 +1,77 @@
-# Scalability Evaluation Method for ROS 2 Distributed Communication
+# ros2-perf-multihost
 
-For the nested workspace that contains the ROS 2 node implementations used in this repository, see [ros2_node_impl_ws/README.md](./ros2_node_impl_ws/README.md).
+**Automated Coordination Framework for Objective Architecture Evaluation in Distributed Systems**
 
-## Generating Execution Scripts with a Shared Docker Image
+The "RMW Cambrian Explosion" in the ROS 2 ecosystem following Zenoh’s integration presents developers with complex middleware choices and architectural challenges.
+Selecting the optimal RMW and system configuration requires empirical data from actual physical hardware.
+
+**ros2-perf-multihost** is an open-source framework for objectively evaluating the performance and architecture of ROS 2 systems in distributed environments on physical devices.
+It coordinates evaluation pipelines across multiple physical devices, and enables developers to quantify how node placement and network configurations impact overall stability.
+Our purpose is to provide a "scientific scale" for optimizing distributed system design across edge devices and servers with real-world networks, empowering data-driven decisions for large-scale robotic systems.
+
+## Overview
+
+### Key Features 🚀
+
+- **Manager-Host Coordination**: Deploy nodes in bulk to multiple target Hosts (Raspberry Pi, Jetson, servers, etc.) via REST API and remotely manage their lifecycle from a central Manager.
+- **Flexible Topology Configuration**: Define node relationships and QoS settings to the host assignments declaratively via JSON. Iterate complex topologies for multiple RMWs efficiently.
+- **RMW Neutrality**: Evaluate multiple RMW implementations (FastDDS, CycloneDDS, Zenoh) while using QoS and topology definitions for cross-RMW comparisons.
+- **Dual Execution Modes**: Support both Docker containerized and native ROS 2 environments for seamless evaluation across development as well as production-like setups.
+- **Precision Telemetry & Monitoring**: Record CPU and memory load on each host with trial-aligned timestamps, enabling time-correlated analysis with end-to-end communication metrics.
+
+### 🏗 Architecture
+
+This framework employs a two-tier architecture:
+
+- **Manager**: Generates topology-specific scripts, coordinates execution across hosts via REST API, collects logs, and aggregates results.
+- **Hosts**: Operate a lightweight REST server to receive execution commands and launch ROS 2 nodes in either Docker containers or native environments.
+
+The workflow proceeds as follows:
+
+1. **Topology Definition**: Users define node placement, topic relationships, and QoS configuration in a topology JSON file.
+2. **Coordination**: The Manager generates execution scripts for the selected RMW and distributes them to each Host for execution.
+3. **Execution**: All hosts begin operation tests simultaneously while collecting system metrics in the background.
+4. **Data Aggregation**: After experiment completion, the Manager collates logs from all hosts and outputs analysis-ready CSV files.
+
+### Observable Metrics 📊
+
+The default pipeline correlates communication performance with host-level resource utilization:
+
+| Category | Metrics | Per |
+| :-- | :-- | :-- |
+| **Communication** | End-to-end latency and message loss count | Per-trial |
+| **Throughput** | Aggregated throughput estimated from publish period, publisher count, payload size, and observed loss | Per-trial |
+| **Host Resource Usage** | CPU and memory usage, load average, and swap usage summary | Per-host / Per-trial |
+
+## Getting Started
+
+### Prerequisites
+
+Prepare the repository root on the manager host first.
+
+```bash
+git clone https://github.com/hal-lab-u-tokyo/ros2-perf-multihost.git
+cd ros2-perf-multihost
+```
+
+Before running the workflows below, make sure the following prerequisites are satisfied:
+
+- Docker is available on hosts that will run the containerized workflow.
+- A ROS 2 environment is available on hosts that will run the native workflow.
+- The repository is placed at the same path on each host for multi-host execution.
+- SSH connectivity is available from the manager host to each target host.
+- For the REST workflow, install `python3-flask` and `python3-requests` on each target host.
+
+```bash
+sudo apt update
+sudo apt install -y python3-flask python3-requests
+```
+
+### Quick Start: Local Verification
 
 Instead of generating and building a Dockerfile for each topology, this repository reuses a single shared Docker image and generates only topology-specific execution scripts and Compose definitions.
 
-### Generate Execution Scripts
-
-Generate execution scripts (`host*_exec.sh`, `host*_run.sh`) and Docker Compose files from a JSON topology file.
-
-```bash
-cd manager_scripts
-python3 generate_exec_scripts.py ../topology_example/simple.json --rmw fastdds --ws-dir performance_ws
-```
-
-### Options Supported by Generated Scripts
-
-Generated `host*_run.sh` and `local_run.sh` scripts support the runtime options below. `--eval-time` is applied to every launched node (Publisher / Subscriber / Intermediate). `payload_size` and `period_ms` must be specified in each Publisher / Intermediate topic entry in the topology JSON, and those values are passed directly to Publisher / Intermediate nodes. `--trial-idx` is available only on `host*_run.sh` and `local_run.sh`. For the JSON schema, see [topology_example/README.md](./topology_example/README.md).
-
-| Option | Short | Description | Default |
-|---|---|---|---|
-| --eval-time | -t | Evaluation time in seconds | 60 |
-| --trial-idx | -r | Trial index for local execution | 1 |
-
-#### Examples
-
-```bash
-# Use default values
-./host1_exec.sh
-
-# Override eval-time
-./host1_run.sh --eval-time 60
-
-# Short options
-./host1_run.sh -t 60
-```
-
-`--eval-time` is applied to all nodes launched through `*_run.sh` or `local_run.sh`. `payload_size` and `period_ms` are read from each Publisher/Intermediate entry in the topology JSON.
-
-### Pull the Shared Docker Image
+1. Pull the shared image.
 
 ```bash
 docker pull ghcr.io/hal-lab-u-tokyo/ros2-perf-multihost:latest
@@ -47,7 +79,25 @@ docker pull ghcr.io/hal-lab-u-tokyo/ros2-perf-multihost:latest
 
 Use the published GitHub Packages image [`ghcr.io/hal-lab-u-tokyo/ros2-perf-multihost:latest`](https://github.com/hal-lab-u-tokyo/ros2-perf-multihost/pkgs/container/ros2-perf-multihost). Generated `local_compose.yaml` and `host{N}_compose.yaml` files also reference the same image. For image build and push steps, see `docker/README.md`.
 
-### Generate Scripts from the Project Root
+2. Generate execution scripts from a topology JSON file.
+
+```bash
+python3 manager_scripts/generate_exec_scripts.py topology_example/simple.json --rmw fastdds --ws-dir performance_ws
+```
+
+3. Run the generated local verification script.
+
+```bash
+bash performance_ws/latest/exec_scripts/local_run.sh
+```
+
+`local_run.sh` automatically sets `LOCAL_UID=$(id -u)` and `LOCAL_GID=$(id -g)` before running `docker compose`, which helps avoid root-owned files on bind mounts.
+
+When using Zenoh, the script starts the Zenoh router first, then launches the host services, and stops the router automatically afterward.
+
+### Generate Execution Scripts
+
+Generate execution scripts (`host*_exec.sh`, `host*_run.sh`) and Docker Compose files from a JSON topology file.
 
 ```bash
 python3 manager_scripts/generate_exec_scripts.py <topology.json> [--rmw <rmw>] [--ws-dir <dir>] [--force|-f]
@@ -105,28 +155,63 @@ Generated files:
 
 Each node launched from `host{N}_run.sh` or `local_run.sh` receives a `--log_dir` under `results/YYYY-MM-DD_hh-mm-ss/exec_logs/trial<trial_idx>/` inside the generated run directory. `results/latest` is updated as a symbolic link to the active run directory. Example: `performance_ws/latest/results/2026-04-26_13-21-45/exec_logs/trial1/`.
 
-### Local Verification with Docker
+#### Runtime Options Supported by Generated Scripts
+
+Generated `host*_run.sh` and `local_run.sh` scripts support the runtime options below. `--eval-time` is applied to every launched node (Publisher / Subscriber / Intermediate). `payload_size` and `period_ms` must be specified in each Publisher / Intermediate topic entry in the topology JSON, and those values are passed directly to Publisher / Intermediate nodes. `--trial-idx` is available only on `host*_run.sh` and `local_run.sh`. For the JSON schema, see [topology_example/README.md](./topology_example/README.md).
+
+| Option | Short | Description | Default |
+|---|---|---|---|
+| --eval-time | -t | Evaluation time in seconds | 60 |
+| --trial-idx | -r | Trial index for local execution | 1 |
+
+Examples:
+
+```bash
+# Use default values
+./host1_exec.sh
+
+# Override eval-time
+./host1_run.sh --eval-time 60
+
+# Short options
+./host1_run.sh -t 60
+```
+
+`--eval-time` is applied to all nodes launched through `*_run.sh` or `local_run.sh`. `payload_size` and `period_ms` are read from each Publisher/Intermediate entry in the topology JSON.
+
+### Run with Docker
+
+Use Docker when you want a containerized execution environment.
 
 ```bash
 bash performance_ws/latest/exec_scripts/local_run.sh
 ```
 
-`local_run.sh` automatically sets `LOCAL_UID=$(id -u)` and `LOCAL_GID=$(id -g)` before running `docker compose`, which helps avoid root-owned files on bind mounts.
+For multi-host execution, run the host-specific wrapper on each target host.
 
-When using Zenoh, the script starts the Zenoh router first, then launches the host services, and stops the router automatically afterward.
+```bash
+# Run on host1
+bash performance_ws/latest/exec_scripts/host1_run.sh
+```
 
-### Native Execution
+If needed, pull the image on each host in advance.
 
-To run in a native ROS 2 environment without Docker, set `ROS2_PERF_WS` to the project root.
+```bash
+docker pull ghcr.io/hal-lab-u-tokyo/ros2-perf-multihost:latest
+```
+
+### Run Natively
+
+Use the native workflow when you want to execute ROS 2 nodes directly on the host without Docker.
 
 ```bash
 export ROS2_PERF_WS=$(pwd)
 bash performance_ws/latest/exec_scripts/host1_exec.sh
 ```
 
-If it is unset, the script falls back to the container default path.
+If `ROS2_PERF_WS` is unset, the script falls back to the container default path.
 
-### Real Multi-Host Deployment
+### Multi-Host Deployment
 
 Prepare the repository and the required Python environment at the same path on each host in advance.
 
@@ -151,27 +236,9 @@ You can override the target paths on the command line.
 ./manager_scripts/distribute_exec_scripts.sh --help
 ```
 
-```bash
-# Run on host1
-bash performance_ws/latest/exec_scripts/host1_run.sh
-```
-
-If needed, pull the image on each host in advance.
-
-```bash
-docker pull ghcr.io/hal-lab-u-tokyo/ros2-perf-multihost:latest
-```
-
-## REST Server and Automated Performance Evaluation
+### Automated Benchmark via REST
 
 In a multi-host setup, each Raspberry Pi runs a REST server implemented by `rest_server.py`. A controller script sends requests to those servers to automate benchmark execution.
-
-Install the required Python packages with apt before starting the REST workflow.
-
-```bash
-sudo apt update
-sudo apt install -y python3-flask python3-requests
-```
 
 1. Start the REST server on every Raspberry Pi.
 
@@ -203,10 +270,62 @@ Main arguments:
 - `--scenario`: Scenario directory to use (default: `latest`)
 - `--eval-time`: Override evaluation time; if omitted, the default from `*_run.sh` or `*_exec.sh` is used
 
-`performance_test.py` launches node groups via REST for each trial, then collects logs from each host with `scp`. On prepare, the manager creates `<ws-dir>/<scenario>/results/<session_timestamp>/` and updates `<ws-dir>/<scenario>/results/latest` to point to it. Trial logs are collected under `<ws-dir>/<scenario>/results/latest/logs/trial<N>/`, and aggregated outputs (for example `total_latency.csv`, `throughput.csv`, `host_trials_usage.csv`, `host_usage_summary.csv`) are written under `<ws-dir>/<scenario>/results/latest/csv/`.
-
 When using Zenoh as the RMW, start the router on the manager host before running the benchmark.
 
 ```bash
 ./manager_scripts/operate_zenoh_router.sh foreground
 ```
+
+### Results and Output Files
+
+`performance_test.py` launches node groups via REST for each trial, then collects logs from each host with `scp`.
+
+On prepare, the manager creates `<ws-dir>/<scenario>/results/<session_timestamp>/` and updates `<ws-dir>/<scenario>/results/latest` to point to it.
+
+- Trial logs are collected under `<ws-dir>/<scenario>/results/latest/logs/trial<N>/`.
+- Aggregated outputs such as `total_latency.csv`, `throughput.csv`, `host_trials_usage.csv`, and `host_usage_summary.csv` are written under `<ws-dir>/<scenario>/results/latest/csv/`.
+
+## Directory Structure
+
+The main directories and their roles are as follows:
+
+| Directory | Role |
+|---|---|
+| `manager_scripts/` | Generates topology-specific execution artifacts and provides helper scripts for distribution and router operation. |
+| `remote_hosts_scripts/` | Runs on each host (REST server, remote start orchestration, and host metrics collection). |
+| `performance_test/` | Executes trial automation, log collection, and CSV aggregation/analysis. |
+| `performance_ws/` | Stores generated scenarios, execution scripts, and run results. |
+| `topology_example/` | Provides example topology JSON files and schema guidance. |
+| `ros2_node_impl_ws/` | ROS 2 node implementation workspace used by generated execution scripts. |
+| `docker/` | Shared Docker image definition and compose-related assets. |
+
+## Related Documents
+
+For detailed usage in subdomains, see the following documents:
+
+- [docker/README.md](./docker/README.md): Docker image build/push details and container workflow notes.
+- [topology_example/README.md](./topology_example/README.md): Topology JSON format and modeling guidance.
+- [ros2_node_impl_ws/README.md](./ros2_node_impl_ws/README.md): ROS 2 node workspace usage and build instructions.
+
+## Troubleshooting
+
+Common issues and fixes:
+
+- `python3 manager_scripts/generate_exec_scripts.py ...` fails because output exists: rerun with `--force` or remove the existing scenario directory under `performance_ws/`.
+- `distribute_exec_scripts.sh` fails with SSH/SCP errors: verify hostnames, SSH keys, and that repository paths are identical across hosts.
+- REST benchmark does not start remote execution: ensure `python3 remote_hosts_scripts/rest_server.py` is running on every target host before calling `performance_test.py`.
+- Docker mode fails on remote hosts: pull `ghcr.io/hal-lab-u-tokyo/ros2-perf-multihost:latest` and confirm Docker permissions on each host.
+- Native mode cannot find workspace paths: set `ROS2_PERF_WS` to the project root before running `host*_exec.sh`.
+- Expected CSV outputs are missing: check `<ws-dir>/<scenario>/results/latest/logs/trial<N>/` for trial logs and inspect script stderr for analyzer failures.
+
+## Contributing and License
+
+Contributions are welcome. Please open an issue to discuss bugs, feature requests, or design changes before large modifications.
+
+When submitting a pull request:
+
+- Keep changes scoped and include a clear rationale.
+- Update documentation for user-facing behavior changes.
+- Include reproduction steps for bug fixes and benchmark-related changes.
+
+This project is licensed under the terms in [LICENSE](./LICENSE).
