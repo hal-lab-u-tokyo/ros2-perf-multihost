@@ -43,57 +43,75 @@ The default pipeline correlates communication performance with host-level resour
 | **Throughput** | Aggregated throughput estimated from publish period, publisher count, payload size, and observed loss | Per-trial |
 | **Host Resource Usage** | CPU and memory usage, load average, and swap usage summary | Per-host / Per-trial |
 
-## Getting Started
+## Quick Start
 
-### Prerequisites
+You can experience the framework's end-to-end workflow in just five minutes on a single PC in front of you.
+For this quick start, Ubuntu 24.04 and Docker are enough.
+Detailed instructions for remote-host execution via REST are covered in the [Usage in Details](#usage-in-details) section.
 
-Prepare the repository root on the manager host first.
+### What You Need
+
+Start by cloning the repository on your local machine.
 
 ```bash
 git clone https://github.com/hal-lab-u-tokyo/ros2-perf-multihost.git
 cd ros2-perf-multihost
 ```
 
-Before running the workflows below, make sure the following prerequisites are satisfied:
+Before running the local quick start, check the following:
 
-- Docker is available on hosts that will run the containerized workflow.
-- A ROS 2 environment is available on hosts that will run the native workflow.
-- The repository is placed at the same path on each host for multi-host execution.
-- SSH connectivity is available from the manager host to each target host.
-- For the REST workflow, install `python3-flask` and `python3-requests` on each target host.
+- Ubuntu 24.04 on the local development machine.
+- Docker (with Compose) is available on the local machine.
+- Python 3 is available to run management and benchmark scripts.
+  - NumPy is required for analysis scripts (install with `sudo apt install -y python3-numpy`).
 
 ```bash
-sudo apt update
-sudo apt install -y python3-flask python3-requests
+docker --version
+docker compose version
+python3 --version
 ```
 
-### Quick Start: Local Verification
-
-Instead of generating and building a Dockerfile for each topology, this repository reuses a single shared Docker image and generates only topology-specific execution scripts and Compose definitions.
-
-1. Pull the shared image.
+Pull the shared image once before running the quick start.
 
 ```bash
 docker pull ghcr.io/hal-lab-u-tokyo/ros2-perf-multihost:latest
 ```
 
-Use the published GitHub Packages image [`ghcr.io/hal-lab-u-tokyo/ros2-perf-multihost:latest`](https://github.com/hal-lab-u-tokyo/ros2-perf-multihost/pkgs/container/ros2-perf-multihost). Generated `local_compose.yaml` and `host{N}_compose.yaml` files also reference the same image. For image build and push steps, see `docker/README.md`.
+### Steps
 
-2. Generate execution scripts from a topology JSON file.
+Run everything on a single machine in this local workflow.
+
+1. Generate execution scripts from a topology JSON file.
 
 ```bash
 python3 manager_scripts/generate_exec_scripts.py topology_example/simple.json --rmw fastdds --ws-dir performance_ws
 ```
 
-3. Run the generated local verification script.
+2. Run a benchmark session.
 
 ```bash
-bash performance_ws/latest/exec_scripts/local_run.sh
+python3 performance_test/performance_test.py --exec-policy local
 ```
 
-`local_run.sh` automatically sets `LOCAL_UID=$(id -u)` and `LOCAL_GID=$(id -g)` before running `docker compose`, which helps avoid root-owned files on bind mounts.
+`performance_test.py` executes `<ws-dir>/<scenario>/exec_scripts/local_run.sh` on the manager machine for each trial.
+This runs 3 trials, each lasting 60 seconds.
 
-When using Zenoh, the script starts the Zenoh router first, then launches the host services, and stops the router automatically afterward.
+3. Check outputs.
+
+- Logs: `<ws-dir>/<scenario>/results/latest/logs/trial<N>/`
+- CSV: `<ws-dir>/<scenario>/results/latest/csv/`
+
+Want to know more about these steps and output results?
+Need multi-host operation, native execution, and REST automation?
+Let's go to the next section [Usage in Details](#usage-in-details).
+
+## Usage in Details
+
+### Shared Docker Image
+
+Use the published GitHub Packages image [`ghcr.io/hal-lab-u-tokyo/ros2-perf-multihost:latest`](https://github.com/hal-lab-u-tokyo/ros2-perf-multihost/pkgs/container/ros2-perf-multihost).
+Generated `local_compose.yaml` and `host{N}_compose.yaml` files reference this image.
+For image build and push steps, see `docker/README.md`.
 
 ### Generate Execution Scripts
 
@@ -179,39 +197,7 @@ Examples:
 
 `--eval-time` is applied to all nodes launched through `*_run.sh` or `local_run.sh`. `payload_size` and `period_ms` are read from each Publisher/Intermediate entry in the topology JSON.
 
-### Run with Docker
-
-Use Docker when you want a containerized execution environment.
-
-```bash
-bash performance_ws/latest/exec_scripts/local_run.sh
-```
-
-For multi-host execution, run the host-specific wrapper on each target host.
-
-```bash
-# Run on host1
-bash performance_ws/latest/exec_scripts/host1_run.sh
-```
-
-If needed, pull the image on each host in advance.
-
-```bash
-docker pull ghcr.io/hal-lab-u-tokyo/ros2-perf-multihost:latest
-```
-
-### Run Natively
-
-Use the native workflow when you want to execute ROS 2 nodes directly on the host without Docker.
-
-```bash
-export ROS2_PERF_WS=$(pwd)
-bash performance_ws/latest/exec_scripts/host1_exec.sh
-```
-
-If `ROS2_PERF_WS` is unset, the script falls back to the container default path.
-
-### Multi-Host Deployment
+### Host-Based Execution
 
 Prepare the repository and the required Python environment at the same path on each host in advance.
 
@@ -240,9 +226,14 @@ You can override the target paths on the command line.
 
 In a multi-host setup, each Raspberry Pi runs a REST server implemented by `rest_server.py`. A controller script sends requests to those servers to automate benchmark execution.
 
-1. Start the REST server on every Raspberry Pi.
+Install required packages on each target host before starting the REST server:
 
-SSH into each host and launch `remote_hosts_scripts/rest_server.py` directly.
+```bash
+sudo apt update
+sudo apt install -y python3-flask python3-requests
+```
+
+1. Start the REST server on every Raspberry Pi.
 
 ```bash
 ssh ubuntu@hostX
@@ -252,18 +243,10 @@ python3 remote_hosts_scripts/rest_server.py
 
 2. Run the benchmark script `performance_test.py`.
 
-After the REST servers are running, use `performance_test/performance_test.py` to execute measurements with the desired payload size, number of trials, and execution mode. Internally, it calls `remote_hosts_scripts/start_exec_scripts.py`, and the target hosts are resolved automatically from `performance_ws/<scenario>/metadata.txt`.
-
 ```bash
 python3 performance_test/performance_test.py
 # Switch to native execution
 python3 performance_test/performance_test.py --exec-policy native
-# Run single-machine local compose (calls exec_scripts/local_run.sh directly)
-python3 performance_test/performance_test.py --exec-policy local
-# Same as above, using short options
-python3 performance_test/performance_test.py -p local -t 5 -e 60
-# Override eval-time explicitly
-python3 performance_test/performance_test.py --eval-time 60
 ```
 
 Main arguments:
@@ -283,8 +266,6 @@ When using Zenoh as the RMW, start the router on the manager host before running
 ### Results and Output Files
 
 `performance_test.py` launches node groups via REST for each trial, then collects logs from each host with `scp`.
-
-With `--exec-policy local`, `performance_test.py` does not use REST. It executes `<ws-dir>/<scenario>/exec_scripts/local_run.sh` on the manager machine for each trial and copies logs from the local `results/<timestamp>/exec_logs/` directory.
 
 On prepare, the manager creates `<ws-dir>/<scenario>/results/<session_timestamp>/` and updates `<ws-dir>/<scenario>/results/latest` to point to it.
 
