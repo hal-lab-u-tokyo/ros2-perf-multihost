@@ -19,7 +19,7 @@ Our purpose is to provide a "scientific scale" for optimizing distributed system
 - **Dual Execution Modes**: Support both Docker containerized and native ROS 2 environments for seamless evaluation across development as well as production-like setups.
 - **Precision Telemetry & Monitoring**: Record CPU and memory load on each host with trial-aligned timestamps, enabling time-correlated analysis with end-to-end communication metrics.
 
-### 🏗 Architecture
+### Architecture 🏗
 
 This framework employs a two-tier architecture:
 
