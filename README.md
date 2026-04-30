@@ -183,7 +183,7 @@ Pull the published GitHub Packages image [`ghcr.io/hal-lab-u-tokyo/ros2-perf-mul
 docker pull ghcr.io/hal-lab-u-tokyo/ros2-perf-multihost:latest
 ```
 
-For details on the Docker image, see [docker/README.md](docker/README.md).
+For details on the Docker image, see [docker/README.md](./docker/README.md).
 
 #### [Optional] Native ROS 2 Environment
 
@@ -192,7 +192,7 @@ If you want to evaluate native execution mode as well, install ROS 2 and build t
 Follow the official [ROS 2 Jazzy Installation steps](https://docs.ros.org/en/jazzy/Installation/Ubuntu-Install-Debs.html).
 Other ROS 2 distributions may also work, but they are not officially tested yet.
 
-Then, build the ROS 2 package used by this framework in `ros2_node_impl_ws/` (see [ros2_node_impl_ws/README.md](ros2_node_impl_ws/README.md) for details on ROS 2 node features).
+Then, build the ROS 2 package used by this framework in `ros2_node_impl_ws/` (see [ros2_node_impl_ws/README.md](./ros2_node_impl_ws/README.md) for details on ROS 2 node features).
 
 ```bash
 source /opt/ros/jazzy/setup.bash
@@ -223,7 +223,12 @@ Once you have completed the [Preliminaries](#preliminaries), you are ready to st
 
 This section walks you through the full usage of the framework in detail, from generating execution scripts to running multi-host benchmarks via REST in either Docker or native environments.
 
-### Generate Execution Scripts
+### Step1: Define Topology
+
+Define node placement, topic relationships, and QoS configuration in a topology JSON file.
+See [topology_example/README.md](./topology_example/README.md) for the JSON schema and definition guidance.
+
+### Step2: Generate and Distribute Execution Scripts
 
 Generate execution scripts (`host*_exec.sh`, `host*_run.sh`) and Docker Compose files from a JSON topology file.
 
@@ -307,7 +312,7 @@ Examples:
 
 `--eval-time` is applied to all nodes launched through `*_run.sh` or `local_run.sh`. `payload_size` and `period_ms` are read from each Publisher/Intermediate entry in the topology JSON.
 
-### Host-Based Execution
+#### Distribute to Hosts
 
 Prepare the repository and the required Python environment at the same path on each host in advance.
 
@@ -332,7 +337,7 @@ You can override the target paths on the command line.
 ./manager_scripts/distribute_exec_scripts.sh --help
 ```
 
-### Automated Benchmark via REST
+### Step3: Automated Benchmark via REST
 
 In a multi-host setup, each Raspberry Pi runs a REST server implemented by `rest_server.py`. A controller script sends requests to those servers to automate benchmark execution.
 
@@ -366,7 +371,7 @@ When using Zenoh as the RMW, start the router on the manager host before running
 ./manager_scripts/operate_zenoh_router.sh foreground
 ```
 
-## Results and Analysis
+### Step4: Results and Analysis
 
 `performance_test.py` launches node groups via REST for each trial, then collects logs from each host with `scp`.
 
