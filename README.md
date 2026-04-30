@@ -250,9 +250,7 @@ Arguments:
 - `--rmw` (`-m`): RMW implementation (`fastdds`, `zenoh`, or `cyclonedds`; default: `fastdds`)
 - `--force` (`-f`): Overwrite an existing output directory without confirmation; useful in CI or scripts
 
-Generated files are written to `<ws-dir>/<json-file-name>-<rmw>/exec_scripts/`. If the directory already exists, the script asks for confirmation before deleting `exec_scripts/*` and regenerating it. If the previously used JSON path recorded in `metadata.txt` under `json_path:` differs from the current one, an additional warning is shown. If stdin is not a TTY, the script exits with an error instead of prompting; use `--force` or `-f` in that case. `<ws-dir>/latest` is always updated to point at the most recently generated directory.
-
-The default `performance_ws/` directory is generated automatically and excluded from version control via `.gitignore`.
+Generated files are written to `<ws-dir>/<json-file-name>-<rmw>/exec_scripts/`. `<ws-dir>/latest` is always updated to point at the most recently generated directory.
 
 ```bash
 # Example: use topology_example/simple.json with Zenoh
@@ -261,65 +259,7 @@ python3 manager_scripts/generate_exec_scripts.py \
   --rmw zenoh
 ```
 
-Generated files:
-
-| File | Purpose |
-|---|---|
-| `host{N}_run.sh` | Wrapper script that launches the host-specific Compose file with automatic UID/GID handling |
-| `host{N}_compose.yaml` | Host-specific Compose definition for real multi-host deployment |
-| `host{N}_exec.sh` | ROS node launch script executed inside the container or in a native environment on each host |
-| `local_run.sh` | Wrapper script for launching all services with `local_compose.yaml` on a single machine |
-| `local_compose.yaml` | Compose definition that launches all services on the local development machine |
-| `metadata.txt` | Metadata for the generated run directory, including input JSON, RMW, and topology statistics |
-
-`metadata.txt` is generated at `<ws-dir>/latest/metadata.txt` and records the following categories of information.
-
-**1. general info**
-- `command`: Full command line used to run the generator
-- `timestamp`: Script execution time in `YYYY-MM-DD_hh-mm-ss` format
-- `json`: Input JSON file name
-- `json_path`: Input JSON file path
-- `ws_dir`: Output base directory
-- `scenario_dir`: Generated run directory name
-
-**2. test config**
-- `rmw`: Selected RMW implementation
-- `qos_history` / `qos_depth` / `qos_reliability`: QoS settings
-
-**3. topology stats**
-- `host_count` / `node_count`: Number of hosts and nodes
-- `publisher_count` / `subscriber_count` / `intermediate_count`: Node counts by role
-- `topic_count`: Number of unique topics
-- `hosts`: Host name list, for example `host1, host2`
-- `publishers` / `subscribers` / `intermediates`: Node name lists grouped by role
-- `topics`: Topic names in alphabetical order
-- `topic_runtime_json`: Per-topic runtime config used for analysis (`payload_size`, `period_ms`, `publisher_count`)
-
-Each node launched from `host{N}_run.sh` or `local_run.sh` receives a `--log_dir` under `results/YYYY-MM-DD_hh-mm-ss/exec_logs/trial<trial_idx>/` inside the generated run directory. `results/latest` is updated as a symbolic link to the active run directory. Example: `performance_ws/latest/results/2026-04-26_13-21-45/exec_logs/trial1/`.
-
-#### Runtime Options Supported by Generated Scripts
-
-Generated `host*_run.sh` and `local_run.sh` scripts support the runtime options below. `--eval-time` is applied to every launched node (Publisher / Subscriber / Intermediate). `payload_size` and `period_ms` must be specified in each Publisher / Intermediate topic entry in the topology JSON, and those values are passed directly to Publisher / Intermediate nodes. `--trial-idx` is available only on `host*_run.sh` and `local_run.sh`. For the JSON schema, see [topology_example/README.md](./topology_example/README.md).
-
-| Option | Short | Description | Default |
-|---|---|---|---|
-| --eval-time | -t | Evaluation time in seconds | 60 |
-| --trial-idx | -r | Trial index for local execution | 1 |
-
-Examples:
-
-```bash
-# Use default values
-./host1_exec.sh
-
-# Override eval-time
-./host1_run.sh --eval-time 60
-
-# Short options
-./host1_run.sh -t 60
-```
-
-`--eval-time` is applied to all nodes launched through `*_run.sh` or `local_run.sh`. `payload_size` and `period_ms` are read from each Publisher/Intermediate entry in the topology JSON.
+For details on generated files, `metadata.txt` format, and runtime options supported by generated scripts, see [manager_scripts/README.md](./manager_scripts/README.md).
 
 #### Distribute to Hosts
 
@@ -393,6 +333,7 @@ On prepare, the manager creates `<ws-dir>/<scenario>/results/<session_timestamp>
 
 For detailed usage in subdomains, see the following documents:
 
+- [manager_scripts/README.md](./manager_scripts/README.md): Script usage, generated file details, `metadata.txt` format, and runtime options.
 - [docker/README.md](./docker/README.md): Docker image build/push details and container workflow notes.
 - [topology_example/README.md](./topology_example/README.md): Topology JSON format and modeling guidance.
 - [ros2_node_impl_ws/README.md](./ros2_node_impl_ws/README.md): ROS 2 node workspace usage and build instructions.
