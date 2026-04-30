@@ -64,7 +64,7 @@ def resolve_host_list(ws_dir, scenario):
 
 def main():
     parser = argparse.ArgumentParser(
-        description="Start test execution on all hosts (Docker or native)",
+        description="Start test execution on all Hosts (Docker or native)",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         usage=(
             "%(prog)s [--exec-policy|-p {docker,native}] [--trial-idx|-r N] "

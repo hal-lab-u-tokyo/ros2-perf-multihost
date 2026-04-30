@@ -14,34 +14,34 @@ Our purpose is to provide a "scientific scale" for optimizing distributed system
 ### Key Features 🚀
 
 - **Manager-Host Coordination**: Deploy nodes in bulk to multiple target Hosts (Raspberry Pi, Jetson, servers, etc.) via REST API and remotely manage their lifecycle from a central Manager.
-- **Flexible Topology Configuration**: Define node relationships and QoS settings to the host assignments declaratively via JSON. Iterate complex topologies for multiple RMWs efficiently.
+- **Flexible Topology Configuration**: Define node relationships and QoS settings to the Host assignments declaratively via JSON. Iterate complex topologies for multiple RMWs efficiently.
 - **RMW Neutrality**: Evaluate multiple RMW implementations (FastDDS, CycloneDDS, Zenoh) while using QoS and topology definitions for cross-RMW comparisons.
 - **Dual Execution Modes**: Support both Docker containerized and native ROS 2 environments for seamless evaluation across development as well as production-like setups.
-- **Precision Telemetry & Monitoring**: Record CPU and memory load on each host with trial-aligned timestamps, enabling time-correlated analysis with end-to-end communication metrics.
+- **Precision Telemetry & Monitoring**: Record CPU and memory load on each Host with trial-aligned timestamps, enabling time-correlated analysis with end-to-end communication metrics.
 
 ### Architecture 🏗
 
 This framework employs a two-tier architecture:
 
-- **Manager**: Generates topology-specific scripts, coordinates execution across hosts via REST API, collects logs, and aggregates results.
+- **Manager**: Generates topology-specific scripts, coordinates execution across Hosts via REST API, collects logs, and aggregates results.
 - **Hosts**: Operate a lightweight REST server to receive execution commands and launch ROS 2 nodes in either Docker containers or native environments.
 
 The workflow proceeds as follows:
 
 1. **Topology Definition**: Users define node placement, topic relationships, and QoS configuration in a topology JSON file.
 2. **Coordination**: The Manager generates execution scripts for the selected RMW and distributes them to each Host for execution.
-3. **Execution**: All hosts begin operation tests simultaneously while collecting system metrics in the background.
-4. **Data Aggregation**: After experiment completion, the Manager collates logs from all hosts and outputs analysis-ready CSV files.
+3. **Execution**: All Hosts begin operation tests simultaneously while collecting system metrics in the background.
+4. **Data Aggregation**: After experiment completion, the Manager collates logs from all Hosts and outputs analysis-ready CSV files.
 
 ### Observable Metrics 📊
 
-The default pipeline correlates communication performance with host-level resource utilization:
+The default pipeline correlates communication performance with Host-level resource utilization:
 
 | Category | Metrics | Per |
 | :-- | :-- | :-- |
 | **Communication** | End-to-end latency and message loss count | Per-trial |
 | **Throughput** | Aggregated throughput estimated from publish period, publisher count, payload size, and observed loss | Per-trial |
-| **Host Resource Usage** | CPU and memory usage, load average, and swap usage summary | Per-host / Per-trial |
+| **Host Resource Usage** | CPU and memory usage, load average, and swap usage summary | Per-Host / Per-trial |
 
 ## Quick Start
 
@@ -99,7 +99,7 @@ python3 manager_scripts/generate_exec_scripts.py \
 python3 performance_test/performance_test.py --exec-policy local
 ```
 
-`performance_test.py` executes `<ws-dir>/<scenario>/exec_scripts/local_run.sh` on the manager machine for each trial.
+`performance_test.py` executes `<ws-dir>/<scenario>/exec_scripts/local_run.sh` on the Manager for each trial.
 This runs 3 trials, each lasting 60 seconds.
 
 3. Check outputs.
@@ -120,7 +120,7 @@ Before starting multi-host benchmarks, it is helpful to understand an overview o
 | Directory | Role |
 |---|---|
 | `manager_scripts/` | Topology-specific execution artifact generator; includes helper scripts for distribution and router operation. |
-| `remote_hosts_scripts/` | REST server, remote execution coordinator, and host metrics collector for remote hosts. |
+| `remote_hosts_scripts/` | REST server, remote execution coordinator, and Host metrics collector for remote Hosts. |
 | `performance_test/` | Trial automation, log collection, and CSV aggregation/analysis. |
 | `performance_ws/` | Working directory for generated scenarios, execution scripts, and run results. Auto-generated on first use; not present in the repository. |
 | `topology_example/` | Example topology JSON files and schema guidance. |
@@ -129,7 +129,7 @@ Before starting multi-host benchmarks, it is helpful to understand an overview o
 
 ### Preparation of Hosts
 
-This section describes the requirements and setup steps for each host to run this framework.
+This section describes the requirements and setup steps for each Host to run this framework.
 
 #### Requirements
 
@@ -171,7 +171,7 @@ Therefore, configure the following settings on the Manager machine to meet this 
 
 #### Clone this repository
 
-Clone this repository on each host. We recommend cloning it into the home directory.
+Clone this repository on each Host. We recommend cloning it into the home directory.
 
 ```bash
 cd ~
@@ -222,7 +222,7 @@ sudo apt install -y python3-flask python3-psutil
 ```
 
 Note that the `python3-requests` package is required on the Manager machine.
-Therefore, install the following package on the Manager machine (not on each host):
+Therefore, install the following package on the Manager (not on each Host):
 
 ```bash
 sudo apt update
@@ -274,8 +274,8 @@ For details on generated files in `exec_scripts/`, `metadata.txt` format, and ru
 
 #### Distribute to Hosts
 
-Distribute the generated `exec_scripts/` directory to each host.
-`manager_scripts/distribute_exec_scripts.sh` reads `hosts`, `ws_dir`, and `scenario_dir` from `performance_ws/latest/metadata.txt` and distributes the corresponding file in `exec_scripts/` to each host.
+Distribute the generated `exec_scripts/` directory to each Host.
+`manager_scripts/distribute_exec_scripts.sh` reads `hosts`, `ws_dir`, and `scenario_dir` from `performance_ws/latest/metadata.txt` and distributes the corresponding file in `exec_scripts/` to each Host.
 
 ```bash
 ./manager_scripts/distribute_exec_scripts.sh \
@@ -301,7 +301,7 @@ Arguments:
 
 #### Start REST Servers (on each Host)
 
-SSH into each host from the Manager and start the REST server.
+SSH into each Host from the Manager and start the REST server.
 
 ```bash
 # on the Manager
@@ -313,7 +313,7 @@ python3 remote_hosts_scripts/rest_server.py
 
 #### Run Benchmark (on the Manager)
 
-Then, run the benchmark script on the manager.
+Then, run the benchmark script on the Manager.
 
 ```bash
 python3 performance_test/performance_test.py \
@@ -350,9 +350,9 @@ Available subcommands:
 
 ### Step4: Results and Analysis
 
-`performance_test.py` launches node groups via REST for each trial, then collects logs from each host with `scp`.
+`performance_test.py` launches node groups via REST for each trial, then collects logs from each Host with `scp`.
 
-On prepare, the manager creates `<ws-dir>/<scenario>/results/<session_timestamp>/` and updates `<ws-dir>/<scenario>/results/latest` to point to it.
+On prepare, the Manager creates `<ws-dir>/<scenario>/results/<session_timestamp>/` and updates `<ws-dir>/<scenario>/results/latest` to point to it.
 
 - Trial logs are collected under `<ws-dir>/<scenario>/results/latest/logs/trial<N>/`.
 - Aggregated outputs such as `total_latency.csv`, `throughput.csv`, `host_trials_usage.csv`, and `host_usage_summary.csv` are written under `<ws-dir>/<scenario>/results/latest/csv/`.
@@ -371,9 +371,9 @@ For detailed usage in subdomains, see the following documents:
 Common issues and fixes:
 
 - `python3 manager_scripts/generate_exec_scripts.py ...` fails because output exists: rerun with `--force` or remove the existing scenario directory under `performance_ws/`.
-- `distribute_exec_scripts.sh` fails with SSH/SCP errors: verify hostnames, SSH keys, and that repository paths are identical across hosts.
-- REST benchmark does not start remote execution: ensure `python3 remote_hosts_scripts/rest_server.py` is running on every target host before calling `performance_test.py`.
-- Docker mode fails on remote hosts: pull `ghcr.io/hal-lab-u-tokyo/ros2-perf-multihost:latest` and confirm Docker permissions on each host.
+- `distribute_exec_scripts.sh` fails with SSH/SCP errors: verify hostnames, SSH keys, and that repository paths are identical across Hosts.
+- REST benchmark does not start remote execution: ensure `python3 remote_hosts_scripts/rest_server.py` is running on every target Host before calling `performance_test.py`.
+- Docker mode fails on remote Hosts: pull `ghcr.io/hal-lab-u-tokyo/ros2-perf-multihost:latest` and confirm Docker permissions on each Host.
 - Native mode cannot find workspace paths: set `ROS2_PERF_WS` to the project root before running `host*_exec.sh`.
 - Expected CSV outputs are missing: check `<ws-dir>/<scenario>/results/latest/logs/trial<N>/` for trial logs and inspect script stderr for analyzer failures.
 
