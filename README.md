@@ -9,6 +9,27 @@ Selecting the optimal RMW and system configuration requires empirical data from 
 It coordinates evaluation pipelines across multiple physical devices, and enables developers to quantify how node placement and network configurations impact overall stability.
 Our purpose is to provide a "scientific scale" for optimizing distributed system design across edge devices and servers with real-world networks, empowering data-driven decisions for large-scale robotic systems.
 
+## Table of Contents
+
+- [Overview](#overview)
+  - [Key Features](#key-features-)
+  - [Architecture](#architecture-)
+  - [Observable Metrics](#observable-metrics-)
+- [Quick Start](#quick-start)
+  - [What You Need](#what-you-need)
+  - [Steps](#steps)
+- [Preliminaries](#preliminaries)
+  - [Directory Structure](#directory-structure)
+  - [Preparation of Hosts](#preparation-of-hosts)
+- [Usage in Details](#usage-in-details)
+  - [Step1: Define Topology](#step1-define-topology)
+  - [Step2: Generate and Distribute Execution Scripts](#step2-generate-and-distribute-execution-scripts)
+  - [Step3: Automated Benchmark via REST](#step3-automated-benchmark-via-rest)
+  - [Step4: Results and Analysis](#step4-results-and-analysis)
+- [Related Documents](#related-documents)
+- [Troubleshooting](#troubleshooting)
+- [Contributing and License](#contributing-and-license)
+
 ## Overview
 
 ### Key Features 🚀
