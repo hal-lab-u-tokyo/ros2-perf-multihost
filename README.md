@@ -108,9 +108,7 @@ Need multi-host operation, Docker or native execution, and REST automation?
 Want to learn more about these steps and output metrics?
 Let’s move on to the following sections to explore the full capabilities of this framework!
 
-## Usage in Details
-
-This section walks you through the full usage of the framework in detail, from generating execution scripts to running multi-host benchmarks via REST in either Docker or native environments.
+## Preliminaries
 
 ### Directory Structure
 
@@ -218,6 +216,12 @@ Therefore, install the following package on the Manager machine (not on each hos
 sudo apt update
 sudo apt install -y python3-requests
 ```
+
+## Usage in Details
+
+Once you have completed the [Preliminaries](#preliminaries), you are ready to start here.
+
+This section walks you through the full usage of the framework in detail, from generating execution scripts to running multi-host benchmarks via REST in either Docker or native environments.
 
 ### Generate Execution Scripts
 
