@@ -317,8 +317,16 @@ Main arguments:
 When using Zenoh as the RMW, start the router on the manager host before running the benchmark.
 
 ```bash
-./manager_scripts/operate_zenoh_router.sh foreground
+./manager_scripts/operate_zenoh_router.sh start
 ```
+
+Available subcommands:
+
+- `start`: start the router in the background with nohup, PID, and log management
+- `foreground`: start in the foreground (blocks the terminal; stop with `Ctrl-C`)
+- `stop`: stop the running router using the saved PID
+- `status`: show process and listening port status
+- `wait`: wait until the router port starts listening
 
 ### Step4: Results and Analysis
 
