@@ -382,12 +382,19 @@ Common issues and fixes:
 
 ## Contributing and License
 
-Contributions are welcome. Please open an issue to discuss bugs, feature requests, or design changes before large modifications.
-
-When submitting a pull request:
-
-- Keep changes scoped and include a clear rationale.
-- Update documentation for user-facing behavior changes.
-- Include reproduction steps for bug fixes and benchmark-related changes.
-
 This project is licensed under the terms in [LICENSE](./LICENSE).
+
+Note that this framework is inspired by the following benchmark projects:
+
+- [iRobot ROS 2 Performance Evaluation Framework](https://github.com/irobot-ros/ros2-performance) ([BSD 3-Clause License](https://github.com/irobot-ros/ros2-performance/blob/master/LICENSE))
+- [ApexAI performance_test](https://gitlab.com/ApexAI/performance_test) ([Apache License 2.0](https://gitlab.com/ApexAI/performance_test/-/blob/master/LICENSE))
+
+If you define a topology for your own ROS 2 system and successfully evaluate it with this framework, we would love to see it shared with the community. Topology JSON pull requests are very welcome.
+
+Of course, as with any open source project, your contributions are always welcome.
+Please feel free to open an issue to discuss bugs, feature requests, or design changes.
+
+Furthermore, we would be delighted if you could submit pull requests for new features or fixes.
+When doing so, please clearly define the scope of the changes and provide a rationale.
+If there are changes to user-facing behavior, please update the documentation.
+For bug fixes or benchmark-related changes, please include reproduction steps.
