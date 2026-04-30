@@ -64,6 +64,7 @@ Before running the local quick start, check the following:
 - Docker (with Compose) is available on the local machine.
   - Follow the official [Install Docker Engine on Ubuntu](https://docs.docker.com/engine/install/ubuntu/) guide.
   - To run Docker commands as a non-root user, add your user to the `docker` group: `sudo usermod -aG docker $USER`
+  - Then log out and log back in, or run `newgrp docker` to update the group membership.
 - Python 3 is available to run management and benchmark scripts.
   - NumPy is required for analysis scripts (install with `sudo apt install -y python3-numpy`).
 
@@ -176,6 +177,7 @@ Install Docker Engine and enable non-root usage.
   ```bash
   sudo usermod -aG docker $USER
   ```
+  Then log out and log back in, or run `newgrp docker` to update the group membership.
 
 Pull the published GitHub Packages image [`ghcr.io/hal-lab-u-tokyo/ros2-perf-multihost:latest`](https://github.com/hal-lab-u-tokyo/ros2-perf-multihost/pkgs/container/ros2-perf-multihost).
 
@@ -202,11 +204,19 @@ colcon build --packages-select ros2_perf_multihost_nodes
 
 #### Python dependencies
 
-Install dependencies for the REST server on each target host:
+Install the following packages on each target Host:
 
 ```bash
 sudo apt update
-sudo apt install -y python3-flask python3-requests
+sudo apt install -y python3-flask python3-psutil
+```
+
+Note that the `python3-requests` package is required on the Manager machine.
+Therefore, install the following package on the Manager machine (not on each host):
+
+```bash
+sudo apt update
+sudo apt install -y python3-requests
 ```
 
 ### Generate Execution Scripts
