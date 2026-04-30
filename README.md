@@ -357,10 +357,13 @@ On prepare, the Manager creates `<ws-dir>/<scenario>/results/<session_timestamp>
 - Trial logs are collected under `<ws-dir>/<scenario>/results/latest/logs/trial<N>/`.
 - Aggregated outputs such as `total_latency.csv`, `throughput.csv`, `host_trials_usage.csv`, and `host_usage_summary.csv` are written under `<ws-dir>/<scenario>/results/latest/csv/`.
 
+For details on output directory structure and CSV column definitions, see [performance_test/README.md](./performance_test/README.md).
+
 ## Related Documents
 
 For detailed usage in subdomains, see the following documents:
 
+- [performance_test/README.md](./performance_test/README.md): Output directory structure, CSV formats, and analysis script descriptions.
 - [manager_scripts/README.md](./manager_scripts/README.md): Script usage, generated file details, `metadata.txt` format, and runtime options.
 - [docker/README.md](./docker/README.md): Docker image build/push details and container workflow notes.
 - [topology_example/README.md](./topology_example/README.md): Topology JSON format and modeling guidance.
