@@ -62,6 +62,8 @@ Before running the local quick start, check the following:
 
 - Ubuntu 24.04 on the local development machine.
 - Docker (with Compose) is available on the local machine.
+  - Follow the official [Install Docker Engine on Ubuntu](https://docs.docker.com/engine/install/ubuntu/) guide to install Docker.
+  - To run Docker commands as a non-root user, add your user to the `docker` group: `sudo usermod -aG docker $USER`
 - Python 3 is available to run management and benchmark scripts.
   - NumPy is required for analysis scripts (install with `sudo apt install -y python3-numpy`).
 
