@@ -63,6 +63,6 @@ For the JSON schema, see [topology_example/README.md](../topology_example/README
 | `--eval-time` | `-t` | Evaluation time in seconds | 60 |
 | `--trial-idx` | `-r` | Trial index for local execution | 1 |
 
-Each node launched from `host{N}_run.sh` or `local_run.sh` receives a `--log_dir` under `results/YYYY-MM-DD_hh-mm-ss/exec_logs/trial<trial_idx>/` inside the generated run directory. `results/latest` is updated as a symbolic link to the active run directory.
+Each node launched from `host{N}_run.sh` or `local_run.sh` receives a `--log-dir` under `results/YYYY-MM-DD_hh-mm-ss/exec_logs/trial<trial_idx>/` inside the generated run directory. `results/latest` is updated as a symbolic link to the active run directory.
 
 Example: `performance_ws/latest/results/2026-04-26_13-21-45/exec_logs/trial1/`

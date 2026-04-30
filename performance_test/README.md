@@ -27,9 +27,10 @@ results/
 └── 2026-04-26_13-21-45/
     ├── logs/
     │   ├── trial1/
-    │   │   ├── <node>_latency.log        # raw latency log per node
-    │   │   ├── <host>_monitor_host.csv   # per-Host resource usage time series
-    │   │   └── exec_logs/               # stdout/stderr from each node
+    │   │   ├── <node>_log/              # per-node log directory
+    │   │   │   └── <topic>_log.txt      # raw latency log per topic
+    │   │   ├── <host>_monitor_host.csv  # per-Host resource usage time series
+    │   │   └── ...                      # stdout/stderr logs copied from exec_logs/
     │   ├── trial2/
     │   └── ...
     └── csv/
