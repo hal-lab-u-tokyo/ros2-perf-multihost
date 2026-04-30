@@ -87,7 +87,10 @@ Run everything on a single machine in this local workflow.
 1. Generate execution scripts from a topology JSON file.
 
 ```bash
-python3 manager_scripts/generate_exec_scripts.py topology_example/simple.json --rmw fastdds --ws-dir performance_ws
+python3 manager_scripts/generate_exec_scripts.py \
+  topology_example/simple.json \
+  --rmw fastdds \
+  --ws-dir performance_ws
 ```
 
 2. Run a benchmark session.
@@ -233,7 +236,11 @@ See [topology_example/README.md](./topology_example/README.md) for the JSON sche
 Generate execution scripts (`host*_exec.sh`, `host*_run.sh`) and Docker Compose files from a JSON topology file.
 
 ```bash
-python3 manager_scripts/generate_exec_scripts.py <topology.json> [--rmw|-m <rmw>] [--ws-dir|-w <dir>] [--force|-f]
+python3 manager_scripts/generate_exec_scripts.py \
+  <topology.json> \
+  [--rmw|-m <rmw>] \
+  [--ws-dir|-w <dir>] \
+  [--force|-f]
 ```
 
 Arguments:
@@ -249,7 +256,9 @@ The default `performance_ws/` directory is generated automatically and excluded 
 
 ```bash
 # Example: use topology_example/simple.json with Zenoh
-python3 manager_scripts/generate_exec_scripts.py topology_example/simple.json --rmw zenoh
+python3 manager_scripts/generate_exec_scripts.py \
+  topology_example/simple.json \
+  --rmw zenoh
 ```
 
 Generated files:
