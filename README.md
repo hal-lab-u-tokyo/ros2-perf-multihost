@@ -169,6 +169,15 @@ Therefore, configure the following settings on the Manager machine to meet this 
         IdentityFile ~/.ssh/id_ed25519
     ```
 
+#### Clone this repository
+
+Clone this repository on each host. We recommend cloning it into the home directory.
+
+```bash
+cd ~
+git clone https://github.com/hal-lab-u-tokyo/ros2-perf-multihost.git
+```
+
 #### Docker and the published image
 
 Install Docker Engine and enable non-root usage.
@@ -259,15 +268,9 @@ python3 manager_scripts/generate_exec_scripts.py \
   --rmw zenoh
 ```
 
-For details on generated files, `metadata.txt` format, and runtime options supported by generated scripts, see [manager_scripts/README.md](./manager_scripts/README.md).
+For details on generated files in `exec_scripts/`, `metadata.txt` format, and runtime options supported by generated scripts, see [manager_scripts/README.md](./manager_scripts/README.md).
 
-#### Distribute to Hosts
-
-Prepare the repository and the required Python environment at the same path on each host in advance.
-
-Distribute the generated `exec_scripts/` directory to each host, then start the host-specific Compose definition on that host.
-
-`manager_scripts/distribute_exec_scripts.sh` reads `hosts`, `ws_dir`, and `scenario_dir` from `performance_ws/latest/metadata.txt` and distributes the corresponding `host{N}_exec.sh`, `host{N}_run.sh`, and `host{N}_compose.yaml` files to each host automatically.
+Then, distribute the generated `exec_scripts/` directory to each host.
 
 ```bash
 ./manager_scripts/distribute_exec_scripts.sh
@@ -280,10 +283,6 @@ You can override the target paths on the command line.
   --scenario simple-cyclonedds \
   --ws-dir performance_ws \
   --remote-repo-base /home/ubuntu/ros2-perf-multihost
-```
-
-```bash
-./manager_scripts/distribute_exec_scripts.sh --help
 ```
 
 ### Step3: Automated Benchmark via REST
