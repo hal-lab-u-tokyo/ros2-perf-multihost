@@ -242,6 +242,8 @@ See [topology_example/README.md](./topology_example/README.md) for the JSON sche
 
 ### Step2: Generate and Distribute Execution Scripts
 
+#### Generate Execution Scripts
+
 Generate execution scripts (`host*_exec.sh`, `host*_run.sh`) and Docker Compose files from a JSON topology file.
 
 ```bash
@@ -270,7 +272,9 @@ python3 manager_scripts/generate_exec_scripts.py \
 
 For details on generated files in `exec_scripts/`, `metadata.txt` format, and runtime options supported by generated scripts, see [manager_scripts/README.md](./manager_scripts/README.md).
 
-Then, distribute the generated `exec_scripts/` directory to each host.
+#### Distribute to Hosts
+
+Distribute the generated `exec_scripts/` directory to each host.
 `manager_scripts/distribute_exec_scripts.sh` reads `hosts`, `ws_dir`, and `scenario_dir` from `performance_ws/latest/metadata.txt` and distributes the corresponding file in `exec_scripts/` to each host.
 
 ```bash
@@ -295,25 +299,32 @@ Arguments:
 
 ### Step3: Automated Benchmark via REST
 
-In a multi-host setup, each Raspberry Pi runs a REST server implemented by `rest_server.py`. A controller script sends requests to those servers to automate benchmark execution.
+#### Start REST Servers (on each Host)
 
-1. Start the REST server on every Raspberry Pi.
+SSH into each host from the Manager and start the REST server.
 
 ```bash
+# on the Manager
 ssh ubuntu@hostX
+# now on hostX
 cd ros2-perf-multihost
 python3 remote_hosts_scripts/rest_server.py
 ```
 
-2. Run the benchmark script `performance_test.py`.
+#### Run Benchmark (on the Manager)
+
+Then, run the benchmark script on the manager.
 
 ```bash
-python3 performance_test/performance_test.py
-# Switch to native execution
-python3 performance_test/performance_test.py --exec-policy native
+python3 performance_test/performance_test.py \
+  [--exec-policy|-p <mode>] \
+  [--trials|-t <n>] \
+  [--ws-dir|-w <dir>] \
+  [--scenario|-s <name>] \
+  [--eval-time|-e <sec>]
 ```
 
-Main arguments:
+Arguments:
 
 - `--exec-policy` (`-p`): Execution mode, one of `docker`, `native`, or `local` (default: `docker`)
 - `--trials` (`-t`): Number of trials (default: `3`)
@@ -321,7 +332,9 @@ Main arguments:
 - `--scenario` (`-s`): Scenario directory to use (default: `latest`)
 - `--eval-time` (`-e`): Override evaluation time; if omitted, the default from `*_run.sh` or `*_exec.sh` is used
 
-When using Zenoh as the RMW, start the router on the manager host before running the benchmark.
+#### Zenoh Router (on the Manager) [Zenoh only]
+
+When using Zenoh as the RMW, start the router on the Manager before running the benchmark.
 
 ```bash
 ./manager_scripts/operate_zenoh_router.sh start
