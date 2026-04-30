@@ -363,10 +363,10 @@ For details on output directory structure and CSV column definitions, see [perfo
 
 For detailed usage in subdomains, see the following documents:
 
-- [performance_test/README.md](./performance_test/README.md): Output directory structure, CSV formats, and analysis script descriptions.
-- [manager_scripts/README.md](./manager_scripts/README.md): Script usage, generated file details, `metadata.txt` format, and runtime options.
-- [docker/README.md](./docker/README.md): Docker image build/push details and container workflow notes.
 - [topology_example/README.md](./topology_example/README.md): Topology JSON format and modeling guidance.
+- [manager_scripts/README.md](./manager_scripts/README.md): Script usage, generated file details, `metadata.txt` format, and runtime options.
+- [performance_test/README.md](./performance_test/README.md): Output directory structure, CSV formats, and analysis script descriptions.
+- [docker/README.md](./docker/README.md): Docker image build/push details and container workflow notes.
 - [ros2_node_impl_ws/README.md](./ros2_node_impl_ws/README.md): ROS 2 node workspace usage and build instructions.
 
 ## Troubleshooting
