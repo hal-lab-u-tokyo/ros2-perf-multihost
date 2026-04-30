@@ -62,7 +62,7 @@ Before running the local quick start, check the following:
 
 - Ubuntu 24.04 on the local development machine.
 - Docker (with Compose) is available on the local machine.
-  - Follow the official [Install Docker Engine on Ubuntu](https://docs.docker.com/engine/install/ubuntu/) guide to install Docker.
+  - Follow the official [Install Docker Engine on Ubuntu](https://docs.docker.com/engine/install/ubuntu/) guide.
   - To run Docker commands as a non-root user, add your user to the `docker` group: `sudo usermod -aG docker $USER`
 - Python 3 is available to run management and benchmark scripts.
   - NumPy is required for analysis scripts (install with `sudo apt install -y python3-numpy`).
@@ -103,17 +103,111 @@ This runs 3 trials, each lasting 60 seconds.
 - Logs: `<ws-dir>/<scenario>/results/latest/logs/trial<N>/`
 - CSV: `<ws-dir>/<scenario>/results/latest/csv/`
 
-Want to know more about these steps and output results?
-Need multi-host operation, native execution, and REST automation?
-Let's go to the next section [Usage in Details](#usage-in-details).
+Need multi-host operation, Docker or native execution, and REST automation?
+Want to learn more about these steps and output metrics?
+Let’s move on to the following sections to explore the full capabilities of this framework!
 
 ## Usage in Details
 
-### Shared Docker Image
+This section walks you through the full usage of the framework in detail, from generating execution scripts to running multi-host benchmarks via REST in either Docker or native environments.
 
-Use the published GitHub Packages image [`ghcr.io/hal-lab-u-tokyo/ros2-perf-multihost:latest`](https://github.com/hal-lab-u-tokyo/ros2-perf-multihost/pkgs/container/ros2-perf-multihost).
-Generated `local_compose.yaml` and `host{N}_compose.yaml` files reference this image.
-For image build and push steps, see `docker/README.md`.
+### Directory Structure
+
+Before starting multi-host benchmarks, it is helpful to understand an overview of the main directories and their roles in the framework.
+
+| Directory | Role |
+|---|---|
+| `manager_scripts/` | Topology-specific execution artifact generator; includes helper scripts for distribution and router operation. |
+| `remote_hosts_scripts/` | REST server, remote execution coordinator, and host metrics collector for remote hosts. |
+| `performance_test/` | Trial automation, log collection, and CSV aggregation/analysis. |
+| `performance_ws/` | Working directory for generated scenarios, execution scripts, and run results. Auto-generated on first use; not present in the repository. |
+| `topology_example/` | Example topology JSON files and schema guidance. |
+| `ros2_node_impl_ws/` | ROS 2 node implementation workspace for generated execution scripts. |
+| `docker/` | Shared Docker image definition and Compose-related assets. |
+
+### Preparation of Hosts
+
+This section describes the requirements and setup steps for each host to run this framework.
+
+#### Requirements
+
+Here is the baseline environment we have tested so far.
+
+- Ubuntu 24.04
+- Verified devices: Raspberry Pi 4 and Raspberry Pi 5.
+  - Other devices or servers should also work if Ubuntu 24.04 is available.
+- User and repository path assumption:
+  - Scripts and examples in this repository assume user `ubuntu` and `/home/ubuntu/ros2-perf-multihost`.
+  - If your username and path differ, how to override these settings is described later.
+
+#### SSH access (on the Manager)
+
+This framework assumes that the Manager can SSH into each Host by hostname only, without a password (using key-based authentication).
+Therefore, configure the following settings on the Manager machine to meet this requirement.
+
+- Generate and register SSH keys (e.g., `ssh-keygen -t ed25519 && ssh-copy-id ubuntu@host1`).
+- Ensure hostnames are resolvable from the Manager.
+- Recommended Manager-side configuration examples:
+  - `/etc/hosts`:
+    ```text
+    192.168.10.11 host1
+    192.168.10.12 host2
+    192.168.10.13 host3
+    ```
+  - `~/.ssh/config`:
+    ```text
+    Host host1
+        User ubuntu
+        IdentityFile ~/.ssh/id_ed25519
+    Host host2
+        User ubuntu
+        IdentityFile ~/.ssh/id_ed25519
+    Host host3
+        User ubuntu
+        IdentityFile ~/.ssh/id_ed25519
+    ```
+
+#### Docker and the published image
+
+Install Docker Engine and enable non-root usage.
+
+- Follow the official [Install Docker Engine on Ubuntu](https://docs.docker.com/engine/install/ubuntu/) guide.
+- To run Docker commands as a non-root user, add your user to the `docker` group:
+  ```bash
+  sudo usermod -aG docker $USER
+  ```
+
+Pull the published GitHub Packages image [`ghcr.io/hal-lab-u-tokyo/ros2-perf-multihost:latest`](https://github.com/hal-lab-u-tokyo/ros2-perf-multihost/pkgs/container/ros2-perf-multihost).
+
+```bash
+docker pull ghcr.io/hal-lab-u-tokyo/ros2-perf-multihost:latest
+```
+
+For details on the Docker image, see [docker/README.md](docker/README.md).
+
+#### [Optional] Native ROS 2 Environment
+
+If you want to evaluate native execution mode as well, install ROS 2 and build the package.
+
+Follow the official [ROS 2 Jazzy Installation steps](https://docs.ros.org/en/jazzy/Installation/Ubuntu-Install-Debs.html).
+Other ROS 2 distributions may also work, but they are not officially tested yet.
+
+Then, build the ROS 2 package used by this framework in `ros2_node_impl_ws/` (see [ros2_node_impl_ws/README.md](ros2_node_impl_ws/README.md) for details on ROS 2 node features).
+
+```bash
+source /opt/ros/jazzy/setup.bash
+cd ros2_node_impl_ws
+colcon build --packages-select ros2_perf_multihost_nodes
+```
+
+#### Python dependencies
+
+Install dependencies for the REST server on each target host:
+
+```bash
+sudo apt update
+sudo apt install -y python3-flask python3-requests
+```
 
 ### Generate Execution Scripts
 
@@ -228,13 +322,6 @@ You can override the target paths on the command line.
 
 In a multi-host setup, each Raspberry Pi runs a REST server implemented by `rest_server.py`. A controller script sends requests to those servers to automate benchmark execution.
 
-Install required packages on each target host before starting the REST server:
-
-```bash
-sudo apt update
-sudo apt install -y python3-flask python3-requests
-```
-
 1. Start the REST server on every Raspberry Pi.
 
 ```bash
@@ -265,7 +352,7 @@ When using Zenoh as the RMW, start the router on the manager host before running
 ./manager_scripts/operate_zenoh_router.sh foreground
 ```
 
-### Results and Output Files
+## Results and Analysis
 
 `performance_test.py` launches node groups via REST for each trial, then collects logs from each host with `scp`.
 
@@ -273,20 +360,6 @@ On prepare, the manager creates `<ws-dir>/<scenario>/results/<session_timestamp>
 
 - Trial logs are collected under `<ws-dir>/<scenario>/results/latest/logs/trial<N>/`.
 - Aggregated outputs such as `total_latency.csv`, `throughput.csv`, `host_trials_usage.csv`, and `host_usage_summary.csv` are written under `<ws-dir>/<scenario>/results/latest/csv/`.
-
-## Directory Structure
-
-The main directories and their roles are as follows:
-
-| Directory | Role |
-|---|---|
-| `manager_scripts/` | Generates topology-specific execution artifacts and provides helper scripts for distribution and router operation. |
-| `remote_hosts_scripts/` | Runs on each host (REST server, remote start orchestration, and host metrics collection). |
-| `performance_test/` | Executes trial automation, log collection, and CSV aggregation/analysis. |
-| `performance_ws/` | Stores generated scenarios, execution scripts, and run results. |
-| `topology_example/` | Provides example topology JSON files and schema guidance. |
-| `ros2_node_impl_ws/` | ROS 2 node implementation workspace used by generated execution scripts. |
-| `docker/` | Shared Docker image definition and compose-related assets. |
 
 ## Related Documents
 
