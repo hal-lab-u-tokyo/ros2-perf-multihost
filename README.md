@@ -271,17 +271,25 @@ python3 manager_scripts/generate_exec_scripts.py \
 For details on generated files in `exec_scripts/`, `metadata.txt` format, and runtime options supported by generated scripts, see [manager_scripts/README.md](./manager_scripts/README.md).
 
 Then, distribute the generated `exec_scripts/` directory to each host.
-
-```bash
-./manager_scripts/distribute_exec_scripts.sh
-```
-
-You can override the target paths on the command line.
+`manager_scripts/distribute_exec_scripts.sh` reads `hosts`, `ws_dir`, and `scenario_dir` from `performance_ws/latest/metadata.txt` and distributes the corresponding file in `exec_scripts/` to each host.
 
 ```bash
 ./manager_scripts/distribute_exec_scripts.sh \
+  [--scenario|-s <name>] \
+  [--ws-dir|-w <dir>] \
+  [--remote-repo-base|-r <dir>]
+```
+
+Arguments:
+
+- `--scenario` (`-s`): Scenario directory under `ws-dir` (default: `latest`)
+- `--ws-dir` (`-w`): Workspace directory that contains scenarios (default: `performance_ws`)
+- `--remote-repo-base` (`-r`): Remote repository base directory (default: `/home/ubuntu/ros2-perf-multihost`)
+
+```bash
+# Example: specify scenario and remote path
+./manager_scripts/distribute_exec_scripts.sh \
   --scenario simple-cyclonedds \
-  --ws-dir performance_ws \
   --remote-repo-base /home/ubuntu/ros2-perf-multihost
 ```
 
