@@ -3,7 +3,7 @@ Unified script to start test execution on all hosts.
 Supports both Docker and native execution modes.
 
 Usage:
-    python3 start_exec_scripts.py <topology> [--rmw|-m {fastdds,zenoh,cyclonedds}] [--exec-policy|-p {docker,native}] [--trial-idx|-i N] [--ws-dir|-w DIR] [--prepare-run] [--hosts-list|-l HOSTS] [--help|-h]
+    python3 start_exec_scripts.py <topology> [--rmw|-m {fastdds,cyclonedds,zenoh}] [--exec-policy|-p {docker,native}] [--trial-idx|-i N] [--ws-dir|-w DIR] [--prepare-run] [--hosts-list|-l HOSTS] [--help|-h]
 
     # Docker mode (sends /start_docker requests)
     python3 start_exec_scripts.py simple --exec-policy docker --trial-idx 1 --ws-dir performance_ws --hosts-list host1,host2,host3
@@ -67,7 +67,7 @@ def main():
         description="Start test execution on all Hosts (Docker or native)",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         usage=(
-            "%(prog)s <topology> [--rmw|-m {fastdds,zenoh,cyclonedds}] "
+            "%(prog)s <topology> [--rmw|-m {fastdds,cyclonedds,zenoh}] "
             "[--exec-policy|-p {docker,native}] [--trial-idx|-i N] "
             "[--ws-dir|-w DIR] [--prepare-run] [--hosts-list|-l HOSTS] [--help|-h]"
         ),
@@ -88,7 +88,7 @@ Examples:
         "-m",
         "--rmw",
         default="fastdds",
-        choices=["fastdds", "zenoh", "cyclonedds"],
+        choices=["fastdds", "cyclonedds", "zenoh"],
         help="RMW implementation (default: fastdds)",
     )
     parser.add_argument(

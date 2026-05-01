@@ -397,7 +397,7 @@ python3 performance_test/performance_test.py \
 Arguments:
 
 - `<topology>`: Topology directory to use (required)
-- `--rmw` (`-m`): RMW implementation (`fastdds`, `zenoh`, or `cyclonedds`) (default: `fastdds`)
+- `--rmw` (`-m`): RMW implementation (`fastdds`, `cyclonedds`, or `zenoh`) (default: `fastdds`)
 - `--exec-policy` (`-p`): Execution mode, one of `docker`, `native`, or `local` (default: `docker`)
 - `--eval-time` (`-e`): Override evaluation time; if omitted, the default from generated `*_exec.sh` scripts is used
 - `--trials` (`-t`): Number of trials (default: `3`)

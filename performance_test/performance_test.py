@@ -13,7 +13,7 @@ if __name__ == "__main__":
         description="Run performance tests using generated exec script defaults",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         usage=(
-            "%(prog)s <topology> [--rmw|-m {fastdds,zenoh,cyclonedds}] "
+            "%(prog)s <topology> [--rmw|-m {fastdds,cyclonedds,zenoh}] "
             "[--exec-policy|-p {docker,native,local}] [--eval-time|-e SEC] "
             "[--trials|-t N] [--ws-dir|-w DIR] [--help|-h]"
         ),
@@ -31,7 +31,7 @@ Examples:
         "--rmw",
         type=str,
         default="fastdds",
-        choices=["fastdds", "zenoh", "cyclonedds"],
+        choices=["fastdds", "cyclonedds", "zenoh"],
         help="RMW implementation used for this run (default: fastdds)",
     )
     parser.add_argument(

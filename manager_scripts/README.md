@@ -60,7 +60,7 @@ For the JSON schema, see [topology_example/README.md](../topology_example/README
 
 | Option | Short | Description | Default |
 |---|---|---|---|
-| `--rmw` | `-m` | RMW implementation (`fastdds`, `zenoh`, `cyclonedds`) | required |
+| `--rmw` | `-m` | RMW implementation (`fastdds`, `cyclonedds`, `zenoh`) | required |
 | `--eval-time` | `-t` | Evaluation time in seconds | 60 |
 | `--trial-idx` | `-i` | Trial index for local execution | 1 |
 

@@ -188,8 +188,8 @@ def prepare_run():
     body = request.get_json(silent=True) or {}
     try:
         rmw = body.get("rmw")
-        if rmw not in ("fastdds", "zenoh", "cyclonedds"):
-            raise ValueError("rmw must be one of: fastdds, zenoh, cyclonedds")
+        if rmw not in ("fastdds", "cyclonedds", "zenoh"):
+            raise ValueError("rmw must be one of: fastdds, cyclonedds, zenoh")
         ctx = _resolve_exec_context(body)
         run_timestamp = _prepare_results_timestamp(ctx, rmw)
         app.logger.info(
@@ -219,8 +219,8 @@ def start_script():
         trial_idx = _to_int(trial_idx, "trial_idx")
         if eval_time is not None:
             eval_time = _to_int(eval_time, "eval_time")
-        if rmw not in ("fastdds", "zenoh", "cyclonedds"):
-            raise ValueError("rmw must be one of: fastdds, zenoh, cyclonedds")
+        if rmw not in ("fastdds", "cyclonedds", "zenoh"):
+            raise ValueError("rmw must be one of: fastdds, cyclonedds, zenoh")
 
         ctx = _resolve_exec_context(body)
         resolved_host, script_path = _resolve_host_script(
@@ -301,8 +301,8 @@ def start_docker():
         trial_idx = _to_int(trial_idx, "trial_idx")
         if eval_time is not None:
             eval_time = _to_int(eval_time, "eval_time")
-        if rmw not in ("fastdds", "zenoh", "cyclonedds"):
-            raise ValueError("rmw must be one of: fastdds, zenoh, cyclonedds")
+        if rmw not in ("fastdds", "cyclonedds", "zenoh"):
+            raise ValueError("rmw must be one of: fastdds, cyclonedds, zenoh")
 
         ctx = _resolve_exec_context(body)
         resolved_host, script_path = _resolve_host_script(
