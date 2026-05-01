@@ -120,7 +120,7 @@ python3 manager_scripts/generate_exec_scripts.py \
 python3 performance_test/performance_test.py --exec-policy local
 ```
 
-`performance_test.py` executes `<ws-dir>/<scenario>/exec_scripts/local_run.sh` on the Manager for each trial.
+`performance_test.py` executes `<ws-dir>/<scenario>/exec_scripts/local_exec.sh` on the Manager for each trial.
 This runs 3 trials, each lasting 60 seconds.
 
 3. Check outputs.
@@ -265,7 +265,7 @@ See [topology_example/README.md](./topology_example/README.md) for the JSON sche
 
 #### Generate Execution Scripts
 
-Generate execution scripts (`host*_exec.sh`, `host*_run.sh`) and Docker Compose files from a JSON topology file.
+Generate execution scripts (`host*.launch.py`, `host*_exec.sh`) and Docker Compose files from a JSON topology file.
 
 ```bash
 python3 manager_scripts/generate_exec_scripts.py \
@@ -351,7 +351,7 @@ Arguments:
 - `--trials` (`-t`): Number of trials (default: `3`)
 - `--ws-dir` (`-w`): Base directory that contains generated execution scripts (default: `performance_ws`)
 - `--scenario` (`-s`): Scenario directory to use (default: `latest`)
-- `--eval-time` (`-e`): Override evaluation time; if omitted, the default from `*_run.sh` or `*_exec.sh` is used
+- `--eval-time` (`-e`): Override evaluation time; if omitted, the default from generated `*_exec.sh` scripts is used
 
 #### Zenoh Router (on the Manager) [Zenoh only]
 

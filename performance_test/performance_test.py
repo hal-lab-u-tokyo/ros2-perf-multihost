@@ -11,7 +11,7 @@ from runner import collect_logs, prepare_run, resolve_host_list, run_test
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(
-        description="Run performance tests using run.sh defaults",
+        description="Run performance tests using generated exec script defaults",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         usage=(
             "%(prog)s [--trials|-t N] [--eval-time|-e SEC] "
@@ -27,13 +27,13 @@ Examples:
     parser.add_argument("-t", "--trials", type=int, default=3,
                         help="Number of trials (default: 3)")
     parser.add_argument("-e", "--eval-time", type=int, default=None,
-                        help="Evaluation duration in seconds; if omitted, use the run.sh default (60)")
+                        help="Evaluation duration in seconds; if omitted, use the generated script default (60)")
     parser.add_argument(
         "-p",
         "--exec-policy",
         choices=["docker", "native", "local"],
         default="docker",
-        help="Execution mode (default: docker). local runs exec_scripts/local_run.sh on this machine",
+        help="Execution mode (default: docker). local runs exec_scripts/local_exec.sh on this machine",
     )
     parser.add_argument(
         "-w",

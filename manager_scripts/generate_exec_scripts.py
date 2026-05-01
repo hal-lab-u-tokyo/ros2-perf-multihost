@@ -125,7 +125,7 @@ Examples:
     )
 
     print(
-        f"Generated host*_run.sh, host*_exec.sh, host*_compose.yaml, local_run.sh, local_compose.yaml"
+        f"Generated host*.launch.py, host*_exec.sh, host*_compose.yaml, local_exec.sh, local_compose.yaml "
         f"in {settings.perf_ws_dir}/{scenario_dir}/exec_scripts (latest: {settings.perf_ws_dir}/latest) "
         f"for {len(json_content['hosts'])} host(s) with RMW={args.rmw}"
     )

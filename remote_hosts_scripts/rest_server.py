@@ -101,14 +101,14 @@ def _resolve_exec_context(request_json):
     }
 
 
-def _resolve_host_script(exec_dir, hosts, suffix):
+def _resolve_host_script(exec_dir, hosts, suffix, joiner="_"):
     hostname = socket.gethostname()
     candidates = [hostname]
     if "." in hostname:
         candidates.append(hostname.split(".", 1)[0])
 
     for cand in candidates:
-        script_name = f"{cand}_{suffix}"
+        script_name = f"{cand}{joiner}{suffix}"
         script_path = os.path.join(exec_dir, script_name)
         if os.path.isfile(script_path):
             return cand, script_path
@@ -117,7 +117,7 @@ def _resolve_host_script(exec_dir, hosts, suffix):
     base = candidates[-1]
     for host in hosts:
         if host == base or host.startswith(base) or base.startswith(host):
-            script_name = f"{host}_{suffix}"
+            script_name = f"{host}{joiner}{suffix}"
             script_path = os.path.join(exec_dir, script_name)
             if os.path.isfile(script_path):
                 return host, script_path
@@ -211,7 +211,7 @@ def start_script():
 
         ctx = _resolve_exec_context(body)
         resolved_host, script_path = _resolve_host_script(
-            ctx["exec_dir"], ctx["hosts"], "exec.sh")
+            ctx["exec_dir"], ctx["hosts"], "launch.py", joiner=".")
         run_timestamp = _resolve_active_timestamp(ctx)
         log_dir = os.path.join(
             REPO_ROOT,
@@ -224,12 +224,19 @@ def start_script():
         )
         os.makedirs(log_dir, exist_ok=True)
 
-        cmd = ["bash", script_path]
-        if eval_time is not None:
-            cmd.extend(["--eval-time", str(eval_time)])
+        launch_cmd = (
+            f'set +u; . /opt/ros/jazzy/setup.bash; '
+            ' . "${ROS2_NODE_IMPL_WS:-' + REPO_ROOT +
+            '/ros2_node_impl_ws}/install/setup.bash"; '
+            f' set -u; ros2 launch "{script_path}" '
+            'eval_time:="${EVAL_TIME:-60}" log_dir:="${LOG_DIR}"'
+        )
+        cmd = ["bash", "-lc", launch_cmd]
 
         env = os.environ.copy()
         env["LOG_DIR"] = log_dir
+        if eval_time is not None:
+            env["EVAL_TIME"] = str(eval_time)
 
         app.logger.info(
             "[start] host=%s scenario=%s trial=%s timestamp=%s script=%s",
@@ -264,7 +271,7 @@ def start_docker():
 
         ctx = _resolve_exec_context(body)
         resolved_host, script_path = _resolve_host_script(
-            ctx["exec_dir"], ctx["hosts"], "run.sh")
+            ctx["exec_dir"], ctx["hosts"], "exec.sh")
         run_timestamp = _resolve_active_timestamp(ctx)
 
         cmd = ["bash", script_path]

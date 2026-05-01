@@ -148,13 +148,13 @@ fi
 failed_hosts=()
 
 for host in "${HOSTS[@]}"; do
+    host_launch="${host}.launch.py"
     host_exec="${host}_exec.sh"
-    host_run="${host}_run.sh"
     host_compose="${host}_compose.yaml"
 
     echo "=== Validating local files for ${host} ==="
     local_files_ok=true
-    for file in "${host_exec}" "${host_run}" "${host_compose}"; do
+    for file in "${host_launch}" "${host_exec}" "${host_compose}"; do
         if [[ ! -f "${LOCAL_EXEC_DIR}/${file}" ]]; then
             echo "ERROR: missing local file: ${LOCAL_EXEC_DIR}/${file}" >&2
             failed_hosts+=("${host}")
@@ -181,8 +181,8 @@ for host in "${HOSTS[@]}"; do
 
     # Copy exec scripts
     if ! err="$(scp \
+        "${LOCAL_EXEC_DIR}/${host_launch}" \
         "${LOCAL_EXEC_DIR}/${host_exec}" \
-        "${LOCAL_EXEC_DIR}/${host_run}" \
         "${LOCAL_EXEC_DIR}/${host_compose}" \
         "${host}:${REMOTE_EXEC_DIR}/" 2>&1)"; then
         echo "ERROR: Failed to copy scripts to ${host}" >&2
@@ -204,7 +204,7 @@ for host in "${HOSTS[@]}"; do
     fi
 
     # Set execute permissions
-    if ! err="$(ssh "${host}" "chmod +x '${REMOTE_EXEC_DIR}/${host_exec}' '${REMOTE_EXEC_DIR}/${host_run}'" 2>&1)"; then
+    if ! err="$(ssh "${host}" "chmod +x '${REMOTE_EXEC_DIR}/${host_exec}'" 2>&1)"; then
         echo "ERROR: Failed to set permissions on ${host}" >&2
         if [[ -n "${err}" ]]; then
             echo "  ssh: ${err}" >&2
