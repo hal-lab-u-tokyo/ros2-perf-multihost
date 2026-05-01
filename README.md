@@ -180,9 +180,7 @@ Here is the baseline environment we have tested so far.
 - User and repository path assumption:
   - Scripts and examples in this repository assume user `ubuntu` and `/home/ubuntu/ros2-perf-multihost`.
   - If your username and path differ, how to override these settings is described later.
-- The REST server (`rest_server.py`) uses `sudo chronyc` internally for clock synchronization.
-  The default `ubuntu` user must be able to run `chronyc` via `sudo` without a password.
-  See [Clock synchronization for REST benchmark (chrony)](#clock-synchronization-for-rest-benchmark-chrony) for the required setup steps.
+  - The default `ubuntu` user needs passwordless `sudo` only for `chronyc` (described later).
 
 #### SSH access (on the Manager)
 
@@ -289,12 +287,11 @@ sudo apt install -y python3-requests
 
 #### Clock synchronization for REST benchmark (chrony)
 
-For remote benchmark reproducibility, `remote_hosts_scripts/rest_server.py` synchronizes the clock with chrony at two points:
-
-- At REST server startup: one-time `makestep` + `waitsync`
-- At `/prepare_run`: check offset and run correction only when offset exceeds threshold
+For remote benchmark reproducibility, the REST server uses [chrony](https://chrony-project.org/) to synchronizes the clock between Hosts.
 
 Because these operations invoke `sudo chronyc` from within the REST server process, the `ubuntu` user must be allowed to run `chronyc` via `sudo` without a password.
+The sudoers entry below grants passwordless `sudo` only for `/usr/bin/chronyc`, so no other commands are affected.
+
 Install chrony and configure the sudoers entry on each Host as follows:
 
 ```bash
@@ -307,15 +304,7 @@ EOF
 sudo chmod 440 /etc/sudoers.d/ros2-perf-chrony
 ```
 
-Optional environment variables for `rest_server.py`:
-
-- `ROS2_PERF_CHRONY_SYNC_ON_STARTUP` (`1` by default): set `0` to disable startup sync
-- `ROS2_PERF_CHRONY_CHECK_ON_PREPARE` (`1` by default): set `0` to disable prepare-time guard check
-- `ROS2_PERF_CHRONYC_CMD_PREFIX` (`sudo chronyc` by default)
-- `ROS2_PERF_CHRONY_WAITSYNC_TRIES` (`20` by default)
-- `ROS2_PERF_CHRONY_WAITSYNC_MAX_CORRECTION_SEC` (`0.001` by default)
-- `ROS2_PERF_CHRONY_PREPARE_MAX_OFFSET_SEC` (`0.001` by default): run `makestep` on `/prepare_run` only if offset is above this threshold
-- `ROS2_PERF_CHRONY_CMD_TIMEOUT_SEC` (`30` by default)
+For details on synchronization behavior and environment variables, see [remote_hosts_scripts/README.md](./remote_hosts_scripts/README.md#clock-synchronization-chrony).
 
 ## Usage in Details
 
@@ -388,8 +377,6 @@ Arguments:
 
 SSH into each Host from the Manager and start the REST server.
 
-Before starting REST servers, complete the chrony/sudo setup described in [Clock synchronization for REST benchmark (chrony)](#clock-synchronization-for-rest-benchmark-chrony).
-
 ```bash
 # on the Manager
 ssh ubuntu@hostX
@@ -397,6 +384,8 @@ ssh ubuntu@hostX
 cd ros2-perf-multihost
 python3 remote_hosts_scripts/rest_server.py
 ```
+
+For details on the specification of REST server and environment variables, see [remote_hosts_scripts/README.md](./remote_hosts_scripts/README.md#rest_serverpy).
 
 #### Run Benchmark (on the Manager)
 
@@ -471,6 +460,7 @@ For detailed usage in subdomains, see the following documents:
 
 - [topology_example/README.md](./topology_example/README.md): Topology JSON format and modeling guidance.
 - [manager_scripts/README.md](./manager_scripts/README.md): Script usage, generated file details, `metadata.txt` format, and runtime options.
+- [remote_hosts_scripts/README.md](./remote_hosts_scripts/README.md): REST server endpoints, environment variables, and monitor CSV format.
 - [performance_test/README.md](./performance_test/README.md): Output directory structure, CSV formats, and analysis script descriptions.
 - [docker/README.md](./docker/README.md): Docker image build/push details and container workflow notes.
 - [ros2_node_impl_ws/README.md](./ros2_node_impl_ws/README.md): ROS 2 node workspace usage and build instructions.
