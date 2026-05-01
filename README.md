@@ -180,6 +180,9 @@ Here is the baseline environment we have tested so far.
 - User and repository path assumption:
   - Scripts and examples in this repository assume user `ubuntu` and `/home/ubuntu/ros2-perf-multihost`.
   - If your username and path differ, how to override these settings is described later.
+- The REST server (`rest_server.py`) uses `sudo chronyc` internally for clock synchronization.
+  The default `ubuntu` user must be able to run `chronyc` via `sudo` without a password.
+  See [Clock synchronization for REST benchmark (chrony)](#clock-synchronization-for-rest-benchmark-chrony) for the required setup steps.
 
 #### SSH access (on the Manager)
 
@@ -284,6 +287,36 @@ sudo apt update
 sudo apt install -y python3-requests
 ```
 
+#### Clock synchronization for REST benchmark (chrony)
+
+For remote benchmark reproducibility, `remote_hosts_scripts/rest_server.py` synchronizes the clock with chrony at two points:
+
+- At REST server startup: one-time `makestep` + `waitsync`
+- At `/prepare_run`: check offset and run correction only when offset exceeds threshold
+
+Because these operations invoke `sudo chronyc` from within the REST server process, the `ubuntu` user must be allowed to run `chronyc` via `sudo` without a password.
+Install chrony and configure the sudoers entry on each Host as follows:
+
+```bash
+sudo apt install -y chrony
+sudo systemctl enable --now chrony
+
+cat <<'EOF' | sudo tee /etc/sudoers.d/ros2-perf-chrony
+ubuntu ALL=(root) NOPASSWD:/usr/bin/chronyc
+EOF
+sudo chmod 440 /etc/sudoers.d/ros2-perf-chrony
+```
+
+Optional environment variables for `rest_server.py`:
+
+- `ROS2_PERF_CHRONY_SYNC_ON_STARTUP` (`1` by default): set `0` to disable startup sync
+- `ROS2_PERF_CHRONY_CHECK_ON_PREPARE` (`1` by default): set `0` to disable prepare-time guard check
+- `ROS2_PERF_CHRONYC_CMD_PREFIX` (`sudo chronyc` by default)
+- `ROS2_PERF_CHRONY_WAITSYNC_TRIES` (`20` by default)
+- `ROS2_PERF_CHRONY_WAITSYNC_MAX_CORRECTION_SEC` (`0.001` by default)
+- `ROS2_PERF_CHRONY_PREPARE_MAX_OFFSET_SEC` (`0.001` by default): run `makestep` on `/prepare_run` only if offset is above this threshold
+- `ROS2_PERF_CHRONY_CMD_TIMEOUT_SEC` (`30` by default)
+
 ## Usage in Details
 
 Once you have completed the [Preliminaries](#preliminaries), you are ready to start here.
@@ -354,6 +387,8 @@ Arguments:
 #### Start REST Servers (on each Host)
 
 SSH into each Host from the Manager and start the REST server.
+
+Before starting REST servers, complete the chrony/sudo setup described in [Clock synchronization for REST benchmark (chrony)](#clock-synchronization-for-rest-benchmark-chrony).
 
 ```bash
 # on the Manager
@@ -450,6 +485,9 @@ Common issues and fixes:
 - Docker mode fails on remote Hosts: pull `ghcr.io/hal-lab-u-tokyo/ros2-perf-multihost:latest` and confirm Docker permissions on each Host.
 - Native mode cannot find workspace paths: set `ROS2_PERF_WS` to the project root before running `host*_exec.sh`.
 - Expected CSV outputs are missing: check `<ws-dir>/<topology>/results/latest-<rmw>/logs/trial<N>/` for trial logs and inspect script stderr for analyzer failures.
+- REST server fails to start with a chrony error: confirm `chronyd` is running (`systemctl status chrony`) and that the sudoers entry for `chronyc` is in place (see [Clock synchronization for REST benchmark (chrony)](#clock-synchronization-for-rest-benchmark-chrony)).
+- `prepare_run` returns `chrony check/sync failed` or `timed out`: check that `sudo chronyc tracking` runs without a password as the REST server user; if the NTP source is unreachable, verify network connectivity or adjust `ROS2_PERF_CHRONY_WAITSYNC_TRIES` and `ROS2_PERF_CHRONY_CMD_TIMEOUT_SEC`.
+- Clock offset between hosts causes unexpectedly large or negative latency values: re-run `chronyc tracking` on each Host to verify synchronization, and restart the REST server to trigger a fresh startup sync.
 
 ## Contributing and License
 

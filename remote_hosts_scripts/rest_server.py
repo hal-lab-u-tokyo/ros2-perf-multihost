@@ -2,6 +2,7 @@ from flask import Flask, jsonify, request
 from datetime import datetime
 import logging
 import os
+import re
 import shutil
 import socket
 import subprocess
@@ -20,6 +21,25 @@ REPO_ROOT = os.environ.get("ROS2_PERF_REPO_ROOT",
                            "/home/ubuntu/ros2-perf-multihost")
 DEFAULT_WS_DIR = os.environ.get("ROS2_PERF_WS_DIR", "performance_ws")
 RUN_SCRIPT_TIMEOUT_SEC = int(os.environ.get("RUN_SCRIPT_TIMEOUT_SEC", "900"))
+CHRONY_SYNC_ON_STARTUP = os.environ.get(
+    "ROS2_PERF_CHRONY_SYNC_ON_STARTUP", "1"
+).strip().lower() in ("1", "true", "yes", "on")
+CHRONY_CHECK_ON_PREPARE = os.environ.get(
+    "ROS2_PERF_CHRONY_CHECK_ON_PREPARE", "1"
+).strip().lower() in ("1", "true", "yes", "on")
+CHRONYC_CMD_PREFIX = os.environ.get(
+    "ROS2_PERF_CHRONYC_CMD_PREFIX", "sudo chronyc"
+).strip()
+CHRONY_WAITSYNC_TRIES = int(os.environ.get(
+    "ROS2_PERF_CHRONY_WAITSYNC_TRIES", "20"))
+CHRONY_WAITSYNC_MAX_CORRECTION_SEC = float(
+    os.environ.get("ROS2_PERF_CHRONY_WAITSYNC_MAX_CORRECTION_SEC", "0.001")
+)
+CHRONY_PREPARE_MAX_OFFSET_SEC = float(
+    os.environ.get("ROS2_PERF_CHRONY_PREPARE_MAX_OFFSET_SEC", "0.001")
+)
+CHRONY_CMD_TIMEOUT_SEC = int(os.environ.get(
+    "ROS2_PERF_CHRONY_CMD_TIMEOUT_SEC", "30"))
 
 
 def _to_int(value, name):
@@ -27,6 +47,120 @@ def _to_int(value, name):
         return int(value)
     except (TypeError, ValueError) as exc:
         raise ValueError(f"{name} must be an integer") from exc
+
+
+def _run_shell_command(command, timeout_sec):
+    result = subprocess.run(
+        ["bash", "-lc", command],
+        text=True,
+        capture_output=True,
+        timeout=timeout_sec,
+    )
+    if result.returncode != 0:
+        stderr = (result.stderr or "").strip()
+        stdout = (result.stdout or "").strip()
+        detail = stderr if stderr else stdout
+        raise RuntimeError(
+            f"command failed (rc={result.returncode}): {command}; detail={detail}"
+        )
+    return (result.stdout or "").strip()
+
+
+def _chrony_makestep_and_waitsync():
+    makestep_cmd = f"{CHRONYC_CMD_PREFIX} -a makestep"
+    waitsync_cmd = (
+        f"{CHRONYC_CMD_PREFIX} waitsync {CHRONY_WAITSYNC_TRIES} "
+        f"{CHRONY_WAITSYNC_MAX_CORRECTION_SEC}"
+    )
+    tracking_cmd = f"{CHRONYC_CMD_PREFIX} tracking"
+
+    makestep_stdout = _run_shell_command(makestep_cmd, CHRONY_CMD_TIMEOUT_SEC)
+    waitsync_stdout = _run_shell_command(waitsync_cmd, CHRONY_CMD_TIMEOUT_SEC)
+    tracking_stdout = _run_shell_command(tracking_cmd, CHRONY_CMD_TIMEOUT_SEC)
+
+    return {
+        "makestep": makestep_stdout,
+        "waitsync": waitsync_stdout,
+        "tracking": tracking_stdout,
+    }
+
+
+def _parse_tracking_offset_seconds(tracking_output):
+    for line in tracking_output.splitlines():
+        stripped = line.strip()
+        if not stripped.lower().startswith("system time"):
+            continue
+        match = re.search(
+            r":\s*([0-9]*\.?[0-9]+)\s+seconds\s+(fast|slow)\b",
+            stripped,
+            flags=re.IGNORECASE,
+        )
+        if match:
+            return abs(float(match.group(1)))
+    raise RuntimeError("failed to parse offset from 'chronyc tracking' output")
+
+
+def _collect_chrony_tracking():
+    tracking_cmd = f"{CHRONYC_CMD_PREFIX} tracking"
+    tracking_stdout = _run_shell_command(tracking_cmd, CHRONY_CMD_TIMEOUT_SEC)
+    offset_sec = _parse_tracking_offset_seconds(tracking_stdout)
+    return {
+        "tracking": tracking_stdout,
+        "offset_seconds": offset_sec,
+    }
+
+
+def _sync_clock_on_startup():
+    if not CHRONY_SYNC_ON_STARTUP:
+        return {
+            "enabled": False,
+            "message": "chrony startup sync disabled by ROS2_PERF_CHRONY_SYNC_ON_STARTUP",
+        }
+
+    sync_result = _chrony_makestep_and_waitsync()
+    tracking_result = _collect_chrony_tracking()
+    return {
+        "enabled": True,
+        "corrected": True,
+        "startup": True,
+        "offset_seconds": tracking_result["offset_seconds"],
+        "makestep": sync_result["makestep"],
+        "waitsync": sync_result["waitsync"],
+        "tracking": tracking_result["tracking"],
+    }
+
+
+def _guard_clock_on_prepare():
+    if not CHRONY_CHECK_ON_PREPARE:
+        return {
+            "enabled": False,
+            "message": "chrony prepare check disabled by ROS2_PERF_CHRONY_CHECK_ON_PREPARE",
+        }
+
+    tracking_result = _collect_chrony_tracking()
+    offset_sec = tracking_result["offset_seconds"]
+    if offset_sec <= CHRONY_PREPARE_MAX_OFFSET_SEC:
+        return {
+            "enabled": True,
+            "corrected": False,
+            "offset_seconds": offset_sec,
+            "threshold_seconds": CHRONY_PREPARE_MAX_OFFSET_SEC,
+            "tracking": tracking_result["tracking"],
+        }
+
+    sync_result = _chrony_makestep_and_waitsync()
+    post_tracking = _collect_chrony_tracking()
+    return {
+        "enabled": True,
+        "corrected": True,
+        "offset_seconds_before": offset_sec,
+        "offset_seconds_after": post_tracking["offset_seconds"],
+        "threshold_seconds": CHRONY_PREPARE_MAX_OFFSET_SEC,
+        "tracking_before": tracking_result["tracking"],
+        "makestep": sync_result["makestep"],
+        "waitsync": sync_result["waitsync"],
+        "tracking_after": post_tracking["tracking"],
+    }
 
 
 def _parse_simple_metadata(path):
@@ -190,19 +324,35 @@ def prepare_run():
         rmw = body.get("rmw")
         if rmw not in ("fastdds", "cyclonedds", "zenoh"):
             raise ValueError("rmw must be one of: fastdds, cyclonedds, zenoh")
+        chrony_sync = _guard_clock_on_prepare()
         ctx = _resolve_exec_context(body)
         run_timestamp = _prepare_results_timestamp(ctx, rmw)
         app.logger.info(
-            "[prepare_run] topology=%s rmw=%s timestamp=%s",
+            "[prepare_run] topology=%s rmw=%s timestamp=%s chrony_enabled=%s chrony_corrected=%s",
             ctx["topology_dir"],
             rmw,
             run_timestamp,
+            chrony_sync.get("enabled", False),
+            chrony_sync.get("corrected", False),
         )
-        return jsonify({"status": "prepared", "run_timestamp": run_timestamp}), 200
+        return (
+            jsonify(
+                {
+                    "status": "prepared",
+                    "run_timestamp": run_timestamp,
+                    "chrony": chrony_sync,
+                }
+            ),
+            200,
+        )
     except FileNotFoundError as exc:
         return jsonify({"error": str(exc)}), 404
     except ValueError as exc:
         return jsonify({"error": str(exc)}), 400
+    except RuntimeError as exc:
+        return jsonify({"error": f"chrony check/sync failed: {exc}"}), 500
+    except subprocess.TimeoutExpired:
+        return jsonify({"error": "chrony check/sync command timed out"}), 504
     except Exception as exc:
         app.logger.exception("[prepare_run] exception")
         return jsonify({"error": str(exc)}), 500
@@ -340,4 +490,15 @@ def start_docker():
 
 
 if __name__ == "__main__":
+    try:
+        startup_sync = _sync_clock_on_startup()
+        app.logger.info(
+            "[startup] chrony_enabled=%s chrony_corrected=%s offset_seconds=%s",
+            startup_sync.get("enabled", False),
+            startup_sync.get("corrected", False),
+            startup_sync.get("offset_seconds", "N/A"),
+        )
+    except Exception:
+        app.logger.exception("[startup] chrony sync failed")
+        raise
     app.run(host="0.0.0.0", port=5000)
