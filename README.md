@@ -300,10 +300,10 @@ Arguments:
 Generated files are written to `<ws-dir>/<json-file-name>-<rmw>/exec_scripts/`. `<ws-dir>/latest` is always updated to point at the most recently generated directory.
 
 ```bash
-# Example: use topology_example/simple.json with Zenoh
+# Example: use topology_example/simple.json with Fast DDS
 python3 manager_scripts/generate_exec_scripts.py \
   topology_example/simple.json \
-  --rmw zenoh
+  --rmw fastdds
 ```
 
 For details on generated files in `exec_scripts/`, `metadata.txt` format, and runtime options supported by generated scripts, see [manager_scripts/README.md](./manager_scripts/README.md).
@@ -329,7 +329,7 @@ Arguments:
 ```bash
 # Example: specify scenario and remote path
 ./manager_scripts/distribute_exec_scripts.sh \
-  --scenario simple-cyclonedds \
+  --scenario simple-fastdds \
   --remote-repo-base /home/ubuntu/ros2-perf-multihost
 ```
 
@@ -358,6 +358,22 @@ python3 performance_test/performance_test.py \
   [--ws-dir|-w <dir>] \
   [--scenario|-s <name>] \
   [--eval-time|-e <sec>]
+```
+
+Examples:
+
+```bash
+# Docker execution on remote Hosts (default policy)
+python3 performance_test/performance_test.py \
+  --exec-policy docker \
+  --scenario simple-fastdds \
+  --eval-time 10 --trials 3
+
+# Native execution on remote Hosts
+python3 performance_test/performance_test.py \
+  --exec-policy native \
+  --scenario simple-fastdds \
+  --eval-time 10 --trials 3
 ```
 
 Arguments:

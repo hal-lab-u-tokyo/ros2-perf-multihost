@@ -65,4 +65,4 @@ For the JSON schema, see [topology_example/README.md](../topology_example/README
 
 Each node launched from `host{N}_exec.sh` or `local_exec.sh` receives a `--log-dir` under `results/YYYY-MM-DD_hh-mm-ss/exec_logs/trial<trial_idx>/` inside the generated run directory. `results/latest` is updated as a symbolic link to the active run directory.
 
-Example: `performance_ws/latest/results/2026-04-26_13-21-45/exec_logs/trial1/`
+Example: `performance_ws/simple-fastdds/results/latest/exec_logs/trial1/`
