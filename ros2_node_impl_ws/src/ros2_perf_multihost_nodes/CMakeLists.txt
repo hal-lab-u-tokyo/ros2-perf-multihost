@@ -71,6 +71,8 @@ install(
 install(TARGETS publisher_node subscriber_node intermediate_node
         DESTINATION lib/${PROJECT_NAME})
 
+install(DIRECTORY launch DESTINATION share/${PROJECT_NAME})
+
 ament_export_dependencies(rosidl_default_runtime)
 
 if(BUILD_TESTING)
