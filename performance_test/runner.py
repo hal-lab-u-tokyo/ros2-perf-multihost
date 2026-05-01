@@ -56,14 +56,15 @@ def run_test(
     print(f"=== Run trial={trial_idx + 1} ===")
 
     if exec_policy == "local":
-        local_run_sh = os.path.join(
-            ws_dir, scenario, "exec_scripts", "local_run.sh")
-        if not os.path.exists(local_run_sh):
-            raise FileNotFoundError(f"local_run.sh not found: {local_run_sh}")
+        local_exec_sh = os.path.join(
+            ws_dir, scenario, "exec_scripts", "local_exec.sh")
+        if not os.path.exists(local_exec_sh):
+            raise FileNotFoundError(
+                f"local_exec.sh not found: {local_exec_sh}")
 
         cmd = [
             "bash",
-            local_run_sh,
+            local_exec_sh,
             "--trial-idx",
             str(trial_idx + 1),
         ]

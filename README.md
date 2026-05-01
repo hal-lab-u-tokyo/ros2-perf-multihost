@@ -101,11 +101,18 @@ Pull the shared image once before running the quick start.
 docker pull ghcr.io/hal-lab-u-tokyo/ros2-perf-multihost:latest
 ```
 
-### Steps
+### Quick Steps
 
 Run everything on a single machine in this local workflow.
 
-1. Generate execution scripts from a topology JSON file.
+#### Step1: Define Topology
+
+This quick example uses [simple.json](./topology_example/simple.json).
+This topology defines a system consisting of 3 Hosts, where nodes communicate through topics.
+
+#### Step2: Generate Execution Scripts
+
+Generate execution scripts and Docker artifacts for FastDDS from the topology JSON.
 
 ```bash
 python3 manager_scripts/generate_exec_scripts.py \
@@ -114,19 +121,27 @@ python3 manager_scripts/generate_exec_scripts.py \
   --ws-dir performance_ws
 ```
 
-2. Run a benchmark session.
+#### Step3: Run Benchmark on Local
+
+Run a local simulation of the multi-host behavior on a single machine.
 
 ```bash
-python3 performance_test/performance_test.py --exec-policy local
+python3 performance_test/performance_test.py \
+  --exec-policy local \
+  --eval-time 10 --trials 3
 ```
 
-`performance_test.py` executes `<ws-dir>/<scenario>/exec_scripts/local_run.sh` on the Manager for each trial.
-This runs 3 trials, each lasting 60 seconds.
+This runs 3 trials, each lasting 10 seconds.
 
-3. Check outputs.
+#### Step4: Results
+
+As a quick check, confirm that the following outputs are generated:
 
 - Logs: `<ws-dir>/<scenario>/results/latest/logs/trial<N>/`
 - CSV: `<ws-dir>/<scenario>/results/latest/csv/`
+
+Because this run is only a local simulation, the aggregated results are not meaningful for performance evaluation.
+A detailed explanation of how to interpret the analysis outputs is provided later.
 
 Need multi-host operation, Docker or native execution, and REST automation?
 Want to learn more about these steps and output metrics?
@@ -265,7 +280,7 @@ See [topology_example/README.md](./topology_example/README.md) for the JSON sche
 
 #### Generate Execution Scripts
 
-Generate execution scripts (`host*_exec.sh`, `host*_run.sh`) and Docker Compose files from a JSON topology file.
+Generate execution scripts (`host*.launch.py`, `host*_exec.sh`) and Docker Compose files from a JSON topology file.
 
 ```bash
 python3 manager_scripts/generate_exec_scripts.py \
@@ -285,10 +300,10 @@ Arguments:
 Generated files are written to `<ws-dir>/<json-file-name>-<rmw>/exec_scripts/`. `<ws-dir>/latest` is always updated to point at the most recently generated directory.
 
 ```bash
-# Example: use topology_example/simple.json with Zenoh
+# Example: use topology_example/simple.json with Fast DDS
 python3 manager_scripts/generate_exec_scripts.py \
   topology_example/simple.json \
-  --rmw zenoh
+  --rmw fastdds
 ```
 
 For details on generated files in `exec_scripts/`, `metadata.txt` format, and runtime options supported by generated scripts, see [manager_scripts/README.md](./manager_scripts/README.md).
@@ -314,7 +329,7 @@ Arguments:
 ```bash
 # Example: specify scenario and remote path
 ./manager_scripts/distribute_exec_scripts.sh \
-  --scenario simple-cyclonedds \
+  --scenario simple-fastdds \
   --remote-repo-base /home/ubuntu/ros2-perf-multihost
 ```
 
@@ -345,13 +360,29 @@ python3 performance_test/performance_test.py \
   [--eval-time|-e <sec>]
 ```
 
+Examples:
+
+```bash
+# Docker execution on remote Hosts (default policy)
+python3 performance_test/performance_test.py \
+  --exec-policy docker \
+  --scenario simple-fastdds \
+  --eval-time 10 --trials 3
+
+# Native execution on remote Hosts
+python3 performance_test/performance_test.py \
+  --exec-policy native \
+  --scenario simple-fastdds \
+  --eval-time 10 --trials 3
+```
+
 Arguments:
 
 - `--exec-policy` (`-p`): Execution mode, one of `docker`, `native`, or `local` (default: `docker`)
 - `--trials` (`-t`): Number of trials (default: `3`)
 - `--ws-dir` (`-w`): Base directory that contains generated execution scripts (default: `performance_ws`)
 - `--scenario` (`-s`): Scenario directory to use (default: `latest`)
-- `--eval-time` (`-e`): Override evaluation time; if omitted, the default from `*_run.sh` or `*_exec.sh` is used
+- `--eval-time` (`-e`): Override evaluation time; if omitted, the default from generated `*_exec.sh` scripts is used
 
 #### Zenoh Router (on the Manager) [Zenoh only]
 

@@ -220,7 +220,7 @@ def append_host_script_epilogue(lines, host_name):
 
 
 def generate_exec_scripts(json_content, rmw, output_dir, settings):
-    """Generate per-host execution scripts that run inside containers."""
+    """Generate per-host launch files consumed by docker compose services."""
     os.makedirs(output_dir, exist_ok=True)
 
     eval_time_default = settings.default_eval_time
@@ -234,46 +234,226 @@ def generate_exec_scripts(json_content, rmw, output_dir, settings):
         f"--qos-reliability {qos_reliability}"
     )
 
+    env_lines = []
+    if rmw == "zenoh":
+        env_lines.extend(
+            [
+                '            SetEnvironmentVariable(name="RMW_IMPLEMENTATION", value="rmw_zenoh_cpp"),',
+                '            SetEnvironmentVariable(name="ZENOH_ROUTER_CHECK_ATTEMPTS", value="5"),',
+                '            SetEnvironmentVariable(name="RUST_LOG", value="zenoh=warn,zenoh_transport=warn"),',
+                (
+                    '            SetEnvironmentVariable('
+                    'name="ZENOH_SESSION_CONFIG_URI", '
+                    f'value="{settings.project_root_in_container}/ros2_node_impl_ws/zenoh_config/DEFAULT_RMW_ZENOH_SESSION_CONFIG.json5"'
+                    '),'
+                ),
+            ]
+        )
+    elif rmw == "fastdds":
+        env_lines.append(
+            '            SetEnvironmentVariable(name="RMW_IMPLEMENTATION", value="rmw_fastrtps_cpp"),'
+        )
+    elif rmw == "cyclonedds":
+        env_lines.append(
+            '            SetEnvironmentVariable(name="RMW_IMPLEMENTATION", value="rmw_cyclonedds_cpp"),'
+        )
+
     for host_dict in json_content["hosts"]:
         host_name = host_dict["host_name"]
-        script_path = os.path.join(output_dir, f"{host_name}_exec.sh")
-        lines = []
+        launch_path = os.path.join(output_dir, f"{host_name}.launch.py")
 
-        append_host_script_prelude(
-            lines,
-            host_name,
-            rmw,
-            eval_time_default,
-            settings,
-        )
+        # Build node variable definitions (outside LaunchDescription)
+        node_var_lines = []
+        node_var_names = []
+        node_idx = 0
 
         for node in host_dict["nodes"]:
             node_name = node["node_name"]
+
             if node.get("publisher"):
-                append_publisher_block(
-                    lines, node_name, node["publisher"], qos_opts)
+                var_name = f"_node_{node_idx}"
+                node_var_names.append(var_name)
+                node_idx += 1
+                topic_names = ",".join(p["topic_name"]
+                                       for p in node["publisher"])
+                payload_sizes = [
+                    require_positive_int(
+                        p, "payload_size", f"node '{node_name}' publisher[{idx}]"
+                    )
+                    for idx, p in enumerate(node["publisher"])
+                ]
+                period_mses = [
+                    require_positive_int(
+                        p, "period_ms", f"node '{node_name}' publisher[{idx}]"
+                    )
+                    for idx, p in enumerate(node["publisher"])
+                ]
+                args = [
+                    f'            "--node-name", "{node_name}",',
+                    f'            "--topic-names", "{topic_names}",',
+                    '            "--eval-time", eval_time,',
+                    f'            "--qos-history", "{qos_history}",',
+                    f'            "--qos-depth", "{qos_depth}",',
+                    f'            "--qos-reliability", "{qos_reliability}",',
+                ]
+                for v in payload_sizes:
+                    args.append(f'            "--size", "{int(v)}",')
+                for v in period_mses:
+                    args.append(f'            "--period", "{int(v)}",')
+                args.append('            "--log-dir", log_dir,')
+                node_var_lines.extend([
+                    f"    {var_name} = Node(",
+                    '        package="ros2_perf_multihost_nodes",',
+                    '        executable="publisher_node",',
+                    '        output="screen",',
+                    "        arguments=[",
+                    *args,
+                    "        ],",
+                    "    )",
+                ])
+
             if node.get("subscriber"):
-                append_subscriber_block(
-                    lines, node_name, node["subscriber"], qos_opts)
+                var_name = f"_node_{node_idx}"
+                node_var_names.append(var_name)
+                node_idx += 1
+                topic_names = ",".join(s["topic_name"]
+                                       for s in node["subscriber"])
+                args = [
+                    f'            "--node-name", "{node_name}",',
+                    f'            "--topic-names", "{topic_names}",',
+                    '            "--eval-time", eval_time,',
+                    f'            "--qos-history", "{qos_history}",',
+                    f'            "--qos-depth", "{qos_depth}",',
+                    f'            "--qos-reliability", "{qos_reliability}",',
+                    '            "--log-dir", log_dir,',
+                ]
+                node_var_lines.extend([
+                    f"    {var_name} = Node(",
+                    '        package="ros2_perf_multihost_nodes",',
+                    '        executable="subscriber_node",',
+                    '        output="screen",',
+                    "        arguments=[",
+                    *args,
+                    "        ],",
+                    "    )",
+                ])
+
             if "intermediate" in node:
+                var_name = f"_node_{node_idx}"
+                node_var_names.append(var_name)
+                node_idx += 1
                 intermediate_entries = normalize_intermediate_entries(
                     node["intermediate"], node_name
                 )
                 pub_defs, sub_topics = collect_intermediate_pub_sub(
                     intermediate_entries)
-                append_intermediate_block(
-                    lines,
-                    node_name,
-                    pub_defs,
-                    sub_topics,
-                    qos_opts,
+                payload_sizes = [
+                    require_positive_int(
+                        p, "payload_size",
+                        f"node '{node_name}' intermediate publisher[{idx}]",
+                    )
+                    for idx, p in enumerate(pub_defs)
+                ]
+                period_mses = [
+                    require_positive_int(
+                        p, "period_ms",
+                        f"node '{node_name}' intermediate publisher[{idx}]",
+                    )
+                    for idx, p in enumerate(pub_defs)
+                ]
+                args = [
+                    f'            "--node-name", "{node_name}",',
+                    f'            "--topic-names-pub", "{",".join(p["topic_name"] for p in pub_defs)}",',
+                    f'            "--topic-names-sub", "{",".join(sub_topics)}",',
+                    '            "--eval-time", eval_time,',
+                    f'            "--qos-history", "{qos_history}",',
+                    f'            "--qos-depth", "{qos_depth}",',
+                    f'            "--qos-reliability", "{qos_reliability}",',
+                ]
+                for v in payload_sizes:
+                    args.append(f'            "--size", "{int(v)}",')
+                for v in period_mses:
+                    args.append(f'            "--period", "{int(v)}",')
+                args.append('            "--log-dir", log_dir,')
+                node_var_lines.extend([
+                    f"    {var_name} = Node(",
+                    '        package="ros2_perf_multihost_nodes",',
+                    '        executable="intermediate_node",',
+                    '        output="screen",',
+                    "        arguments=[",
+                    *args,
+                    "        ],",
+                    "    )",
+                ])
+
+        # Assemble the full launch file
+        lines = [
+            "from launch import LaunchDescription",
+            "from launch.actions import DeclareLaunchArgument, EmitEvent, ExecuteProcess, RegisterEventHandler, SetEnvironmentVariable",
+            "from launch.event_handlers import OnProcessExit",
+            "from launch.events import Shutdown",
+            "from launch.substitutions import EnvironmentVariable, LaunchConfiguration, PathJoinSubstitution",
+            "from launch_ros.actions import Node",
+            "",
+            "",
+            "def generate_launch_description():",
+            '    eval_time = LaunchConfiguration("eval_time")',
+            '    log_dir = LaunchConfiguration("log_dir")',
+            '    project_root = EnvironmentVariable("ROS2_PERF_REPO_ROOT", default_value=EnvironmentVariable("ROS2_PERF_WS", default_value="/workdir/ros2-perf-multihost"))',
+            "",
+            *node_var_lines,
+        ]
+
+        if node_var_names:
+            lines.extend([
+                "",
+                f"    _remaining = [{len(node_var_names)}]",
+                "",
+                "    def _on_node_exit(event, context):",
+                "        if event.returncode != 0:",
+                "            print(f\"[ERROR] A node exited with code {event.returncode}. Shutting down.\")",
+                "            return [EmitEvent(event=Shutdown())]",
+                "        _remaining[0] -= 1",
+                "        if _remaining[0] <= 0:",
+                "            return [EmitEvent(event=Shutdown())]",
+                "        return []",
+                "",
+            ])
+
+        lines.extend([
+            "    return LaunchDescription(",
+            "        [",
+            f'            DeclareLaunchArgument("eval_time", default_value=EnvironmentVariable("EVAL_TIME", default_value="{eval_time_default}")),',
+            '            DeclareLaunchArgument("log_dir", default_value=EnvironmentVariable("LOG_DIR", default_value="")),',
+            *env_lines,
+            "            ExecuteProcess(",
+            "                cmd=[",
+            '                    "python3",',
+            '                    PathJoinSubstitution([project_root, "remote_hosts_scripts", "monitor_psutil.py"]),',
+            '                    "0.5",',
+            f'                    PathJoinSubstitution([log_dir, "{host_name}_monitor_host.csv"]),',
+            "                ],",
+            '                output="screen",',
+            "            ),",
+        ])
+
+        for var_name in node_var_names:
+            lines.append(f"            {var_name},")
+
+        if node_var_names:
+            for var_name in node_var_names:
+                lines.append(
+                    f"            RegisterEventHandler(OnProcessExit("
+                    f"target_action={var_name}, on_exit=_on_node_exit)),"
                 )
 
-        append_host_script_epilogue(lines, host_name)
+        lines.extend([
+            "        ]",
+            "    )",
+        ])
 
-        with open(script_path, "w") as f:
+        with open(launch_path, "w") as f:
             f.write("\n".join(lines) + "\n")
-        os.chmod(script_path, 0o755)
 
 
 def append_common_service(
@@ -318,7 +498,11 @@ def append_common_service(
         lines.append("      service_zenohd:")
         lines.append("        condition: service_healthy")
     lines.append(
-        f'    command: [ "/bin/bash", "/exec_scripts/{host_name}_exec.sh" ]')
+        (
+            '    command: [ "/bin/bash", "-lc", '
+            f'"set +u; . \\\"$$ROS2_NODE_IMPL_WS/install/setup.sh\\\"; set -u; ros2 launch /exec_scripts/{host_name}.launch.py eval_time:=\\\"$$EVAL_TIME\\\" log_dir:=\\\"$$LOG_DIR\\\"" ]'
+        )
+    )
 
 
 def append_zenohd_service(lines, project_root, output_dir, settings):
@@ -351,6 +535,8 @@ def append_zenohd_service(lines, project_root, output_dir, settings):
     lines.append(
         f"    command: [ \"/bin/bash\", \"{settings.project_root_in_container}/manager_scripts/operate_zenoh_router.sh\", \"foreground\" ]"
     )
+
+
 def generate_compose(json_content, rmw, output_dir, project_root, settings):
     """Generate local_compose.yaml for validation on a development machine."""
     eval_time_default = settings.default_eval_time
@@ -476,13 +662,13 @@ def run_script_common_prefix(lines, rel_root, eval_time_default, settings):
     )
 
 
-def generate_host_run_scripts(json_content, output_dir, project_root, settings):
-    """Generate host*_run.sh wrapper scripts for host-specific Compose files."""
+def generate_host_exec_scripts(json_content, output_dir, project_root, settings):
+    """Generate host*_exec.sh wrapper scripts for host-specific Compose files."""
     rel_root = os.path.relpath(project_root, output_dir)
     eval_time_default = settings.default_eval_time
     for host_dict in json_content["hosts"]:
         host_name = host_dict["host_name"]
-        script_path = os.path.join(output_dir, f"{host_name}_run.sh")
+        script_path = os.path.join(output_dir, f"{host_name}_exec.sh")
         compose_file = f"$SCRIPT_DIR/{host_name}_compose.yaml"
         lines = []
         run_script_common_prefix(lines, rel_root, eval_time_default, settings)
@@ -513,14 +699,15 @@ def generate_host_run_scripts(json_content, output_dir, project_root, settings):
 
 
 def generate_local_run_script(json_content, rmw, output_dir, project_root, settings):
-    """Generate local_run.sh to start all services using local_compose.yaml."""
+    """Generate local_exec.sh to start all services using local_compose.yaml."""
     hosts = json_content["hosts"]
     host_services = " ".join(f"service_{h['host_name']}" for h in hosts)
     rel_root = os.path.relpath(project_root, output_dir)
 
-    script_path = os.path.join(output_dir, "local_run.sh")
+    script_path = os.path.join(output_dir, "local_exec.sh")
     lines = []
-    run_script_common_prefix(lines, rel_root, settings.default_eval_time, settings)
+    run_script_common_prefix(
+        lines, rel_root, settings.default_eval_time, settings)
     lines.extend(
         [
             'COMPOSE_FILE="$SCRIPT_DIR/local_compose.yaml"',
