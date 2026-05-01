@@ -261,37 +261,19 @@ def generate_exec_scripts(json_content, rmw, output_dir, settings):
     for host_dict in json_content["hosts"]:
         host_name = host_dict["host_name"]
         launch_path = os.path.join(output_dir, f"{host_name}.launch.py")
-        lines = [
-            "from launch import LaunchDescription",
-            "from launch.actions import DeclareLaunchArgument, ExecuteProcess, SetEnvironmentVariable",
-            "from launch.substitutions import EnvironmentVariable, LaunchConfiguration, PathJoinSubstitution",
-            "from launch_ros.actions import Node",
-            "",
-            "",
-            "def generate_launch_description():",
-            "    eval_time = LaunchConfiguration(\"eval_time\")",
-            "    log_dir = LaunchConfiguration(\"log_dir\")",
-            "    project_root = EnvironmentVariable(\"ROS2_PERF_WS\", default_value=\"/workdir/ros2-perf-multihost\")",
-            "",
-            "    return LaunchDescription(",
-            "        [",
-            f'            DeclareLaunchArgument("eval_time", default_value=EnvironmentVariable("EVAL_TIME", default_value="{eval_time_default}")),',
-            '            DeclareLaunchArgument("log_dir", default_value=EnvironmentVariable("LOG_DIR", default_value="")),',
-            *env_lines,
-            "            ExecuteProcess(",
-            "                cmd=[",
-            "                    \"python3\",",
-            "                    PathJoinSubstitution([project_root, \"remote_hosts_scripts\", \"monitor_psutil.py\"]),",
-            "                    \"0.5\",",
-            f'                    PathJoinSubstitution([log_dir, "{host_name}_monitor_host.csv"]),',
-            "                ],",
-            "                output=\"screen\",",
-            "            ),",
-        ]
+
+        # Build node variable definitions (outside LaunchDescription)
+        node_var_lines = []
+        node_var_names = []
+        node_idx = 0
 
         for node in host_dict["nodes"]:
             node_name = node["node_name"]
+
             if node.get("publisher"):
+                var_name = f"_node_{node_idx}"
+                node_var_names.append(var_name)
+                node_idx += 1
                 topic_names = ",".join(p["topic_name"]
                                        for p in node["publisher"])
                 payload_sizes = [
@@ -306,57 +288,60 @@ def generate_exec_scripts(json_content, rmw, output_dir, settings):
                     )
                     for idx, p in enumerate(node["publisher"])
                 ]
-                pub_args = [
-                    f'                    "--node-name", "{node_name}",',
-                    f'                    "--topic-names", "{topic_names}",',
-                    '                    "--eval-time", eval_time,',
-                    f'                    "--qos-history", "{qos_history}",',
-                    f'                    "--qos-depth", "{qos_depth}",',
-                    f'                    "--qos-reliability", "{qos_reliability}",',
+                args = [
+                    f'            "--node-name", "{node_name}",',
+                    f'            "--topic-names", "{topic_names}",',
+                    '            "--eval-time", eval_time,',
+                    f'            "--qos-history", "{qos_history}",',
+                    f'            "--qos-depth", "{qos_depth}",',
+                    f'            "--qos-reliability", "{qos_reliability}",',
                 ]
-                for payload_size in payload_sizes:
-                    pub_args.append(
-                        f'                    "--size", "{int(payload_size)}",')
-                for period_ms in period_mses:
-                    pub_args.append(
-                        f'                    "--period", "{int(period_ms)}",')
-                pub_args.append('                    "--log-dir", log_dir,')
-                lines.extend(
-                    [
-                        "            Node(",
-                        '                package="ros2_perf_multihost_nodes",',
-                        '                executable="publisher_node",',
-                        '                output="screen",',
-                        "                arguments=[",
-                        *pub_args,
-                        "                ],",
-                        "            ),",
-                    ]
-                )
+                for v in payload_sizes:
+                    args.append(f'            "--size", "{int(v)}",')
+                for v in period_mses:
+                    args.append(f'            "--period", "{int(v)}",')
+                args.append('            "--log-dir", log_dir,')
+                node_var_lines.extend([
+                    f"    {var_name} = Node(",
+                    '        package="ros2_perf_multihost_nodes",',
+                    '        executable="publisher_node",',
+                    '        output="screen",',
+                    "        arguments=[",
+                    *args,
+                    "        ],",
+                    "    )",
+                ])
 
             if node.get("subscriber"):
+                var_name = f"_node_{node_idx}"
+                node_var_names.append(var_name)
+                node_idx += 1
                 topic_names = ",".join(s["topic_name"]
                                        for s in node["subscriber"])
-                lines.extend(
-                    [
-                        "            Node(",
-                        '                package="ros2_perf_multihost_nodes",',
-                        '                executable="subscriber_node",',
-                        '                output="screen",',
-                        "                arguments=[",
-                        f'                    "--node-name", "{node_name}",',
-                        f'                    "--topic-names", "{topic_names}",',
-                        '                    "--eval-time", eval_time,',
-                        f'                    "--qos-history", "{qos_history}",',
-                        f'                    "--qos-depth", "{qos_depth}",',
-                        f'                    "--qos-reliability", "{qos_reliability}",',
-                        '                    "--log-dir", log_dir,',
-                        "                ],",
-                        "            ),",
-                    ]
-                )
+                args = [
+                    f'            "--node-name", "{node_name}",',
+                    f'            "--topic-names", "{topic_names}",',
+                    '            "--eval-time", eval_time,',
+                    f'            "--qos-history", "{qos_history}",',
+                    f'            "--qos-depth", "{qos_depth}",',
+                    f'            "--qos-reliability", "{qos_reliability}",',
+                    '            "--log-dir", log_dir,',
+                ]
+                node_var_lines.extend([
+                    f"    {var_name} = Node(",
+                    '        package="ros2_perf_multihost_nodes",',
+                    '        executable="subscriber_node",',
+                    '        output="screen",',
+                    "        arguments=[",
+                    *args,
+                    "        ],",
+                    "    )",
+                ])
 
             if "intermediate" in node:
+                var_name = f"_node_{node_idx}"
+                node_var_names.append(var_name)
+                node_idx += 1
                 intermediate_entries = normalize_intermediate_entries(
                     node["intermediate"], node_name
                 )
@@ -364,55 +349,108 @@ def generate_exec_scripts(json_content, rmw, output_dir, settings):
                     intermediate_entries)
                 payload_sizes = [
                     require_positive_int(
-                        p,
-                        "payload_size",
+                        p, "payload_size",
                         f"node '{node_name}' intermediate publisher[{idx}]",
                     )
                     for idx, p in enumerate(pub_defs)
                 ]
                 period_mses = [
                     require_positive_int(
-                        p,
-                        "period_ms",
+                        p, "period_ms",
                         f"node '{node_name}' intermediate publisher[{idx}]",
                     )
                     for idx, p in enumerate(pub_defs)
                 ]
-                int_args = [
-                    f'                    "--node-name", "{node_name}",',
-                    f'                    "--topic-names-pub", "{",".join(p["topic_name"] for p in pub_defs)}",',
-                    f'                    "--topic-names-sub", "{",".join(sub_topics)}",',
-                    '                    "--eval-time", eval_time,',
-                    f'                    "--qos-history", "{qos_history}",',
-                    f'                    "--qos-depth", "{qos_depth}",',
-                    f'                    "--qos-reliability", "{qos_reliability}",',
+                args = [
+                    f'            "--node-name", "{node_name}",',
+                    f'            "--topic-names-pub", "{",".join(p["topic_name"] for p in pub_defs)}",',
+                    f'            "--topic-names-sub", "{",".join(sub_topics)}",',
+                    '            "--eval-time", eval_time,',
+                    f'            "--qos-history", "{qos_history}",',
+                    f'            "--qos-depth", "{qos_depth}",',
+                    f'            "--qos-reliability", "{qos_reliability}",',
                 ]
-                for payload_size in payload_sizes:
-                    int_args.append(
-                        f'                    "--size", "{int(payload_size)}",')
-                for period_ms in period_mses:
-                    int_args.append(
-                        f'                    "--period", "{int(period_ms)}",')
-                int_args.append('                    "--log-dir", log_dir,')
-                lines.extend(
-                    [
-                        "            Node(",
-                        '                package="ros2_perf_multihost_nodes",',
-                        '                executable="intermediate_node",',
-                        '                output="screen",',
-                        "                arguments=[",
-                        *int_args,
-                        "                ],",
-                        "            ),",
-                    ]
+                for v in payload_sizes:
+                    args.append(f'            "--size", "{int(v)}",')
+                for v in period_mses:
+                    args.append(f'            "--period", "{int(v)}",')
+                args.append('            "--log-dir", log_dir,')
+                node_var_lines.extend([
+                    f"    {var_name} = Node(",
+                    '        package="ros2_perf_multihost_nodes",',
+                    '        executable="intermediate_node",',
+                    '        output="screen",',
+                    "        arguments=[",
+                    *args,
+                    "        ],",
+                    "    )",
+                ])
+
+        # Assemble the full launch file
+        lines = [
+            "from launch import LaunchDescription",
+            "from launch.actions import DeclareLaunchArgument, EmitEvent, ExecuteProcess, RegisterEventHandler, SetEnvironmentVariable",
+            "from launch.event_handlers import OnProcessExit",
+            "from launch.events import Shutdown",
+            "from launch.substitutions import EnvironmentVariable, LaunchConfiguration, PathJoinSubstitution",
+            "from launch_ros.actions import Node",
+            "",
+            "",
+            "def generate_launch_description():",
+            '    eval_time = LaunchConfiguration("eval_time")',
+            '    log_dir = LaunchConfiguration("log_dir")',
+            '    project_root = EnvironmentVariable("ROS2_PERF_WS", default_value="/workdir/ros2-perf-multihost")',
+            "",
+            *node_var_lines,
+        ]
+
+        if node_var_names:
+            lines.extend([
+                "",
+                f"    _remaining = [{len(node_var_names)}]",
+                "",
+                "    def _on_node_exit(event, context):",
+                "        if event.returncode != 0:",
+                "            print(f\"[ERROR] A node exited with code {event.returncode}. Shutting down.\")",
+                "            return [EmitEvent(event=Shutdown())]",
+                "        _remaining[0] -= 1",
+                "        if _remaining[0] <= 0:",
+                "            return [EmitEvent(event=Shutdown())]",
+                "        return []",
+                "",
+            ])
+
+        lines.extend([
+            "    return LaunchDescription(",
+            "        [",
+            f'            DeclareLaunchArgument("eval_time", default_value=EnvironmentVariable("EVAL_TIME", default_value="{eval_time_default}")),',
+            '            DeclareLaunchArgument("log_dir", default_value=EnvironmentVariable("LOG_DIR", default_value="")),',
+            *env_lines,
+            "            ExecuteProcess(",
+            "                cmd=[",
+            '                    "python3",',
+            '                    PathJoinSubstitution([project_root, "remote_hosts_scripts", "monitor_psutil.py"]),',
+            '                    "0.5",',
+            f'                    PathJoinSubstitution([log_dir, "{host_name}_monitor_host.csv"]),',
+            "                ],",
+            '                output="screen",',
+            "            ),",
+        ])
+
+        for var_name in node_var_names:
+            lines.append(f"            {var_name},")
+
+        if node_var_names:
+            for var_name in node_var_names:
+                lines.append(
+                    f"            RegisterEventHandler(OnProcessExit("
+                    f"target_action={var_name}, on_exit=_on_node_exit)),"
                 )
 
-        lines.extend(
-            [
-                "        ]",
-                "    )",
-            ]
-        )
+        lines.extend([
+            "        ]",
+            "    )",
+        ])
 
         with open(launch_path, "w") as f:
             f.write("\n".join(lines) + "\n")
