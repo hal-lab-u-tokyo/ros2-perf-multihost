@@ -350,6 +350,7 @@ def append_common_service(
     lines.append(f"  {service_name}:")
     lines.append(f"    image: {settings.image_name}")
     lines.append("    network_mode: host")
+    lines.append("    ipc: host")
     lines.append('    user: "${LOCAL_UID:-1000}:${LOCAL_GID:-1000}"')
     rel_project_root = os.path.relpath(project_root, output_dir)
     lines.append("    volumes:")
@@ -384,6 +385,7 @@ def append_zenohd_service(lines, project_root, output_dir, settings):
     lines.append("  service_zenohd:")
     lines.append(f"    image: {settings.image_name}")
     lines.append("    network_mode: host")
+    lines.append("    ipc: host")
     lines.append('    user: "${LOCAL_UID:-1000}:${LOCAL_GID:-1000}"')
     lines.append("    volumes:")
     lines.append(
