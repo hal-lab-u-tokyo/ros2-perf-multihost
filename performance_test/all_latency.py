@@ -150,8 +150,7 @@ def cal_all_latency(all_node_info, logs_folder_path):
                                 logs_folder_path, f"{pub_node_name}_log", f"{sub_topic}_log.txt")
                         elif pub_node_type == "Intermediate":
                             pub_logdata_path = os.path.join(
-                                logs_folder_path, f"{pub_node_name}_log", f"{
-                                    sub_topic}_pub_log.txt"
+                                logs_folder_path, f"{pub_node_name}_log", f"{sub_topic}_pub_log.txt"
                             )
 
                         sub_logdata_path = ""
@@ -160,8 +159,7 @@ def cal_all_latency(all_node_info, logs_folder_path):
                                 logs_folder_path, f"{sub_node_name}_log", f"{sub_topic}_log.txt")
                         elif sub_node_type == "Intermediate":
                             sub_logdata_path = os.path.join(
-                                logs_folder_path, f"{sub_node_name}_log", f"{
-                                    sub_topic}_sub_log.txt"
+                                logs_folder_path, f"{sub_node_name}_log", f"{sub_topic}_sub_log.txt"
                             )
 
                         pub_logdata_list = get_log(
@@ -206,12 +204,9 @@ def cal_all_latency(all_node_info, logs_folder_path):
                         # Warn and skip if no overlapping time window exists.
                         if common_start_time >= common_end_time:
                             print(
-                                f"[WARN] No common time window: node={
-                                    sub_node_name}, topic={sub_topic} "
-                                f"pub_node={pub_node_name}, pub_path={
-                                    pub_logdata_path}, sub_path={sub_logdata_path} "
-                                f"(pub:[{pub_start_time},{pub_end_time}] sub:[{
-                                    sub_start_time},{sub_end_time}] warmup={warmup_ns})"
+                                f"[WARN] No common time window: node={sub_node_name}, topic={sub_topic} "
+                                f"pub_node={pub_node_name}, pub_path={pub_logdata_path}, sub_path={sub_logdata_path} "
+                                f"(pub:[{pub_start_time},{pub_end_time}] sub:[{sub_start_time},{sub_end_time}] warmup={warmup_ns})"
                             )
                             continue
 
@@ -317,15 +312,15 @@ def write_all_latency(sub_all_node_statics, results_dir):
                 )
 
         col_widths = [12, 12, 12, 12, 12, 12, 12, 12, 12, 12]
-        header = "".join(f"{data[0][i]:<{col_widths[i]}
-                            }" for i in range(len(data[0])))
+        header = "".join(
+            f"{data[0][i]:<{col_widths[i]}}" for i in range(len(data[0])))
         f.write(f"{header}\n")
         f.write("-" * len(header))
         f.write("\n")
 
         for row in data[1:]:
-            row = "".join(f"{row[i]:<{col_widths[i]}
-                             }" for i in range(len(row)))
+            row = "".join(
+                f"{row[i]:<{col_widths[i]}}" for i in range(len(row)))
             f.write(f"{row}\n")
 
 
@@ -363,15 +358,15 @@ def write_total_latency(sub_all_node_statics, all_latency_results, result_dir):
                     total_q1, total_mid, total_q3, total_max])
 
         col_widths = [12, 12, 12, 12, 12, 12, 12, 12]
-        header = "".join(f"{data[0][i]:<{col_widths[i]}
-                            }" for i in range(len(data[0])))
+        header = "".join(
+            f"{data[0][i]:<{col_widths[i]}}" for i in range(len(data[0])))
         f.write(f"{header}\n")
         f.write("-" * len(header))
         f.write("\n")
 
         for row in data[1:]:
-            row = "".join(f"{row[i]:<{col_widths[i]}
-                             }" for i in range(len(row)))
+            row = "".join(
+                f"{row[i]:<{col_widths[i]}}" for i in range(len(row)))
             f.write(f"{row}\n")
 
 
