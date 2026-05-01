@@ -113,7 +113,6 @@ This topology defines a system consisting of 3 Hosts, where nodes communicate th
 #### Step2: Generate Execution Scripts
 
 Generate execution scripts and Docker artifacts from the topology JSON.
-RMW is not specified here — it is selected at runtime in Step3.
 
 ```bash
 python3 manager_scripts/generate_exec_scripts.py \
@@ -124,17 +123,16 @@ python3 manager_scripts/generate_exec_scripts.py \
 #### Step3: Run Benchmark on Local
 
 Run a local simulation of the multi-host behavior on a single machine.
-The topology name (directory under `performance_ws/`) and the RMW to use are both required.
+The topology name (directory under `performance_ws/`) is required; the RMW defaults to `fastdds` if not specified.
 
 ```bash
 python3 performance_test/performance_test.py \
   simple \
-  --rmw fastdds \
-  --exec-policy local \
+  --rmw fastdds --exec-policy local \
   --eval-time 10 --trials 3
 ```
 
-This runs 3 trials, each lasting 10 seconds, using Fast DDS.
+This runs 3 trials, each lasting 10 seconds, using Fast DDS (default RMW).
 
 #### Step4: Results
 
@@ -372,7 +370,7 @@ Then, run the benchmark script on the Manager.
 ```bash
 python3 performance_test/performance_test.py \
   <topology> \
-  --rmw|-m <rmw> \
+  [--rmw|-m <rmw>] \
   [--exec-policy|-p <mode>] \
   [--eval-time|-e <sec>] \
   [--trials|-t <n>] \
@@ -382,17 +380,16 @@ python3 performance_test/performance_test.py \
 Examples:
 
 ```bash
-# Docker execution on remote Hosts (default policy)
+# Docker execution on remote Hosts (default policy, default RMW: fastdds)
 python3 performance_test/performance_test.py \
   simple \
-  --rmw fastdds \
   --exec-policy docker \
   --eval-time 10 --trials 3
 
-# Native execution on remote Hosts
+# Native execution on remote Hosts with Zenoh
 python3 performance_test/performance_test.py \
   simple \
-  --rmw fastdds \
+  --rmw zenoh \
   --exec-policy native \
   --eval-time 10 --trials 3
 ```
@@ -400,7 +397,7 @@ python3 performance_test/performance_test.py \
 Arguments:
 
 - `<topology>`: Topology directory to use (required)
-- `--rmw` (`-m`): RMW implementation (`fastdds`, `zenoh`, or `cyclonedds`) (required)
+- `--rmw` (`-m`): RMW implementation (`fastdds`, `zenoh`, or `cyclonedds`) (default: `fastdds`)
 - `--exec-policy` (`-p`): Execution mode, one of `docker`, `native`, or `local` (default: `docker`)
 - `--eval-time` (`-e`): Override evaluation time; if omitted, the default from generated `*_exec.sh` scripts is used
 - `--trials` (`-t`): Number of trials (default: `3`)

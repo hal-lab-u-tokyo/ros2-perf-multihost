@@ -13,14 +13,15 @@ if __name__ == "__main__":
         description="Run performance tests using generated exec script defaults",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         usage=(
-            "%(prog)s <topology> --rmw|-m {fastdds,zenoh,cyclonedds} "
+            "%(prog)s <topology> [--rmw|-m {fastdds,zenoh,cyclonedds}] "
             "[--exec-policy|-p {docker,native,local}] [--eval-time|-e SEC] "
             "[--trials|-t N] [--ws-dir|-w DIR] [--help|-h]"
         ),
         epilog="""
 Examples:
-    python3 performance_test/performance_test.py simple --rmw fastdds --exec-policy local --eval-time 60 --trials 5
-    short: python3 performance_test/performance_test.py simple -m fastdds -p local -e 60 -t 5
+    python3 performance_test/performance_test.py simple --exec-policy local --eval-time 60 --trials 5
+    python3 performance_test/performance_test.py simple --rmw zenoh --exec-policy local --eval-time 60 --trials 5
+    short: python3 performance_test/performance_test.py simple -m zenoh -p local -e 60 -t 5
 """,
     )
     parser.add_argument("topology_name", metavar="topology", type=str,
@@ -29,9 +30,9 @@ Examples:
         "-m",
         "--rmw",
         type=str,
-        required=True,
+        default="fastdds",
         choices=["fastdds", "zenoh", "cyclonedds"],
-        help="RMW implementation used for this run",
+        help="RMW implementation used for this run (default: fastdds)",
     )
     parser.add_argument(
         "-p",
