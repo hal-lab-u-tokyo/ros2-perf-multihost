@@ -201,6 +201,8 @@ def prepare_run():
         return jsonify({"status": "prepared", "run_timestamp": run_timestamp}), 200
     except FileNotFoundError as exc:
         return jsonify({"error": str(exc)}), 404
+    except ValueError as exc:
+        return jsonify({"error": str(exc)}), 400
     except Exception as exc:
         app.logger.exception("[prepare_run] exception")
         return jsonify({"error": str(exc)}), 500

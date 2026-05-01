@@ -222,8 +222,12 @@ def collect_logs(
         if not rmw:
             raise ValueError("rmw is required when exec_policy is remote")
 
+        # Use ROS2_PERF_REPO_ROOT if set, otherwise default
+        remote_repo_root = os.environ.get(
+            "ROS2_PERF_REPO_ROOT", "/home/ubuntu/ros2-perf-multihost"
+        )
         remote_log_dir = (
-            f"/home/ubuntu/ros2-perf-multihost/{ws_dir}/{topology_name}"
+            f"{remote_repo_root}/{ws_dir}/{topology_name}"
             f"/results/latest-{rmw}/exec_logs/trial{trial_idx + 1}"
         )
 
