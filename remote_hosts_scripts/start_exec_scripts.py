@@ -3,15 +3,15 @@ Unified script to start test execution on all hosts.
 Supports both Docker and native execution modes.
 
 Usage:
-    python3 start_exec_scripts.py [--exec-policy|-p {docker,native}] [--trial-idx|-i N] [--prepare-run] [--ws-dir|-w DIR] [--topology|-t NAME] [--rmw|-r {fastdds,zenoh,cyclonedds}] [--hosts-list|-l HOSTS] [--help|-h]
+    python3 start_exec_scripts.py [--exec-policy|-p {docker,native}] [--trial-idx|-i N] [--prepare-run] [--ws-dir|-w DIR] [--topology|-t NAME] [--rmw|-m {fastdds,zenoh,cyclonedds}] [--hosts-list|-l HOSTS] [--help|-h]
 
   # Docker mode (sends /start_docker requests)
       python3 start_exec_scripts.py --exec-policy docker --trial-idx 1 --ws-dir performance_ws --topology simple --rmw fastdds --hosts-list host1,host2,host3
-      short: python3 start_exec_scripts.py -p docker -i 1 -w performance_ws -t simple -r fastdds -l host1,host2,host3
+    short: python3 start_exec_scripts.py -p docker -i 1 -w performance_ws -t simple -m fastdds -l host1,host2,host3
 
   # Native mode (sends /start requests)
       python3 start_exec_scripts.py --exec-policy native --trial-idx 1 --ws-dir performance_ws --topology simple --rmw fastdds --hosts-list host1,host2,host3
-      short: python3 start_exec_scripts.py -p native -i 1 -w performance_ws -t simple -r fastdds -l host1,host2,host3
+    short: python3 start_exec_scripts.py -p native -i 1 -w performance_ws -t simple -m fastdds -l host1,host2,host3
 """
 
 import requests
@@ -69,17 +69,17 @@ def main():
         usage=(
             "%(prog)s [--exec-policy|-p {docker,native}] [--trial-idx|-i N] "
             "[--prepare-run] [--ws-dir|-w DIR] --topology|-t NAME "
-            "--rmw|-r {fastdds,zenoh,cyclonedds} [--hosts-list|-l HOSTS] [--help|-h]"
+            "--rmw|-m {fastdds,zenoh,cyclonedds} [--hosts-list|-l HOSTS] [--help|-h]"
         ),
         epilog="""
 Examples:
   # Docker mode
     python3 start_exec_scripts.py --exec-policy docker --trial-idx 1 --ws-dir performance_ws --topology simple --rmw fastdds --hosts-list host1,host2,host3
-    short: python3 start_exec_scripts.py -p docker -i 1 -w performance_ws -t simple -r fastdds -l host1,host2,host3
+    short: python3 start_exec_scripts.py -p docker -i 1 -w performance_ws -t simple -m fastdds -l host1,host2,host3
 
   # Native mode
     python3 start_exec_scripts.py --exec-policy native --trial-idx 1 --ws-dir performance_ws --topology simple --rmw fastdds --hosts-list host1,host2,host3
-    short: python3 start_exec_scripts.py -p native -i 1 -w performance_ws -t simple -r fastdds -l host1,host2,host3
+    short: python3 start_exec_scripts.py -p native -i 1 -w performance_ws -t simple -m fastdds -l host1,host2,host3
         """
     )
     parser.add_argument(
@@ -101,7 +101,7 @@ Examples:
     parser.add_argument("-t", "--topology", required=True,
                         help="Topology directory name under ws-dir")
     parser.add_argument(
-        "-r",
+        "-m",
         "--rmw",
         required=True,
         choices=["fastdds", "zenoh", "cyclonedds"],

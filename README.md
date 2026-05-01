@@ -375,7 +375,7 @@ python3 performance_test/performance_test.py \
   [--exec-policy|-p <mode>] \
   [--trials|-t <n>] \
   [--ws-dir|-w <dir>] \
-  --rmw|-r <rmw> \
+  --rmw|-m <rmw> \
   [--eval-time|-e <sec>]
 ```
 
@@ -403,7 +403,7 @@ Arguments:
 - `--trials` (`-t`): Number of trials (default: `3`)
 - `--ws-dir` (`-w`): Base directory that contains generated execution scripts (default: `performance_ws`)
 - `<topology>`: Topology directory to use (required)
-- `--rmw` (`-r`): RMW implementation (`fastdds`, `zenoh`, or `cyclonedds`) (required)
+- `--rmw` (`-m`): RMW implementation (`fastdds`, `zenoh`, or `cyclonedds`) (required)
 - `--eval-time` (`-e`): Override evaluation time; if omitted, the default from generated `*_exec.sh` scripts is used
 
 #### Zenoh Router (on the Manager) [Zenoh only]

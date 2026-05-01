@@ -15,12 +15,12 @@ if __name__ == "__main__":
         usage=(
             "%(prog)s <topology> [--trials|-t N] [--eval-time|-e SEC] "
             "[--exec-policy|-p {docker,native,local}] [--ws-dir|-w DIR] "
-            "[--rmw|-r {fastdds,zenoh,cyclonedds}] [--help|-h]"
+            "[--rmw|-m {fastdds,zenoh,cyclonedds}] [--help|-h]"
         ),
         epilog="""
 Examples:
     python3 performance_test/performance_test.py simple --exec-policy local --rmw fastdds --trials 5 --eval-time 60
-    short: python3 performance_test/performance_test.py simple -p local -r fastdds -t 5 -e 60
+    short: python3 performance_test/performance_test.py simple -p local -m fastdds -t 5 -e 60
 """,
     )
     parser.add_argument("topology_name", metavar="topology", type=str,
@@ -44,7 +44,7 @@ Examples:
         help="Workspace directory (default: performance_ws)",
     )
     parser.add_argument(
-        "-r",
+        "-m",
         "--rmw",
         type=str,
         required=True,
