@@ -245,12 +245,28 @@ If you want to evaluate native execution mode as well, install ROS 2 and build t
 Follow the official [ROS 2 Jazzy Installation steps](https://docs.ros.org/en/jazzy/Installation/Ubuntu-Install-Debs.html).
 Other ROS 2 distributions may also work, but they are not officially tested yet.
 
+To benchmark with non-default RMW implementations, install the corresponding packages:
+
+```bash
+# For CycloneDDS (rmw_cyclonedds_cpp)
+sudo apt install -y ros-jazzy-rmw-cyclonedds-cpp
+
+# For Zenoh (rmw_zenoh_cpp)
+sudo apt install -y ros-jazzy-rmw-zenoh-cpp
+```
+
 Then, build the ROS 2 package used by this framework in `ros2_node_impl_ws/` (see [ros2_node_impl_ws/README.md](./ros2_node_impl_ws/README.md) for details on ROS 2 node features).
 
 ```bash
 source /opt/ros/jazzy/setup.bash
 cd ros2_node_impl_ws
 colcon build --packages-select ros2_perf_multihost_nodes
+```
+
+It is recommended to add the following to your `~/.bashrc` so the built package is automatically sourced in every shell session:
+
+```bash
+echo "source ~/ros2-perf-multihost/ros2_node_impl_ws/install/local_setup.bash" >> ~/.bashrc
 ```
 
 #### Python dependencies
