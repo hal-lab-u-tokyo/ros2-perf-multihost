@@ -618,7 +618,7 @@ def run_script_common_prefix(lines, rel_root, eval_time_default, settings):
             '    export RMW_IMPLEMENTATION=rmw_zenoh_cpp',
             '    export ZENOH_ROUTER_CHECK_ATTEMPTS=5',
             '    export RUST_LOG=${RUST_LOG:-zenoh=warn,zenoh_transport=warn}',
-            '    export ZENOH_SESSION_CONFIG_URI="$PROJECT_ROOT/ros2_node_impl_ws/zenoh_config/DEFAULT_RMW_ZENOH_SESSION_CONFIG.json5"',
+            f'    export ZENOH_SESSION_CONFIG_URI="{settings.zenoh_config_dir_in_container}/DEFAULT_RMW_ZENOH_SESSION_CONFIG.json5"',
             '    ;;',
             '  cyclonedds)',
             '    export RMW_IMPLEMENTATION=rmw_cyclonedds_cpp',
