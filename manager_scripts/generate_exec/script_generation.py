@@ -346,10 +346,13 @@ def append_common_service(
     output_dir,
     eval_time_default,
     settings,
+    ipc_host=False,
 ):
     lines.append(f"  {service_name}:")
     lines.append(f"    image: {settings.image_name}")
     lines.append("    network_mode: host")
+    if ipc_host:
+        lines.append("    ipc: host")
     lines.append('    user: "${LOCAL_UID:-1000}:${LOCAL_GID:-1000}"')
     rel_project_root = os.path.relpath(project_root, output_dir)
     lines.append("    volumes:")
@@ -384,6 +387,7 @@ def append_zenohd_service(lines, project_root, output_dir, settings):
     lines.append("  service_zenohd:")
     lines.append(f"    image: {settings.image_name}")
     lines.append("    network_mode: host")
+    lines.append("    ipc: host")
     lines.append('    user: "${LOCAL_UID:-1000}:${LOCAL_GID:-1000}"')
     lines.append("    volumes:")
     lines.append(
@@ -426,6 +430,7 @@ def generate_compose(json_content, output_dir, project_root, settings):
             output_dir,
             eval_time_default,
             settings,
+            ipc_host=True,
         )
 
     append_zenohd_service(lines, project_root, output_dir, settings)
@@ -634,6 +639,14 @@ def generate_local_run_script(json_content, output_dir, project_root, settings):
                 'LOG_DIR="$LOG_DIR" '
                 'docker compose -f "$COMPOSE_FILE" down --remove-orphans >/dev/null 2>&1 || true'
             ),
+            "",
+            "# Clean up FastDDS shared memory segments from host /dev/shm only for FastDDS runs.",
+            "# ipc:host causes residual SHM segments to remain after each trial; FastDDS fails to",
+            "# recreate segments with the same domain ('File exists'). Set FASTDDS_SHM_CLEANUP=0 to",
+            "# disable this cleanup when sharing the host with other FastDDS applications.",
+            'if [[ "$RMW_CHOICE" == "fastdds" && "${FASTDDS_SHM_CLEANUP:-1}" != "0" ]]; then',
+            '  rm -f /dev/shm/sem.rtps* /dev/shm/rtps* 2>/dev/null || true',
+            'fi',
             "",
         ]
     )
