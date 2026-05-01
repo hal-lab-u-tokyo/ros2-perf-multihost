@@ -1,7 +1,6 @@
 import argparse
 from datetime import datetime
 import os
-import shutil
 import sys
 import time
 
@@ -14,16 +13,18 @@ if __name__ == "__main__":
         description="Run performance tests using generated exec script defaults",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         usage=(
-            "%(prog)s [--trials|-t N] [--eval-time|-e SEC] "
+            "%(prog)s <topology> [--trials|-t N] [--eval-time|-e SEC] "
             "[--exec-policy|-p {docker,native,local}] [--ws-dir|-w DIR] "
-            "[--scenario|-s NAME] [--help|-h]"
+            "[--rmw|-r {fastdds,zenoh,cyclonedds}] [--help|-h]"
         ),
         epilog="""
 Examples:
-  python3 performance_test/performance_test.py --exec-policy local --trials 5 --eval-time 60
-  short: python3 performance_test/performance_test.py -p local -t 5 -e 60
+    python3 performance_test/performance_test.py simple --exec-policy local --rmw fastdds --trials 5 --eval-time 60
+    short: python3 performance_test/performance_test.py simple -p local -r fastdds -t 5 -e 60
 """,
     )
+    parser.add_argument("topology_name", metavar="topology", type=str,
+                        help="Topology directory name under ws-dir")
     parser.add_argument("-t", "--trials", type=int, default=3,
                         help="Number of trials (default: 3)")
     parser.add_argument("-e", "--eval-time", type=int, default=None,
@@ -43,11 +44,12 @@ Examples:
         help="Workspace directory (default: performance_ws)",
     )
     parser.add_argument(
-        "-s",
-        "--scenario",
+        "-r",
+        "--rmw",
         type=str,
-        default="latest",
-        help="Scenario directory name (default: latest)",
+        required=True,
+        choices=["fastdds", "zenoh", "cyclonedds"],
+        help="RMW implementation used for this run",
     )
     args = parser.parse_args()
 
@@ -60,28 +62,27 @@ Examples:
     start_exec_scripts_py = os.path.join(
         repo_root, "remote_hosts_scripts", "start_exec_scripts.py")
 
-    local_results_root = os.path.join(args.ws_dir, args.scenario, "results")
+    local_results_root = os.path.join(
+        args.ws_dir, args.topology_name, "results")
     os.makedirs(local_results_root, exist_ok=True)
     local_timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
-    local_session_dir = os.path.join(local_results_root, local_timestamp)
+    run_timestamp = f"{local_timestamp}-{args.rmw}"
+    local_session_dir = os.path.join(local_results_root, run_timestamp)
     local_logs_dir = os.path.join(local_session_dir, "logs")
     local_csv_dir = os.path.join(local_session_dir, "csv")
 
     os.makedirs(local_logs_dir, exist_ok=True)
     os.makedirs(local_csv_dir, exist_ok=True)
 
-    local_latest_link = os.path.join(local_results_root, "latest")
+    local_latest_link = os.path.join(local_results_root, f"latest-{args.rmw}")
     if os.path.lexists(local_latest_link):
-        if os.path.islink(local_latest_link) or os.path.isfile(local_latest_link):
-            os.remove(local_latest_link)
-        elif os.path.isdir(local_latest_link):
-            shutil.rmtree(local_latest_link)
-    os.symlink(local_timestamp, local_latest_link)
+        os.remove(local_latest_link)
+    os.symlink(run_timestamp, local_latest_link)
 
     # Resolve actual host list from metadata (metadata.txt is authoritative)
     try:
         hosts = resolve_host_list(
-            args.ws_dir, args.scenario, mode=args.exec_policy
+            args.ws_dir, args.topology_name, mode=args.exec_policy
         )
     except (FileNotFoundError, ValueError) as e:
         print(f"ERROR: {e}", file=sys.stderr)
@@ -90,15 +91,16 @@ Examples:
     print(f"Note: payload_size and period_ms are determined by topology JSON; eval_time can be overridden")
     print(f"Local logs dir: {local_logs_dir}")
     print(f"Local csv dir: {local_csv_dir}")
-    print(f"Local latest alias: {local_latest_link} -> {local_timestamp}")
+    print(f"Local latest alias: {local_latest_link} -> {run_timestamp}")
 
     prepare_run(
         start_exec_scripts_py,
         hosts,
         args.ws_dir,
-        args.scenario,
+        args.topology_name,
+        rmw=args.rmw,
         exec_policy=args.exec_policy,
-        run_timestamp=local_timestamp,
+        run_timestamp=run_timestamp,
     )
 
     for trial_idx in range(args.trials):
@@ -107,10 +109,11 @@ Examples:
             start_exec_scripts_py,
             hosts,
             args.ws_dir,
-            args.scenario,
+            args.topology_name,
+            rmw=args.rmw,
             exec_policy=args.exec_policy,
             eval_time=eval_time,
-            run_timestamp=local_timestamp,
+            run_timestamp=run_timestamp,
         )
         time.sleep(10)
 
@@ -119,9 +122,10 @@ Examples:
         args.trials,
         hosts,
         ws_dir=args.ws_dir,
-        scenario=args.scenario,
+        topology_name=args.topology_name,
+        rmw=args.rmw,
         exec_policy=args.exec_policy,
-        run_timestamp=local_timestamp,
+        run_timestamp=run_timestamp,
     )
 
     aggregate_total_latency(
@@ -131,6 +135,6 @@ Examples:
         hosts,
         eval_time=eval_time,
         ws_dir=args.ws_dir,
-        scenario=args.scenario,
+        topology_name=args.topology_name,
     )
     print("All tests and aggregation complete.")

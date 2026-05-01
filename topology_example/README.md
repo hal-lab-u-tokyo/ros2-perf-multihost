@@ -68,7 +68,7 @@ For `intermediate[].publisher[]`, `payload_size` and `period_ms` are also requir
 
 ## 3. Notes
 
-The RMW implementation is selected with the command-line arguments to `generate_exec_scripts.py`. Defining it in the JSON file has no effect.
+The RMW implementation is selected at runtime (for example via `performance_test.py --rmw ...` or generated `*_exec.sh --rmw ...`). Defining RMW information in this JSON file has no effect.
 
 ## 4. Minimal Template
 

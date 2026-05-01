@@ -96,11 +96,11 @@ def unique_in_order(items):
 
 
 def generate_metadata_file(
-    json_content, json_path, rmw, ws_dir, project_root, scenario_dir
+    json_content, json_path, ws_dir, project_root, topology_dir
 ):
-    """Generate <ws-dir>/latest/metadata.txt."""
-    latest_dir = os.path.join(project_root, ws_dir, "latest")
-    metadata_path = os.path.join(latest_dir, "metadata.txt")
+    """Generate <ws-dir>/<topology>/metadata.txt."""
+    topology_root = os.path.join(project_root, ws_dir, topology_dir)
+    metadata_path = os.path.join(topology_root, "metadata.txt")
 
     (
         host_names,
@@ -132,11 +132,10 @@ def generate_metadata_file(
             f"json: {os.path.basename(json_path)}",
             f"json_path: {json_path}",
             f"ws_dir: {ws_dir}",
-            f"scenario_dir: {scenario_dir}",
+            f"topology_dir: {topology_dir}",
         ],
         [
             "# --- 2. test config ---",
-            f"rmw: {rmw}",
             f"qos_history: {qos.get('history', 'KEEP_LAST')}",
             f"qos_depth: {qos.get('depth', 1)}",
             f"qos_reliability: {qos.get('reliability', 'RELIABLE')}",

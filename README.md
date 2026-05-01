@@ -112,33 +112,38 @@ This topology defines a system consisting of 3 Hosts, where nodes communicate th
 
 #### Step2: Generate Execution Scripts
 
-Generate execution scripts and Docker artifacts for FastDDS from the topology JSON.
+Generate execution scripts and Docker artifacts from the topology JSON.
+RMW is not specified here — it is selected at runtime in Step3.
 
 ```bash
 python3 manager_scripts/generate_exec_scripts.py \
   topology_example/simple.json \
-  --rmw fastdds \
   --ws-dir performance_ws
 ```
 
 #### Step3: Run Benchmark on Local
 
 Run a local simulation of the multi-host behavior on a single machine.
+The topology name (directory under `performance_ws/`) and the RMW to use are both required.
 
 ```bash
 python3 performance_test/performance_test.py \
+  simple \
   --exec-policy local \
+  --rmw fastdds \
   --eval-time 10 --trials 3
 ```
 
-This runs 3 trials, each lasting 10 seconds.
+This runs 3 trials, each lasting 10 seconds, using Fast DDS.
 
 #### Step4: Results
 
 As a quick check, confirm that the following outputs are generated:
 
-- Logs: `<ws-dir>/<scenario>/results/latest/logs/trial<N>/`
-- CSV: `<ws-dir>/<scenario>/results/latest/csv/`
+- Logs: `<ws-dir>/<topology>/results/latest-<rmw>/logs/trial<N>/`
+- CSV: `<ws-dir>/<topology>/results/latest-<rmw>/csv/`
+
+For example with the command above: `performance_ws/simple/results/latest-fastdds/`
 
 Because this run is only a local simulation, the aggregated results are not meaningful for performance evaluation.
 A detailed explanation of how to interpret the analysis outputs is provided later.
@@ -158,7 +163,7 @@ Before starting multi-host benchmarks, it is helpful to understand an overview o
 | `manager_scripts/` | Topology-specific execution artifact generator; includes helper scripts for distribution and router operation. |
 | `remote_hosts_scripts/` | REST server, remote execution coordinator, and Host metrics collector for remote Hosts. |
 | `performance_test/` | Trial automation, log collection, and CSV aggregation/analysis. |
-| `performance_ws/` | Working directory for generated scenarios, execution scripts, and run results. Auto-generated on first use; not present in the repository. |
+| `performance_ws/` | Working directory for topology-specific execution scripts and run results. Auto-generated on first use; not present in the repository. |
 | `topology_example/` | Example topology JSON files and schema guidance. |
 | `ros2_node_impl_ws/` | ROS 2 node implementation workspace for generated execution scripts. |
 | `docker/` | Shared Docker image definition and Compose-related assets. |
@@ -285,7 +290,6 @@ Generate execution scripts (`host*.launch.py`, `host*_exec.sh`) and Docker Compo
 ```bash
 python3 manager_scripts/generate_exec_scripts.py \
   <topology.json> \
-  [--rmw|-m <rmw>] \
   [--ws-dir|-w <dir>] \
   [--force|-f]
 ```
@@ -294,16 +298,14 @@ Arguments:
 
 - `<topology.json>`: Path to the topology definition JSON file
 - `--ws-dir` (`-w`): Base directory for generated artifacts (default: `performance_ws`)
-- `--rmw` (`-m`): RMW implementation (`fastdds`, `zenoh`, or `cyclonedds`; default: `fastdds`)
 - `--force` (`-f`): Overwrite an existing output directory without confirmation; useful in CI or scripts
 
-Generated files are written to `<ws-dir>/<json-file-name>-<rmw>/exec_scripts/`. `<ws-dir>/latest` is always updated to point at the most recently generated directory.
+Generated files are written to `<ws-dir>/<json-file-name>/exec_scripts/`.
 
 ```bash
-# Example: use topology_example/simple.json with Fast DDS
+# Example: generate common exec scripts for topology_example/simple.json
 python3 manager_scripts/generate_exec_scripts.py \
-  topology_example/simple.json \
-  --rmw fastdds
+  topology_example/simple.json
 ```
 
 For details on generated files in `exec_scripts/`, `metadata.txt` format, and runtime options supported by generated scripts, see [manager_scripts/README.md](./manager_scripts/README.md).
@@ -311,25 +313,25 @@ For details on generated files in `exec_scripts/`, `metadata.txt` format, and ru
 #### Distribute to Hosts
 
 Distribute the generated `exec_scripts/` directory to each Host.
-`manager_scripts/distribute_exec_scripts.sh` reads `hosts`, `ws_dir`, and `scenario_dir` from `performance_ws/latest/metadata.txt` and distributes the corresponding file in `exec_scripts/` to each Host.
+`manager_scripts/distribute_exec_scripts.sh` reads `hosts`, `ws_dir`, and `topology_dir` from `performance_ws/<topology>/metadata.txt` and distributes the corresponding file in `exec_scripts/` to each Host.
 
 ```bash
 ./manager_scripts/distribute_exec_scripts.sh \
-  [--scenario|-s <name>] \
+  <topology> \
   [--ws-dir|-w <dir>] \
   [--remote-repo-base|-r <dir>]
 ```
 
 Arguments:
 
-- `--scenario` (`-s`): Scenario directory under `ws-dir` (default: `latest`)
-- `--ws-dir` (`-w`): Workspace directory that contains scenarios (default: `performance_ws`)
+- `<topology>`: Topology directory under `ws-dir` (required)
+- `--ws-dir` (`-w`): Workspace directory that contains topologies (default: `performance_ws`)
 - `--remote-repo-base` (`-r`): Remote repository base directory (default: `/home/ubuntu/ros2-perf-multihost`)
 
 ```bash
-# Example: specify scenario and remote path
+# Example: specify topology and remote path
 ./manager_scripts/distribute_exec_scripts.sh \
-  --scenario simple-fastdds \
+  simple \
   --remote-repo-base /home/ubuntu/ros2-perf-multihost
 ```
 
@@ -353,10 +355,11 @@ Then, run the benchmark script on the Manager.
 
 ```bash
 python3 performance_test/performance_test.py \
+  <topology> \
   [--exec-policy|-p <mode>] \
   [--trials|-t <n>] \
   [--ws-dir|-w <dir>] \
-  [--scenario|-s <name>] \
+  --rmw|-r <rmw> \
   [--eval-time|-e <sec>]
 ```
 
@@ -365,14 +368,16 @@ Examples:
 ```bash
 # Docker execution on remote Hosts (default policy)
 python3 performance_test/performance_test.py \
+  simple \
   --exec-policy docker \
-  --scenario simple-fastdds \
+  --rmw fastdds \
   --eval-time 10 --trials 3
 
 # Native execution on remote Hosts
 python3 performance_test/performance_test.py \
+  simple \
   --exec-policy native \
-  --scenario simple-fastdds \
+  --rmw fastdds \
   --eval-time 10 --trials 3
 ```
 
@@ -381,7 +386,8 @@ Arguments:
 - `--exec-policy` (`-p`): Execution mode, one of `docker`, `native`, or `local` (default: `docker`)
 - `--trials` (`-t`): Number of trials (default: `3`)
 - `--ws-dir` (`-w`): Base directory that contains generated execution scripts (default: `performance_ws`)
-- `--scenario` (`-s`): Scenario directory to use (default: `latest`)
+- `<topology>`: Topology directory to use (required)
+- `--rmw` (`-r`): RMW implementation (`fastdds`, `zenoh`, or `cyclonedds`) (required)
 - `--eval-time` (`-e`): Override evaluation time; if omitted, the default from generated `*_exec.sh` scripts is used
 
 #### Zenoh Router (on the Manager) [Zenoh only]
@@ -404,10 +410,10 @@ Available subcommands:
 
 `performance_test.py` launches node groups via REST for each trial, then collects logs from each Host with `scp`.
 
-On prepare, the Manager creates `<ws-dir>/<scenario>/results/<session_timestamp>/` and updates `<ws-dir>/<scenario>/results/latest` to point to it.
+On prepare, the Manager creates `<ws-dir>/<topology>/results/<session_timestamp>-<rmw>/` and updates `<ws-dir>/<topology>/results/latest-<rmw>` to point to it.
 
-- Trial logs are collected under `<ws-dir>/<scenario>/results/latest/logs/trial<N>/`.
-- Aggregated outputs such as `total_latency.csv`, `throughput.csv`, `host_trials_usage.csv`, and `host_usage_summary.csv` are written under `<ws-dir>/<scenario>/results/latest/csv/`.
+- Trial logs are collected under `<ws-dir>/<topology>/results/latest-<rmw>/logs/trial<N>/`.
+- Aggregated outputs such as `total_latency.csv`, `throughput.csv`, `host_trials_usage.csv`, and `host_usage_summary.csv` are written under `<ws-dir>/<topology>/results/latest-<rmw>/csv/`.
 
 For details on output directory structure and CSV column definitions, see [performance_test/README.md](./performance_test/README.md).
 
@@ -425,12 +431,12 @@ For detailed usage in subdomains, see the following documents:
 
 Common issues and fixes:
 
-- `python3 manager_scripts/generate_exec_scripts.py ...` fails because output exists: rerun with `--force` or remove the existing scenario directory under `performance_ws/`.
+- `python3 manager_scripts/generate_exec_scripts.py ...` fails because output exists: rerun with `--force` or remove the existing topology directory under `performance_ws/`.
 - `distribute_exec_scripts.sh` fails with SSH/SCP errors: verify hostnames, SSH keys, and that repository paths are identical across Hosts.
 - REST benchmark does not start remote execution: ensure `python3 remote_hosts_scripts/rest_server.py` is running on every target Host before calling `performance_test.py`.
 - Docker mode fails on remote Hosts: pull `ghcr.io/hal-lab-u-tokyo/ros2-perf-multihost:latest` and confirm Docker permissions on each Host.
 - Native mode cannot find workspace paths: set `ROS2_PERF_WS` to the project root before running `host*_exec.sh`.
-- Expected CSV outputs are missing: check `<ws-dir>/<scenario>/results/latest/logs/trial<N>/` for trial logs and inspect script stderr for analyzer failures.
+- Expected CSV outputs are missing: check `<ws-dir>/<topology>/results/latest-<rmw>/logs/trial<N>/` for trial logs and inspect script stderr for analyzer failures.
 
 ## Contributing and License
 

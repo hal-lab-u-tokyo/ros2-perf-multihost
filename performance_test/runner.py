@@ -17,7 +17,7 @@ def get_metadata_value(key, metadata_path):
     return None
 
 
-def resolve_host_list(ws_dir, scenario, mode="raw"):
+def resolve_host_list(ws_dir, topology_name, mode="raw"):
     """Resolve host list from environment or metadata.txt."""
     # mode is kept for compatibility with existing call sites.
     _ = mode
@@ -26,7 +26,7 @@ def resolve_host_list(ws_dir, scenario, mode="raw"):
     if env_hosts:
         return [h.strip() for h in env_hosts.split(",") if h.strip()]
 
-    metadata_path = os.path.join(ws_dir, scenario, "metadata.txt")
+    metadata_path = os.path.join(ws_dir, topology_name, "metadata.txt")
     if not os.path.exists(metadata_path):
         raise FileNotFoundError(f"metadata.txt not found: {metadata_path}")
 
@@ -48,7 +48,8 @@ def run_test(
     start_exec_scripts_py,
     hosts,
     ws_dir,
-    scenario,
+    topology_name,
+    rmw,
     exec_policy="docker",
     eval_time=None,
     run_timestamp=None,
@@ -57,7 +58,7 @@ def run_test(
 
     if exec_policy == "local":
         local_exec_sh = os.path.join(
-            ws_dir, scenario, "exec_scripts", "local_exec.sh")
+            ws_dir, topology_name, "exec_scripts", "local_exec.sh")
         if not os.path.exists(local_exec_sh):
             raise FileNotFoundError(
                 f"local_exec.sh not found: {local_exec_sh}")
@@ -65,6 +66,8 @@ def run_test(
         cmd = [
             "bash",
             local_exec_sh,
+            "--rmw",
+            rmw,
             "--trial-idx",
             str(trial_idx + 1),
         ]
@@ -93,8 +96,10 @@ def run_test(
         str(trial_idx + 1),
         "--ws-dir",
         ws_dir,
-        "--scenario",
-        scenario,
+        "--topology",
+        topology_name,
+        "--rmw",
+        rmw,
         "--hosts-list",
         hosts_str,
     ]
@@ -120,11 +125,12 @@ def prepare_run(
     start_exec_scripts_py,
     hosts,
     ws_dir,
-    scenario,
+    topology_name,
+    rmw,
     exec_policy="docker",
     run_timestamp=None,
 ):
-    """Initialize run timestamp/latest on all hosts before trial loop."""
+    """Initialize run timestamp/latest-rmw on all hosts before trial loop."""
     if exec_policy == "local":
         if not run_timestamp:
             raise ValueError(
@@ -143,8 +149,10 @@ def prepare_run(
         "--prepare-run",
         "--ws-dir",
         ws_dir,
-        "--scenario",
-        scenario,
+        "--topology",
+        topology_name,
+        "--rmw",
+        rmw,
         "--hosts-list",
         hosts_str,
     ]
@@ -160,7 +168,8 @@ def collect_logs(
     num_trials,
     hosts,
     ws_dir="performance_ws",
-    scenario="latest",
+    topology_name=None,
+    rmw=None,
     exec_policy="docker",
     run_timestamp=None,
 ):
@@ -168,13 +177,15 @@ def collect_logs(
     src_log_dir = os.path.abspath(local_logs_dir)
 
     if exec_policy == "local":
+        if not topology_name:
+            raise ValueError("topology is required when exec_policy=local")
         if not run_timestamp:
             raise ValueError(
                 "run_timestamp is required when exec_policy=local")
 
-        scenario_root = os.path.join(ws_dir, scenario)
+        topology_root = os.path.join(ws_dir, topology_name)
         local_exec_logs_root = os.path.join(
-            scenario_root,
+            topology_root,
             "results",
             str(run_timestamp),
             "exec_logs",
@@ -208,9 +219,14 @@ def collect_logs(
         trial_log_dir = os.path.join(src_log_dir, f"trial{trial_idx + 1}")
         os.makedirs(trial_log_dir, exist_ok=True)
 
+        if not topology_name:
+            raise ValueError("topology is required when exec_policy is remote")
+        if not rmw:
+            raise ValueError("rmw is required when exec_policy is remote")
+
         remote_log_dir = (
-            f"/home/ubuntu/ros2-perf-multihost/{ws_dir}/{scenario}"
-            f"/results/latest/exec_logs/trial{trial_idx + 1}"
+            f"/home/ubuntu/ros2-perf-multihost/{ws_dir}/{topology_name}"
+            f"/results/latest-{rmw}/exec_logs/trial{trial_idx + 1}"
         )
 
         for host in hosts:

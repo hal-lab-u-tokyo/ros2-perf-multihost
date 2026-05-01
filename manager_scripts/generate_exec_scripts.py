@@ -9,7 +9,6 @@ from generate_exec.metadata import generate_metadata_file
 from generate_exec.paths import (
     clear_directory_contents,
     resolve_output_paths,
-    update_latest_symlink,
 )
 from generate_exec.script_generation import (
     GenerationSettings,
@@ -36,12 +35,12 @@ if __name__ == "__main__":
         formatter_class=argparse.RawDescriptionHelpFormatter,
         usage=(
             "%(prog)s <topology.json> [--ws-dir|-w <dir>] [--force|-f] "
-            "[--rmw|-m <rmw>] [--help|-h]"
+            "[--help|-h]"
         ),
         epilog="""
 Examples:
-  python3 manager_scripts/generate_exec_scripts.py topology_example/simple.json --rmw fastdds --ws-dir performance_ws
-  short: python3 manager_scripts/generate_exec_scripts.py topology_example/simple.json -m fastdds -w performance_ws
+    python3 manager_scripts/generate_exec_scripts.py topology_example/simple.json --ws-dir performance_ws
+    short: python3 manager_scripts/generate_exec_scripts.py topology_example/simple.json -w performance_ws
 """,
     )
     parser.add_argument("json_path", help="Path to the input JSON file")
@@ -58,14 +57,6 @@ Examples:
         action="store_true",
         help="Overwrite existing output directory without confirmation",
     )
-    parser.add_argument(
-        "-m",
-        "--rmw",
-        type=str,
-        default="fastdds",
-        choices=["fastdds", "zenoh", "cyclonedds"],
-        help="RMW implementation (default: fastdds)",
-    )
     args = parser.parse_args()
 
     settings = GenerationSettings(
@@ -77,8 +68,8 @@ Examples:
         default_eval_time=DEFAULT_EVAL_TIME,
     )
 
-    project_root, output_dir, scenario_dir, overwrite = resolve_output_paths(
-        args.json_path, args.rmw, args.ws_dir, force=args.force
+    project_root, output_dir, topology_dir, overwrite = resolve_output_paths(
+        args.json_path, args.ws_dir, force=args.force
     )
 
     with open(args.json_path, "r") as f:
@@ -93,15 +84,14 @@ Examples:
     os.makedirs(tmp_dir)
 
     try:
-        generate_exec_scripts(json_content, args.rmw, tmp_dir, settings)
-        generate_compose(json_content, args.rmw,
-                         tmp_dir, project_root, settings)
+        generate_exec_scripts(json_content, tmp_dir, settings)
+        generate_compose(json_content, tmp_dir, project_root, settings)
         generate_compose_per_host(
-            json_content, args.rmw, tmp_dir, project_root, settings)
+            json_content, tmp_dir, project_root, settings)
         generate_host_exec_scripts(
             json_content, tmp_dir, project_root, settings)
         generate_local_run_script(
-            json_content, args.rmw, tmp_dir, project_root, settings)
+            json_content, tmp_dir, project_root, settings)
 
         # Generation succeeded; replace the existing directory atomically.
         if overwrite:
@@ -112,20 +102,16 @@ Examples:
         shutil.rmtree(tmp_dir, ignore_errors=True)
         raise
 
-    perf_ws_dir = os.path.join(project_root, settings.perf_ws_dir)
-    update_latest_symlink(perf_ws_dir, scenario_dir)
-
     generate_metadata_file(
         json_content,
         args.json_path,
-        args.rmw,
         args.ws_dir,
         project_root,
-        scenario_dir,
+        topology_dir,
     )
 
     print(
         f"Generated host*.launch.py, host*_exec.sh, host*_compose.yaml, local_exec.sh, local_compose.yaml "
-        f"in {settings.perf_ws_dir}/{scenario_dir}/exec_scripts (latest: {settings.perf_ws_dir}/latest)"
-        f" for {len(json_content['hosts'])} host(s) with RMW={args.rmw}"
+        f"in {settings.perf_ws_dir}/{topology_dir}/exec_scripts "
+        f"for {len(json_content['hosts'])} host(s)"
     )
