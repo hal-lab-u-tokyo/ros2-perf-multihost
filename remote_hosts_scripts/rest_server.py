@@ -65,9 +65,14 @@ def _resolve_exec_context(request_json):
     ws_dir_input = _sanitize_relative_path(
         request_json.get("ws_dir", DEFAULT_WS_DIR), "ws_dir"
     )
-    topology_input = _sanitize_relative_path(
-        request_json.get("topology"), "topology"
-    )
+
+    topology_raw = request_json.get("topology")
+    if topology_raw is None:
+        raise ValueError("topology is required")
+    if isinstance(topology_raw, str) and not topology_raw.strip():
+        raise ValueError("topology cannot be empty")
+
+    topology_input = _sanitize_relative_path(topology_raw, "topology")
 
     metadata_path = _join_under_repo(
         ws_dir_input, topology_input, "metadata.txt")

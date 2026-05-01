@@ -13,36 +13,18 @@ if __name__ == "__main__":
         description="Run performance tests using generated exec script defaults",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         usage=(
-            "%(prog)s <topology> [--trials|-t N] [--eval-time|-e SEC] "
-            "[--exec-policy|-p {docker,native,local}] [--ws-dir|-w DIR] "
-            "[--rmw|-m {fastdds,zenoh,cyclonedds}] [--help|-h]"
+            "%(prog)s <topology> --rmw|-m {fastdds,zenoh,cyclonedds} "
+            "[--exec-policy|-p {docker,native,local}] [--eval-time|-e SEC] "
+            "[--trials|-t N] [--ws-dir|-w DIR] [--help|-h]"
         ),
         epilog="""
 Examples:
-    python3 performance_test/performance_test.py simple --exec-policy local --rmw fastdds --trials 5 --eval-time 60
-    short: python3 performance_test/performance_test.py simple -p local -m fastdds -t 5 -e 60
+    python3 performance_test/performance_test.py simple --rmw fastdds --exec-policy local --eval-time 60 --trials 5
+    short: python3 performance_test/performance_test.py simple -m fastdds -p local -e 60 -t 5
 """,
     )
     parser.add_argument("topology_name", metavar="topology", type=str,
                         help="Topology directory name under ws-dir")
-    parser.add_argument("-t", "--trials", type=int, default=3,
-                        help="Number of trials (default: 3)")
-    parser.add_argument("-e", "--eval-time", type=int, default=None,
-                        help="Evaluation duration in seconds; if omitted, use the generated script default (60)")
-    parser.add_argument(
-        "-p",
-        "--exec-policy",
-        choices=["docker", "native", "local"],
-        default="docker",
-        help="Execution mode (default: docker). local runs exec_scripts/local_exec.sh on this machine",
-    )
-    parser.add_argument(
-        "-w",
-        "--ws-dir",
-        type=str,
-        default="performance_ws",
-        help="Workspace directory (default: performance_ws)",
-    )
     parser.add_argument(
         "-m",
         "--rmw",
@@ -50,6 +32,24 @@ Examples:
         required=True,
         choices=["fastdds", "zenoh", "cyclonedds"],
         help="RMW implementation used for this run",
+    )
+    parser.add_argument(
+        "-p",
+        "--exec-policy",
+        choices=["docker", "native", "local"],
+        default="docker",
+        help="Execution mode (default: docker). local runs exec_scripts/local_exec.sh on this machine",
+    )
+    parser.add_argument("-e", "--eval-time", type=int, default=None,
+                        help="Evaluation duration in seconds; if omitted, use the generated script default (60)")
+    parser.add_argument("-t", "--trials", type=int, default=3,
+                        help="Number of trials (default: 3)")
+    parser.add_argument(
+        "-w",
+        "--ws-dir",
+        type=str,
+        default="performance_ws",
+        help="Workspace directory (default: performance_ws)",
     )
     args = parser.parse_args()
 

@@ -272,7 +272,7 @@ def generate_exec_scripts(json_content, output_dir, settings):
         # Assemble the full launch file
         lines = [
             "from launch import LaunchDescription",
-            "from launch.actions import DeclareLaunchArgument, EmitEvent, ExecuteProcess, RegisterEventHandler, SetEnvironmentVariable",
+            "from launch.actions import DeclareLaunchArgument, EmitEvent, ExecuteProcess, RegisterEventHandler",
             "from launch.event_handlers import OnProcessExit",
             "from launch.events import Shutdown",
             "from launch.substitutions import EnvironmentVariable, LaunchConfiguration, PathJoinSubstitution",

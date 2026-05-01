@@ -129,8 +129,8 @@ The topology name (directory under `performance_ws/`) and the RMW to use are bot
 ```bash
 python3 performance_test/performance_test.py \
   simple \
-  --exec-policy local \
   --rmw fastdds \
+  --exec-policy local \
   --eval-time 10 --trials 3
 ```
 
@@ -372,11 +372,11 @@ Then, run the benchmark script on the Manager.
 ```bash
 python3 performance_test/performance_test.py \
   <topology> \
-  [--exec-policy|-p <mode>] \
-  [--trials|-t <n>] \
-  [--ws-dir|-w <dir>] \
   --rmw|-m <rmw> \
-  [--eval-time|-e <sec>]
+  [--exec-policy|-p <mode>] \
+  [--eval-time|-e <sec>] \
+  [--trials|-t <n>] \
+  [--ws-dir|-w <dir>]
 ```
 
 Examples:
@@ -385,26 +385,26 @@ Examples:
 # Docker execution on remote Hosts (default policy)
 python3 performance_test/performance_test.py \
   simple \
-  --exec-policy docker \
   --rmw fastdds \
+  --exec-policy docker \
   --eval-time 10 --trials 3
 
 # Native execution on remote Hosts
 python3 performance_test/performance_test.py \
   simple \
-  --exec-policy native \
   --rmw fastdds \
+  --exec-policy native \
   --eval-time 10 --trials 3
 ```
 
 Arguments:
 
-- `--exec-policy` (`-p`): Execution mode, one of `docker`, `native`, or `local` (default: `docker`)
-- `--trials` (`-t`): Number of trials (default: `3`)
-- `--ws-dir` (`-w`): Base directory that contains generated execution scripts (default: `performance_ws`)
 - `<topology>`: Topology directory to use (required)
 - `--rmw` (`-m`): RMW implementation (`fastdds`, `zenoh`, or `cyclonedds`) (required)
+- `--exec-policy` (`-p`): Execution mode, one of `docker`, `native`, or `local` (default: `docker`)
 - `--eval-time` (`-e`): Override evaluation time; if omitted, the default from generated `*_exec.sh` scripts is used
+- `--trials` (`-t`): Number of trials (default: `3`)
+- `--ws-dir` (`-w`): Base directory that contains generated execution scripts (default: `performance_ws`)
 
 #### Zenoh Router (on the Manager) [Zenoh only]
 
