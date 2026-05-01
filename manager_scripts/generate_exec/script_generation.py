@@ -637,6 +637,11 @@ def generate_local_run_script(json_content, output_dir, project_root, settings):
                 'docker compose -f "$COMPOSE_FILE" down --remove-orphans >/dev/null 2>&1 || true'
             ),
             "",
+            "# Clean up FastDDS shared memory segments from host /dev/shm to prevent 'File exists' errors",
+            "# when running multiple trials with ipc:host. Each trial leaves residual SHM segments that",
+            "# FastDDS fails to recreate with the same domain. Removing them allows trial reuse.",
+            'rm -f /dev/shm/sem.rtps* /dev/shm/rtps* 2>/dev/null || true',
+            "",
         ]
     )
 
