@@ -101,11 +101,18 @@ Pull the shared image once before running the quick start.
 docker pull ghcr.io/hal-lab-u-tokyo/ros2-perf-multihost:latest
 ```
 
-### Steps
+### Quick Steps
 
 Run everything on a single machine in this local workflow.
 
-1. Generate execution scripts from a topology JSON file.
+#### Step1: Define Topology
+
+This quick example uses [simple.json](./topology_example/simple.json).
+This topology defines a system consisting of 3 Hosts, where nodes communicate through topics.
+
+#### Step2: Generate Execution Scripts
+
+Generate execution scripts and Docker artifacts for FastDDS from the topology JSON.
 
 ```bash
 python3 manager_scripts/generate_exec_scripts.py \
@@ -114,19 +121,27 @@ python3 manager_scripts/generate_exec_scripts.py \
   --ws-dir performance_ws
 ```
 
-2. Run a benchmark session.
+#### Step3: Run Benchmark on Local
+
+Run a local simulation of the multi-host behavior on a single machine.
 
 ```bash
-python3 performance_test/performance_test.py --exec-policy local
+python3 performance_test/performance_test.py \
+  --exec-policy local \
+  --eval-time 10 --trials 3
 ```
 
-`performance_test.py` executes `<ws-dir>/<scenario>/exec_scripts/local_exec.sh` on the Manager for each trial.
-This runs 3 trials, each lasting 60 seconds.
+This runs 3 trials, each lasting 10 seconds.
 
-3. Check outputs.
+#### Step4: Results
+
+As a quick check, confirm that the following outputs are generated:
 
 - Logs: `<ws-dir>/<scenario>/results/latest/logs/trial<N>/`
 - CSV: `<ws-dir>/<scenario>/results/latest/csv/`
+
+Because this run is only a local simulation, the aggregated results are not meaningful for performance evaluation.
+A detailed explanation of how to interpret the analysis outputs is provided later.
 
 Need multi-host operation, Docker or native execution, and REST automation?
 Want to learn more about these steps and output metrics?
