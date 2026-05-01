@@ -18,99 +18,6 @@ class GenerationSettings:
     default_eval_time: int
 
 
-def rmw_env_lines(rmw):
-    """Return environment export lines for the selected RMW implementation."""
-    if rmw == "zenoh":
-        return [
-            "# RMW Zenoh settings",
-            "export RMW_IMPLEMENTATION=rmw_zenoh_cpp",
-            "export ZENOH_ROUTER_CHECK_ATTEMPTS=5",
-            "export RUST_LOG=zenoh=warn,zenoh_transport=warn",
-            'export ZENOH_SESSION_CONFIG_URI="$PROJECT_ROOT/ros2_node_impl_ws/zenoh_config/DEFAULT_RMW_ZENOH_SESSION_CONFIG.json5"',
-        ]
-    if rmw == "fastdds":
-        return [
-            "# RMW Fast DDS settings",
-            "export RMW_IMPLEMENTATION=rmw_fastrtps_cpp",
-        ]
-    if rmw == "cyclonedds":
-        return [
-            "# RMW Cyclone DDS settings",
-            "export RMW_IMPLEMENTATION=rmw_cyclonedds_cpp",
-        ]
-    return [f'# Unknown RMW "{rmw}", using default settings']
-
-
-def append_host_script_prelude(lines, host_name, rmw, eval_time_default, settings):
-    """Append the shared prelude used by host*_exec.sh."""
-    lines.extend(
-        [
-            "#!/usr/bin/env bash",
-            "set -euo pipefail",
-            "",
-            '# Project root: use /workdir/ros2-perf-multihost in Docker, or the repository root in native mode',
-            f'PROJECT_ROOT="${{ROS2_PERF_WS:-{settings.project_root_in_container}}}"',
-            '# Consolidated ROS 2 node implementation workspace',
-            'ROS_WS="${ROS2_NODE_IMPL_WS:-$PROJECT_ROOT/ros2_node_impl_ws}"',
-            "",
-            f'EVAL_TIME="${{EVAL_TIME:-{eval_time_default}}}"',
-            "",
-            "# allow runtime override via script option",
-            'while [[ $# -gt 0 ]]; do',
-            '  case "$1" in',
-            '    --eval-time|-t)',
-            '      EVAL_TIME="$2"; shift 2;;',
-            '    --)',
-            '      shift; break;;',
-            '    *)',
-            '      echo "Unknown option: $1" >&2; exit 2;;',
-            '  esac',
-            'done',
-            'if ! [[ "$EVAL_TIME" =~ ^[0-9]+$ ]] || [[ "$EVAL_TIME" -le 0 ]]; then',
-            '  echo "ERROR: EVAL_TIME must be a positive integer." >&2',
-            '  exit 2',
-            'fi',
-            "",
-            'LOG_DIR="${LOG_DIR:?LOG_DIR is required. Use host*_run.sh or local_run.sh}"',
-            'mkdir -p "$LOG_DIR"',
-            "",
-            "# colcon setup.sh may reference COLCON_CURRENT_PREFIX before it is defined",
-            "# so disable -u only around the source command",
-            "set +u",
-            '. "$ROS_WS/install/setup.sh"',
-            "set -u",
-            "",
-        ]
-    )
-
-    lines.extend(rmw_env_lines(rmw))
-    lines.extend(
-        [
-            "",
-            "# host-level monitor (CPU/memory)",
-            'MONITOR_HOST_PY="$PROJECT_ROOT/remote_hosts_scripts/monitor_psutil.py"',
-            'if [ ! -f "$MONITOR_HOST_PY" ]; then',
-            '  MONITOR_HOST_PY="$ROS_WS/../remote_hosts_scripts/monitor_psutil.py"',
-            "fi",
-            'if [ ! -f "$MONITOR_HOST_PY" ]; then',
-            '  echo "ERROR: monitor_psutil.py not found under $PROJECT_ROOT/remote_hosts_scripts" >&2',
-            "  exit 1",
-            "fi",
-            f'python3 "$MONITOR_HOST_PY" 0.5 "$LOG_DIR/{host_name}_monitor_host.csv" &',
-            "MON_HOST_PID=$!",
-            "",
-            (
-                "trap 'set +e; "
-                '[ -n "${MON_HOST_PID:-}" ] && kill ${MON_HOST_PID} 2>/dev/null || true; '
-                "exit' EXIT"
-            ),
-            "",
-            "# start ROS 2 nodes",
-            "node_pids=()",
-        ]
-    )
-
-
 def append_publisher_block(lines, node_name, pub_list, qos_opts):
     topic_names = ",".join(p["topic_name"] for p in pub_list)
     payload_sizes = [
@@ -219,7 +126,7 @@ def append_host_script_epilogue(lines, host_name):
     )
 
 
-def generate_exec_scripts(json_content, rmw, output_dir, settings):
+def generate_exec_scripts(json_content, output_dir, settings):
     """Generate per-host launch files consumed by docker compose services."""
     os.makedirs(output_dir, exist_ok=True)
 
@@ -233,30 +140,6 @@ def generate_exec_scripts(json_content, rmw, output_dir, settings):
         f"--qos-history {qos_history} --qos-depth {qos_depth} "
         f"--qos-reliability {qos_reliability}"
     )
-
-    env_lines = []
-    if rmw == "zenoh":
-        env_lines.extend(
-            [
-                '            SetEnvironmentVariable(name="RMW_IMPLEMENTATION", value="rmw_zenoh_cpp"),',
-                '            SetEnvironmentVariable(name="ZENOH_ROUTER_CHECK_ATTEMPTS", value="5"),',
-                '            SetEnvironmentVariable(name="RUST_LOG", value="zenoh=warn,zenoh_transport=warn"),',
-                (
-                    '            SetEnvironmentVariable('
-                    'name="ZENOH_SESSION_CONFIG_URI", '
-                    f'value="{settings.project_root_in_container}/ros2_node_impl_ws/zenoh_config/DEFAULT_RMW_ZENOH_SESSION_CONFIG.json5"'
-                    '),'
-                ),
-            ]
-        )
-    elif rmw == "fastdds":
-        env_lines.append(
-            '            SetEnvironmentVariable(name="RMW_IMPLEMENTATION", value="rmw_fastrtps_cpp"),'
-        )
-    elif rmw == "cyclonedds":
-        env_lines.append(
-            '            SetEnvironmentVariable(name="RMW_IMPLEMENTATION", value="rmw_cyclonedds_cpp"),'
-        )
 
     for host_dict in json_content["hosts"]:
         host_name = host_dict["host_name"]
@@ -389,7 +272,7 @@ def generate_exec_scripts(json_content, rmw, output_dir, settings):
         # Assemble the full launch file
         lines = [
             "from launch import LaunchDescription",
-            "from launch.actions import DeclareLaunchArgument, EmitEvent, ExecuteProcess, RegisterEventHandler, SetEnvironmentVariable",
+            "from launch.actions import DeclareLaunchArgument, EmitEvent, ExecuteProcess, RegisterEventHandler",
             "from launch.event_handlers import OnProcessExit",
             "from launch.events import Shutdown",
             "from launch.substitutions import EnvironmentVariable, LaunchConfiguration, PathJoinSubstitution",
@@ -425,7 +308,6 @@ def generate_exec_scripts(json_content, rmw, output_dir, settings):
             "        [",
             f'            DeclareLaunchArgument("eval_time", default_value=EnvironmentVariable("EVAL_TIME", default_value="{eval_time_default}")),',
             '            DeclareLaunchArgument("log_dir", default_value=EnvironmentVariable("LOG_DIR", default_value="")),',
-            *env_lines,
             "            ExecuteProcess(",
             "                cmd=[",
             '                    "python3",',
@@ -460,12 +342,10 @@ def append_common_service(
     lines,
     service_name,
     host_name,
-    rmw,
     project_root,
     output_dir,
     eval_time_default,
     settings,
-    depends_on_zenohd=False,
 ):
     lines.append(f"  {service_name}:")
     lines.append(f"    image: {settings.image_name}")
@@ -481,22 +361,15 @@ def append_common_service(
     lines.append("    environment:")
     lines.append(f"      - ROS2_PERF_WS={settings.project_root_in_container}")
     lines.append(f"      - ROS2_NODE_IMPL_WS={settings.ros_ws_in_container}")
-    if rmw == "zenoh":
-        lines.append("      - RMW_IMPLEMENTATION=rmw_zenoh_cpp")
-        lines.append(
-            f"      - ZENOH_SESSION_CONFIG_URI={settings.zenoh_config_dir_in_container}/DEFAULT_RMW_ZENOH_SESSION_CONFIG.json5"
-        )
-        lines.append("      - RUST_LOG=zenoh=warn,zenoh_transport=warn")
-    elif rmw == "fastdds":
-        lines.append("      - RMW_IMPLEMENTATION=rmw_fastrtps_cpp")
-    elif rmw == "cyclonedds":
-        lines.append("      - RMW_IMPLEMENTATION=rmw_cyclonedds_cpp")
+    lines.append("      - RMW_CHOICE=${RMW_CHOICE:-}")
+    lines.append("      - RMW_IMPLEMENTATION=${RMW_IMPLEMENTATION:-}")
+    lines.append(
+        "      - ZENOH_SESSION_CONFIG_URI=${ZENOH_SESSION_CONFIG_URI:-}")
+    lines.append(
+        "      - ZENOH_ROUTER_CHECK_ATTEMPTS=${ZENOH_ROUTER_CHECK_ATTEMPTS:-}")
+    lines.append("      - RUST_LOG=${RUST_LOG:-}")
     lines.append(f"      - EVAL_TIME=${{EVAL_TIME:-{eval_time_default}}}")
     lines.append("      - LOG_DIR=${LOG_DIR:-}")
-    if depends_on_zenohd and rmw == "zenoh":
-        lines.append("    depends_on:")
-        lines.append("      service_zenohd:")
-        lines.append("        condition: service_healthy")
     lines.append(
         (
             '    command: [ "/bin/bash", "-lc", '
@@ -537,7 +410,7 @@ def append_zenohd_service(lines, project_root, output_dir, settings):
     )
 
 
-def generate_compose(json_content, rmw, output_dir, project_root, settings):
+def generate_compose(json_content, output_dir, project_root, settings):
     """Generate local_compose.yaml for validation on a development machine."""
     eval_time_default = settings.default_eval_time
     lines = ["services:"]
@@ -549,23 +422,20 @@ def generate_compose(json_content, rmw, output_dir, project_root, settings):
             lines,
             service_name,
             host_name,
-            rmw,
             project_root,
             output_dir,
             eval_time_default,
             settings,
-            depends_on_zenohd=(rmw == "zenoh"),
         )
 
-    if rmw == "zenoh":
-        append_zenohd_service(lines, project_root, output_dir, settings)
+    append_zenohd_service(lines, project_root, output_dir, settings)
 
     compose_path = os.path.join(output_dir, "local_compose.yaml")
     with open(compose_path, "w") as f:
         f.write("\n".join(lines) + "\n")
 
 
-def generate_compose_per_host(json_content, rmw, output_dir, project_root, settings):
+def generate_compose_per_host(json_content, output_dir, project_root, settings):
     """Generate one host-specific host*_compose.yaml file per host."""
     eval_time_default = settings.default_eval_time
     for host_dict in json_content["hosts"]:
@@ -575,7 +445,6 @@ def generate_compose_per_host(json_content, rmw, output_dir, project_root, setti
             lines,
             f"service_{host_name}",
             host_name,
-            rmw,
             project_root,
             output_dir,
             eval_time_default,
@@ -602,6 +471,7 @@ def run_script_common_prefix(lines, rel_root, eval_time_default, settings):
             'LOCAL_UID="${LOCAL_UID:-$(id -u)}"',
             'LOCAL_GID="${LOCAL_GID:-$(id -g)}"',
             f'EVAL_TIME="${{EVAL_TIME:-{eval_time_default}}}"',
+            'RMW_CHOICE="${RMW_CHOICE:-${RMW:-}}"',
             'TRIAL_IDX="${TRIAL_IDX:-1}"',
             "",
             'print_help() {',
@@ -610,7 +480,8 @@ def run_script_common_prefix(lines, rel_root, eval_time_default, settings):
             '',
             'Options:',
             '  -t, --eval-time SEC       Evaluation duration in seconds (default: $EVAL_TIME)',
-            '  -r, --trial-idx N         Trial index (default: $TRIAL_IDX)',
+            '  -i, --trial-idx N         Trial index (default: $TRIAL_IDX)',
+            '  -m, --rmw NAME            RMW implementation: fastdds|zenoh|cyclonedds',
             '  -h, --help                Show this help message and exit',
             '',
             'Notes:',
@@ -624,8 +495,10 @@ def run_script_common_prefix(lines, rel_root, eval_time_default, settings):
             '  case "$1" in',
             '    --eval-time|-t)',
             '      EVAL_TIME="$2"; shift 2;;',
-            '    --trial-idx|-r)',
+            '    --trial-idx|-i)',
             '      TRIAL_IDX="$2"; shift 2;;',
+            '    --rmw|-m)',
+            '      RMW_CHOICE="$2"; shift 2;;',
             '    --help|-h)',
             '      print_help; exit 0;;',
             '    --)',
@@ -638,14 +511,40 @@ def run_script_common_prefix(lines, rel_root, eval_time_default, settings):
             '  echo "ERROR: EVAL_TIME must be a positive integer." >&2',
             '  exit 2',
             'fi',
+            'if [[ -z "$RMW_CHOICE" ]]; then',
+            '  echo "ERROR: --rmw is required (fastdds|zenoh|cyclonedds)." >&2',
+            '  exit 2',
+            'fi',
+            'case "$RMW_CHOICE" in',
+            '  fastdds)',
+            '    export RMW_IMPLEMENTATION=rmw_fastrtps_cpp',
+            '    unset ZENOH_ROUTER_CHECK_ATTEMPTS ZENOH_SESSION_CONFIG_URI',
+            '    export RUST_LOG=${RUST_LOG:-}',
+            '    ;;',
+            '  zenoh)',
+            '    export RMW_IMPLEMENTATION=rmw_zenoh_cpp',
+            '    export ZENOH_ROUTER_CHECK_ATTEMPTS=5',
+            '    export RUST_LOG=${RUST_LOG:-zenoh=warn,zenoh_transport=warn}',
+            f'    export ZENOH_SESSION_CONFIG_URI="{settings.zenoh_config_dir_in_container}/DEFAULT_RMW_ZENOH_SESSION_CONFIG.json5"',
+            '    ;;',
+            '  cyclonedds)',
+            '    export RMW_IMPLEMENTATION=rmw_cyclonedds_cpp',
+            '    unset ZENOH_ROUTER_CHECK_ATTEMPTS ZENOH_SESSION_CONFIG_URI',
+            '    export RUST_LOG=${RUST_LOG:-}',
+            '    ;;',
+            '  *)',
+            '    echo "ERROR: unsupported rmw: $RMW_CHOICE" >&2',
+            '    exit 2',
+            '    ;;',
+            'esac',
             'RESULTS_HOST_DIR="$RUN_ROOT_DIR/results"',
             'mkdir -p "$RESULTS_HOST_DIR"',
             'if [[ -z "${RUN_TIMESTAMP:-}" ]]; then',
-            '  RUN_TIMESTAMP="$(date +%Y-%m-%d_%H-%M-%S)"',
+            '  RUN_TIMESTAMP="$(date +%Y-%m-%d_%H-%M-%S)-${RMW_CHOICE}"',
             'fi',
             'RUN_RESULTS_HOST_DIR="$RESULTS_HOST_DIR/$RUN_TIMESTAMP"',
             'mkdir -p "$RUN_RESULTS_HOST_DIR"',
-            'ln -sfn "$RUN_TIMESTAMP" "$RESULTS_HOST_DIR/latest"',
+            'ln -sfn "$RUN_TIMESTAMP" "$RESULTS_HOST_DIR/latest-${RMW_CHOICE}"',
             'EXEC_LOGS_HOST_DIR="$RUN_RESULTS_HOST_DIR/exec_logs/trial${TRIAL_IDX}"',
             'mkdir -p "$EXEC_LOGS_HOST_DIR"',
             (
@@ -657,6 +556,7 @@ def run_script_common_prefix(lines, rel_root, eval_time_default, settings):
             'echo "Running containers as uid:gid $LOCAL_UID:$LOCAL_GID"',
             'echo "LOG_DIR (in container): $LOG_DIR"',
             'echo "EVAL_TIME=$EVAL_TIME"',
+            'echo "RMW_CHOICE=$RMW_CHOICE"',
             "",
         ]
     )
@@ -680,12 +580,22 @@ def generate_host_exec_scripts(json_content, output_dir, project_root, settings)
                 (
                     f'LOCAL_UID="$LOCAL_UID" LOCAL_GID="$LOCAL_GID" '
                     'EVAL_TIME="$EVAL_TIME" '
+                    'RMW_CHOICE="$RMW_CHOICE" '
+                    'RMW_IMPLEMENTATION="$RMW_IMPLEMENTATION" '
+                    'ZENOH_SESSION_CONFIG_URI="${ZENOH_SESSION_CONFIG_URI:-}" '
+                    'ZENOH_ROUTER_CHECK_ATTEMPTS="${ZENOH_ROUTER_CHECK_ATTEMPTS:-}" '
+                    'RUST_LOG="${RUST_LOG:-}" '
                     'LOG_DIR="$LOG_DIR" '
                     'docker compose -f "$COMPOSE_FILE" down --remove-orphans >/dev/null 2>&1 || true'
                 ),
                 (
                     f'LOCAL_UID="$LOCAL_UID" LOCAL_GID="$LOCAL_GID" '
                     'EVAL_TIME="$EVAL_TIME" '
+                    'RMW_CHOICE="$RMW_CHOICE" '
+                    'RMW_IMPLEMENTATION="$RMW_IMPLEMENTATION" '
+                    'ZENOH_SESSION_CONFIG_URI="${ZENOH_SESSION_CONFIG_URI:-}" '
+                    'ZENOH_ROUTER_CHECK_ATTEMPTS="${ZENOH_ROUTER_CHECK_ATTEMPTS:-}" '
+                    'RUST_LOG="${RUST_LOG:-}" '
                     'LOG_DIR="$LOG_DIR" '
                     f'docker compose -f "$COMPOSE_FILE" up service_{host_name}'
                 ),
@@ -698,7 +608,7 @@ def generate_host_exec_scripts(json_content, output_dir, project_root, settings)
         os.chmod(script_path, 0o755)
 
 
-def generate_local_run_script(json_content, rmw, output_dir, project_root, settings):
+def generate_local_run_script(json_content, output_dir, project_root, settings):
     """Generate local_exec.sh to start all services using local_compose.yaml."""
     hosts = json_content["hosts"]
     host_services = " ".join(f"service_{h['host_name']}" for h in hosts)
@@ -716,6 +626,11 @@ def generate_local_run_script(json_content, rmw, output_dir, project_root, setti
             (
                 'LOCAL_UID="$LOCAL_UID" LOCAL_GID="$LOCAL_GID" '
                 'EVAL_TIME="$EVAL_TIME" '
+                'RMW_CHOICE="$RMW_CHOICE" '
+                'RMW_IMPLEMENTATION="$RMW_IMPLEMENTATION" '
+                'ZENOH_SESSION_CONFIG_URI="${ZENOH_SESSION_CONFIG_URI:-}" '
+                'ZENOH_ROUTER_CHECK_ATTEMPTS="${ZENOH_ROUTER_CHECK_ATTEMPTS:-}" '
+                'RUST_LOG="${RUST_LOG:-}" '
                 'LOG_DIR="$LOG_DIR" '
                 'docker compose -f "$COMPOSE_FILE" down --remove-orphans >/dev/null 2>&1 || true'
             ),
@@ -723,54 +638,66 @@ def generate_local_run_script(json_content, rmw, output_dir, project_root, setti
         ]
     )
 
-    if rmw == "zenoh":
-        lines.extend(
-            [
-                'echo "[1/3] Starting service_zenohd..."',
-                (
-                    'LOCAL_UID="$LOCAL_UID" LOCAL_GID="$LOCAL_GID" '
-                    'EVAL_TIME="$EVAL_TIME" '
-                    'LOG_DIR="$LOG_DIR" '
-                    'docker compose -f "$COMPOSE_FILE" up -d service_zenohd'
-                ),
-                "",
-                'echo "[2/3] Waiting 5 seconds for zenoh router startup..."',
-                "sleep 5",
-                "",
-                f'echo "[3/3] Starting host services: {host_services}"',
-                "status=0",
-                (
-                    'LOCAL_UID="$LOCAL_UID" LOCAL_GID="$LOCAL_GID" '
-                    'EVAL_TIME="$EVAL_TIME" '
-                    'LOG_DIR="$LOG_DIR" '
-                    f'docker compose -f "$COMPOSE_FILE" up {host_services} || status=$?'
-                ),
-                "",
-                'echo "Stopping service_zenohd..."',
-                (
-                    'LOCAL_UID="$LOCAL_UID" LOCAL_GID="$LOCAL_GID" '
-                    'EVAL_TIME="$EVAL_TIME" '
-                    'LOG_DIR="$LOG_DIR" '
-                    'docker compose -f "$COMPOSE_FILE" stop service_zenohd >/dev/null 2>&1 || true'
-                ),
-                "",
-                'echo "Finished. service_zenohd stopped."',
-                "",
-                'exit "$status"',
-            ]
-        )
-    else:
-        lines.extend(
-            [
-                f'echo "Starting all services: {host_services}"',
-                (
-                    'LOCAL_UID="$LOCAL_UID" LOCAL_GID="$LOCAL_GID" '
-                    'EVAL_TIME="$EVAL_TIME" '
-                    'LOG_DIR="$LOG_DIR" '
-                    f'docker compose -f "$COMPOSE_FILE" up {host_services}'
-                ),
-            ]
-        )
+    lines.extend(
+        [
+            "status=0",
+            'if [[ "$RMW_CHOICE" == "zenoh" ]]; then',
+            '  echo "[1/3] Starting service_zenohd..."',
+            (
+                '  LOCAL_UID="$LOCAL_UID" LOCAL_GID="$LOCAL_GID" '
+                'EVAL_TIME="$EVAL_TIME" '
+                'RMW_CHOICE="$RMW_CHOICE" '
+                'RMW_IMPLEMENTATION="$RMW_IMPLEMENTATION" '
+                'ZENOH_SESSION_CONFIG_URI="${ZENOH_SESSION_CONFIG_URI:-}" '
+                'ZENOH_ROUTER_CHECK_ATTEMPTS="${ZENOH_ROUTER_CHECK_ATTEMPTS:-}" '
+                'RUST_LOG="${RUST_LOG:-}" '
+                'LOG_DIR="$LOG_DIR" '
+                'docker compose -f "$COMPOSE_FILE" up -d service_zenohd'
+            ),
+            '  echo "[2/3] Waiting 5 seconds for zenoh router startup..."',
+            '  sleep 5',
+            f'  echo "[3/3] Starting host services: {host_services}"',
+            (
+                '  LOCAL_UID="$LOCAL_UID" LOCAL_GID="$LOCAL_GID" '
+                'EVAL_TIME="$EVAL_TIME" '
+                'RMW_CHOICE="$RMW_CHOICE" '
+                'RMW_IMPLEMENTATION="$RMW_IMPLEMENTATION" '
+                'ZENOH_SESSION_CONFIG_URI="${ZENOH_SESSION_CONFIG_URI:-}" '
+                'ZENOH_ROUTER_CHECK_ATTEMPTS="${ZENOH_ROUTER_CHECK_ATTEMPTS:-}" '
+                'RUST_LOG="${RUST_LOG:-}" '
+                'LOG_DIR="$LOG_DIR" '
+                f'docker compose -f "$COMPOSE_FILE" up {host_services} || status=$?'
+            ),
+            '  echo "Stopping service_zenohd..."',
+            (
+                '  LOCAL_UID="$LOCAL_UID" LOCAL_GID="$LOCAL_GID" '
+                'EVAL_TIME="$EVAL_TIME" '
+                'RMW_CHOICE="$RMW_CHOICE" '
+                'RMW_IMPLEMENTATION="$RMW_IMPLEMENTATION" '
+                'ZENOH_SESSION_CONFIG_URI="${ZENOH_SESSION_CONFIG_URI:-}" '
+                'ZENOH_ROUTER_CHECK_ATTEMPTS="${ZENOH_ROUTER_CHECK_ATTEMPTS:-}" '
+                'RUST_LOG="${RUST_LOG:-}" '
+                'LOG_DIR="$LOG_DIR" '
+                'docker compose -f "$COMPOSE_FILE" stop service_zenohd >/dev/null 2>&1 || true'
+            ),
+            '  echo "Finished. service_zenohd stopped."',
+            'else',
+            f'  echo "Starting all services: {host_services}"',
+            (
+                '  LOCAL_UID="$LOCAL_UID" LOCAL_GID="$LOCAL_GID" '
+                'EVAL_TIME="$EVAL_TIME" '
+                'RMW_CHOICE="$RMW_CHOICE" '
+                'RMW_IMPLEMENTATION="$RMW_IMPLEMENTATION" '
+                'ZENOH_SESSION_CONFIG_URI="${ZENOH_SESSION_CONFIG_URI:-}" '
+                'ZENOH_ROUTER_CHECK_ATTEMPTS="${ZENOH_ROUTER_CHECK_ATTEMPTS:-}" '
+                'RUST_LOG="${RUST_LOG:-}" '
+                'LOG_DIR="$LOG_DIR" '
+                f'docker compose -f "$COMPOSE_FILE" up {host_services} || status=$?'
+            ),
+            'fi',
+            'exit "$status"',
+        ]
+    )
 
     with open(script_path, "w") as f:
         f.write("\n".join(lines) + "\n")

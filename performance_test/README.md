@@ -19,12 +19,13 @@ For usage of `performance_test.py`, see the [Usage in Details](../README.md#usag
 
 ## Output Structure
 
-`performance_test.py` creates the following directory structure under `<ws-dir>/<scenario>/results/`:
+`performance_test.py` creates the following directory structure under `<ws-dir>/<topology>/results/`:
 
 ```
 results/
-├── latest -> 2026-04-26_13-21-45/   # symlink to the most recent session
-└── 2026-04-26_13-21-45/
+├── latest-fastdds -> 2026-04-26_13-21-45-fastdds/   # symlink per RMW
+├── latest-zenoh   -> 2026-04-26_14-02-10-zenoh/
+└── 2026-04-26_13-21-45-fastdds/
     ├── logs/
     │   ├── trial1/
     │   │   ├── <node>_log/              # per-node log directory

@@ -3,15 +3,15 @@ Unified script to start test execution on all hosts.
 Supports both Docker and native execution modes.
 
 Usage:
-    python3 start_exec_scripts.py [--exec-policy|-p {docker,native}] [--trial-idx|-r N] [--prepare-run] [--ws-dir|-w DIR] [--scenario|-s NAME] [--hosts-list|-l HOSTS] [--help|-h]
+    python3 start_exec_scripts.py <topology> [--rmw|-m {fastdds,zenoh,cyclonedds}] [--exec-policy|-p {docker,native}] [--trial-idx|-i N] [--ws-dir|-w DIR] [--prepare-run] [--hosts-list|-l HOSTS] [--help|-h]
 
-  # Docker mode (sends /start_docker requests)
-      python3 start_exec_scripts.py --exec-policy docker --trial-idx 1 --ws-dir performance_ws --scenario latest --hosts-list host1,host2,host3
-      short: python3 start_exec_scripts.py -p docker -r 1 -w performance_ws -s latest -l host1,host2,host3
+    # Docker mode (sends /start_docker requests)
+    python3 start_exec_scripts.py simple --exec-policy docker --trial-idx 1 --ws-dir performance_ws --hosts-list host1,host2,host3
+    short: python3 start_exec_scripts.py simple -p docker -i 1 -w performance_ws -l host1,host2,host3
 
-  # Native mode (sends /start requests)
-      python3 start_exec_scripts.py --exec-policy native --trial-idx 1 --ws-dir performance_ws --scenario latest --hosts-list host1,host2,host3
-      short: python3 start_exec_scripts.py -p native -r 1 -w performance_ws -s latest -l host1,host2,host3
+    # Native mode with non-default RMW (sends /start requests)
+    python3 start_exec_scripts.py simple --rmw zenoh --exec-policy native --trial-idx 1 --ws-dir performance_ws --hosts-list host1,host2,host3
+    short: python3 start_exec_scripts.py simple -m zenoh -p native -i 1 -w performance_ws -l host1,host2,host3
 """
 
 import requests
@@ -34,7 +34,7 @@ def get_metadata_value(key, metadata_path):
     return None
 
 
-def resolve_host_list(ws_dir, scenario):
+def resolve_host_list(ws_dir, topology_name):
     """Resolve host list from environment or metadata.txt."""
     # Check environment variable first
     env_hosts = os.environ.get("ROS2_PERF_HOSTS")
@@ -43,7 +43,7 @@ def resolve_host_list(ws_dir, scenario):
         return hosts
 
     # Read from metadata.txt (required)
-    metadata_path = os.path.join(ws_dir, scenario, "metadata.txt")
+    metadata_path = os.path.join(ws_dir, topology_name, "metadata.txt")
     if not os.path.exists(metadata_path):
         raise FileNotFoundError(f"metadata.txt not found: {metadata_path}")
 
@@ -67,20 +67,29 @@ def main():
         description="Start test execution on all Hosts (Docker or native)",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         usage=(
-            "%(prog)s [--exec-policy|-p {docker,native}] [--trial-idx|-r N] "
-            "[--prepare-run] [--ws-dir|-w DIR] [--scenario|-s NAME] "
-            "[--hosts-list|-l HOSTS] [--help|-h]"
+            "%(prog)s <topology> [--rmw|-m {fastdds,zenoh,cyclonedds}] "
+            "[--exec-policy|-p {docker,native}] [--trial-idx|-i N] "
+            "[--ws-dir|-w DIR] [--prepare-run] [--hosts-list|-l HOSTS] [--help|-h]"
         ),
         epilog="""
 Examples:
-  # Docker mode
-  python3 start_exec_scripts.py --exec-policy docker --trial-idx 1 --ws-dir performance_ws --scenario latest --hosts-list host1,host2,host3
-  short: python3 start_exec_scripts.py -p docker -r 1 -w performance_ws -s latest -l host1,host2,host3
+    # Docker mode
+    python3 start_exec_scripts.py simple --exec-policy docker --trial-idx 1 --ws-dir performance_ws --hosts-list host1,host2,host3
+    short: python3 start_exec_scripts.py simple -p docker -i 1 -w performance_ws -l host1,host2,host3
 
-  # Native mode
-  python3 start_exec_scripts.py --exec-policy native --trial-idx 1 --ws-dir performance_ws --scenario latest --hosts-list host1,host2,host3
-  short: python3 start_exec_scripts.py -p native -r 1 -w performance_ws -s latest -l host1,host2,host3
+    # Native mode with non-default RMW
+    python3 start_exec_scripts.py simple --rmw zenoh --exec-policy native --trial-idx 1 --ws-dir performance_ws --hosts-list host1,host2,host3
+    short: python3 start_exec_scripts.py simple -m zenoh -p native -i 1 -w performance_ws -l host1,host2,host3
         """
+    )
+    parser.add_argument("topology",
+                        help="Topology directory name under ws-dir")
+    parser.add_argument(
+        "-m",
+        "--rmw",
+        default="fastdds",
+        choices=["fastdds", "zenoh", "cyclonedds"],
+        help="RMW implementation (default: fastdds)",
     )
     parser.add_argument(
         "-p",
@@ -89,17 +98,15 @@ Examples:
         default="docker",
         help="Execution mode. docker sends /start_docker, native sends /start (default: docker)",
     )
-    parser.add_argument("-r", "--trial-idx", type=int, default=1,
+    parser.add_argument("-i", "--trial-idx", type=int, default=1,
                         help="Trial index")
+    parser.add_argument("-w", "--ws-dir", default="performance_ws",
+                        help="Workspace directory (default: performance_ws)")
     parser.add_argument(
         "--prepare-run",
         action="store_true",
-        help="Prepare run timestamp/latest on all hosts before trials",
+        help="Prepare run timestamp and latest-<rmw> alias on all hosts before trials",
     )
-    parser.add_argument("-w", "--ws-dir", default="performance_ws",
-                        help="Workspace directory (default: performance_ws)")
-    parser.add_argument("-s", "--scenario", default="latest",
-                        help="Scenario directory name (default: latest)")
     parser.add_argument("-l", "--hosts-list", default=None,
                         help="Comma-separated list of hosts (optional; if not provided, resolved from metadata)")
 
@@ -107,7 +114,8 @@ Examples:
 
     trial_idx = args.trial_idx
     ws_dir = args.ws_dir
-    scenario = args.scenario
+    topology_name = args.topology
+    rmw = args.rmw
     hosts_list = args.hosts_list
 
     # Support host list from parameter or resolve from metadata
@@ -117,7 +125,7 @@ Examples:
     else:
         # Resolve from environment or metadata
         try:
-            hosts = resolve_host_list(ws_dir, scenario)
+            hosts = resolve_host_list(ws_dir, topology_name)
         except (FileNotFoundError, ValueError) as e:
             print(f"ERROR: {e}", file=sys.stderr)
             sys.exit(1)
@@ -161,7 +169,8 @@ Examples:
 
             request_body = {
                 "ws_dir": ws_dir,
-                "scenario": scenario,
+                "topology": topology_name,
+                "rmw": rmw,
             }
             if not args.prepare_run:
                 request_body["trial_idx"] = trial_idx

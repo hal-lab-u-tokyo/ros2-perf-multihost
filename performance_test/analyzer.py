@@ -38,9 +38,9 @@ def _parse_all_latency_losses(all_latency_path):
     return rows
 
 
-def _collect_topic_runtime_config(ws_dir, scenario):
+def _collect_topic_runtime_config(ws_dir, topology_name):
     """Load topic-level period/payload/publisher_count from metadata.txt."""
-    metadata_path = os.path.join(ws_dir, scenario, "metadata.txt")
+    metadata_path = os.path.join(ws_dir, topology_name, "metadata.txt")
     runtime_json = _read_metadata_value(metadata_path, "topic_runtime_json")
     if not runtime_json:
         raise ValueError(
@@ -129,13 +129,15 @@ def aggregate_total_latency(
     hosts,
     eval_time=None,
     ws_dir="performance_ws",
-    scenario="latest",
+    topology_name=None,
 ):
     if eval_time is None:
         eval_time = 60
 
     trial_dir = csv_dir
-    topic_runtime_cfg = _collect_topic_runtime_config(ws_dir, scenario)
+    if not topology_name:
+        raise ValueError("topology is required")
+    topic_runtime_cfg = _collect_topic_runtime_config(ws_dir, topology_name)
 
     analyzer_script = os.path.join(os.path.dirname(__file__), "all_latency.py")
     try:
