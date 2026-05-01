@@ -119,15 +119,10 @@ Example for ROS 2 Jazzy:
 source /opt/ros/jazzy/setup.bash
 cd ros2_node_impl_ws
 colcon build --packages-select ros2_perf_multihost_nodes
+source install/setup.bash
 ```
 
 ## Run
-
-```bash
-source /opt/ros/jazzy/setup.bash
-cd ros2_node_impl_ws
-source install/setup.bash
-```
 
 Publisher example:
 
@@ -167,4 +162,33 @@ ros2 run ros2_perf_multihost_nodes publisher_node \
     --size 64 \
     --period 100 \
     --log-dir logs
+```
+
+## Launch
+
+To start all three nodes (Publisher, Subscriber, and Intermediate) at once with a single command, use the launch file below. The arguments for each node are fixed to match the `ros2 run` examples above, without `--log-dir`:
+
+```bash
+ros2 launch ros2_perf_multihost_nodes all_nodes_readme.launch.py
+```
+
+To start a single node with configurable arguments, use the dedicated launch file for each node type:
+
+```bash
+ros2 launch ros2_perf_multihost_nodes publisher.launch.py \
+    node_name:=pub1 \
+    topic_names:=topic1 \
+    size:=64 \
+    period:=100
+
+ros2 launch ros2_perf_multihost_nodes subscriber.launch.py \
+    node_name:=sub1 \
+    topic_names:=topic1
+
+ros2 launch ros2_perf_multihost_nodes intermediate.launch.py \
+    node_name:=relay1 \
+    topic_names_pub:=topic_out \
+    topic_names_sub:=topic_in \
+    size:=64 \
+    period:=100
 ```

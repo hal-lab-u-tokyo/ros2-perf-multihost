@@ -100,6 +100,22 @@ def cal_all_latency(all_node_info, logs_folder_path):
 
         return logdata_list
 
+    def extract_start_end(logdata_list, path, node_name, topic, role):
+        start_time = next(
+            (item[1] for item in logdata_list if item[0] == "StartTime"),
+            None,
+        )
+        end_time = next(
+            (item[1] for item in logdata_list if item[0] == "EndTime"),
+            None,
+        )
+        if start_time is None or end_time is None:
+            print(
+                f"[WARN] Missing StartTime/EndTime: role={role}, node={node_name}, topic={topic}, path={path}"
+            )
+            return None, None
+        return int(start_time), int(end_time)
+
     warmup_ns = 1_000_000_000
     all_latency_results = []
     sub_all_node_statics = []
@@ -134,8 +150,7 @@ def cal_all_latency(all_node_info, logs_folder_path):
                                 logs_folder_path, f"{pub_node_name}_log", f"{sub_topic}_log.txt")
                         elif pub_node_type == "Intermediate":
                             pub_logdata_path = os.path.join(
-                                logs_folder_path, f"{pub_node_name}_log", f"{
-                                    sub_topic}_pub_log.txt"
+                                logs_folder_path, f"{pub_node_name}_log", f"{sub_topic}_pub_log.txt"
                             )
 
                         sub_logdata_path = ""
@@ -144,8 +159,7 @@ def cal_all_latency(all_node_info, logs_folder_path):
                                 logs_folder_path, f"{sub_node_name}_log", f"{sub_topic}_log.txt")
                         elif sub_node_type == "Intermediate":
                             sub_logdata_path = os.path.join(
-                                logs_folder_path, f"{sub_node_name}_log", f"{
-                                    sub_topic}_sub_log.txt"
+                                logs_folder_path, f"{sub_node_name}_log", f"{sub_topic}_sub_log.txt"
                             )
 
                         pub_logdata_list = get_log(
@@ -157,14 +171,23 @@ def cal_all_latency(all_node_info, logs_folder_path):
                             # [("StartTime, 1112"), ("EndTime, 2232"), (0, 1121), (1, 1128)...]
                         )
 
-                        pub_start_time = next(
-                            item[1] for item in pub_logdata_list if item[0] == "StartTime")
-                        pub_end_time = next(
-                            item[1] for item in pub_logdata_list if item[0] == "EndTime")
-                        sub_start_time = next(
-                            item[1] for item in sub_logdata_list if item[0] == "StartTime")
-                        sub_end_time = next(
-                            item[1] for item in sub_logdata_list if item[0] == "EndTime")
+                        pub_start_time, pub_end_time = extract_start_end(
+                            pub_logdata_list,
+                            pub_logdata_path,
+                            pub_node_name,
+                            sub_topic,
+                            "publisher",
+                        )
+                        sub_start_time, sub_end_time = extract_start_end(
+                            sub_logdata_list,
+                            sub_logdata_path,
+                            sub_node_name,
+                            sub_topic,
+                            "subscriber",
+                        )
+                        if pub_start_time is None or sub_start_time is None:
+                            continue
+
                         # Remove StartTime and EndTime entries after extracting them.
                         pub_logdata_list = [
                             item for item in pub_logdata_list if item[0] != "StartTime" and item[0] != "EndTime"
@@ -174,19 +197,16 @@ def cal_all_latency(all_node_info, logs_folder_path):
                         ]
 
                         # The overlapping time window is the measurement target.
-                        common_start_time = int(
-                            max(pub_start_time, sub_start_time)) + warmup_ns
-                        common_end_time = int(min(pub_end_time, sub_end_time))
+                        common_start_time = max(
+                            pub_start_time, sub_start_time) + warmup_ns
+                        common_end_time = min(pub_end_time, sub_end_time)
 
                         # Warn and skip if no overlapping time window exists.
                         if common_start_time >= common_end_time:
                             print(
-                                f"[WARN] No common time window: node={
-                                    sub_node_name}, topic={sub_topic} "
-                                f"pub_node={pub_node_name}, pub_path={
-                                    pub_logdata_path}, sub_path={sub_logdata_path} "
-                                f"(pub:[{pub_start_time},{pub_end_time}] sub:[{
-                                    sub_start_time},{sub_end_time}] warmup={warmup_ns})"
+                                f"[WARN] No common time window: node={sub_node_name}, topic={sub_topic} "
+                                f"pub_node={pub_node_name}, pub_path={pub_logdata_path}, sub_path={sub_logdata_path} "
+                                f"(pub:[{pub_start_time},{pub_end_time}] sub:[{sub_start_time},{sub_end_time}] warmup={warmup_ns})"
                             )
                             continue
 
@@ -222,16 +242,31 @@ def cal_all_latency(all_node_info, logs_folder_path):
                         #     latency_results.append((timestamp_sub - timestamp_pub) / 1_000_000)  # [0.120, 0.321, ...]
 
                 sub_topic_statics["loss"] = loss
-                sub_topic_statics["mean"] = round(np.mean(latency_results), 6)
-                sub_topic_statics["sd"] = round(np.std(latency_results), 6)
-                sub_topic_statics["min"] = round(np.min(latency_results), 6)
-                sub_topic_statics["max"] = round(np.max(latency_results), 6)
-                sub_topic_statics["q1"] = round(
-                    np.percentile(latency_results, 25), 6)
-                sub_topic_statics["mid"] = round(
-                    np.percentile(latency_results, 50), 6)
-                sub_topic_statics["q3"] = round(
-                    np.percentile(latency_results, 75), 6)
+                if latency_results:
+                    sub_topic_statics["mean"] = round(
+                        np.mean(latency_results), 6)
+                    sub_topic_statics["sd"] = round(np.std(latency_results), 6)
+                    sub_topic_statics["min"] = round(
+                        np.min(latency_results), 6)
+                    sub_topic_statics["max"] = round(
+                        np.max(latency_results), 6)
+                    sub_topic_statics["q1"] = round(
+                        np.percentile(latency_results, 25), 6)
+                    sub_topic_statics["mid"] = round(
+                        np.percentile(latency_results, 50), 6)
+                    sub_topic_statics["q3"] = round(
+                        np.percentile(latency_results, 75), 6)
+                else:
+                    print(
+                        f"[WARN] No latency samples in common window: node={sub_node_name}, topic={sub_topic}"
+                    )
+                    sub_topic_statics["mean"] = "N/A"
+                    sub_topic_statics["sd"] = "N/A"
+                    sub_topic_statics["min"] = "N/A"
+                    sub_topic_statics["max"] = "N/A"
+                    sub_topic_statics["q1"] = "N/A"
+                    sub_topic_statics["mid"] = "N/A"
+                    sub_topic_statics["q3"] = "N/A"
 
                 sub_node_statics["topics"].append(
                     sub_topic_statics
@@ -277,15 +312,15 @@ def write_all_latency(sub_all_node_statics, results_dir):
                 )
 
         col_widths = [12, 12, 12, 12, 12, 12, 12, 12, 12, 12]
-        header = "".join(f"{data[0][i]:<{col_widths[i]}
-                            }" for i in range(len(data[0])))
+        header = "".join(
+            f"{data[0][i]:<{col_widths[i]}}" for i in range(len(data[0])))
         f.write(f"{header}\n")
         f.write("-" * len(header))
         f.write("\n")
 
         for row in data[1:]:
-            row = "".join(f"{row[i]:<{col_widths[i]}
-                             }" for i in range(len(row)))
+            row = "".join(
+                f"{row[i]:<{col_widths[i]}}" for i in range(len(row)))
             f.write(f"{row}\n")
 
 
@@ -298,13 +333,22 @@ def write_total_latency(sub_all_node_statics, all_latency_results, result_dir):
     final_latency_results = [
         # [[], [],,,,] -> []
         item for node_latency in all_latency_results for item in node_latency]
-    total_mean = round(np.mean(final_latency_results), 6)
-    total_sd = round(np.std(final_latency_results), 6)
-    total_min = round(np.min(final_latency_results), 6)
-    total_q1 = round(np.percentile(final_latency_results, 25), 6)
-    total_mid = round(np.percentile(final_latency_results, 50), 6)
-    total_q3 = round(np.percentile(final_latency_results, 75), 6)
-    total_max = round(np.max(final_latency_results), 6)
+    if final_latency_results:
+        total_mean = round(np.mean(final_latency_results), 6)
+        total_sd = round(np.std(final_latency_results), 6)
+        total_min = round(np.min(final_latency_results), 6)
+        total_q1 = round(np.percentile(final_latency_results, 25), 6)
+        total_mid = round(np.percentile(final_latency_results, 50), 6)
+        total_q3 = round(np.percentile(final_latency_results, 75), 6)
+        total_max = round(np.max(final_latency_results), 6)
+    else:
+        total_mean = "N/A"
+        total_sd = "N/A"
+        total_min = "N/A"
+        total_q1 = "N/A"
+        total_mid = "N/A"
+        total_q3 = "N/A"
+        total_max = "N/A"
 
     data = []
     data.append(["lost[#]", "mean[ms]", "sd[ms]", "min[ms]",
@@ -314,15 +358,15 @@ def write_total_latency(sub_all_node_statics, all_latency_results, result_dir):
                     total_q1, total_mid, total_q3, total_max])
 
         col_widths = [12, 12, 12, 12, 12, 12, 12, 12]
-        header = "".join(f"{data[0][i]:<{col_widths[i]}
-                            }" for i in range(len(data[0])))
+        header = "".join(
+            f"{data[0][i]:<{col_widths[i]}}" for i in range(len(data[0])))
         f.write(f"{header}\n")
         f.write("-" * len(header))
         f.write("\n")
 
         for row in data[1:]:
-            row = "".join(f"{row[i]:<{col_widths[i]}
-                             }" for i in range(len(row)))
+            row = "".join(
+                f"{row[i]:<{col_widths[i]}}" for i in range(len(row)))
             f.write(f"{row}\n")
 
 
@@ -410,7 +454,9 @@ Examples:
             process_log_directory(
                 log_dir_name, logs_base_path, results_base_path)
         except Exception as e:
-            print(f"  Error processing {log_dir_name}: {e}")
+            print(
+                f"  Error processing {log_dir_name}: {type(e).__name__}: {e}"
+            )
         print()
 
     print("All processing complete.")

@@ -59,26 +59,15 @@ def confirm_overwrite(output_dir, force=False, existing_json_path=None, new_json
         print("Please answer yes or no.")
 
 
-def update_latest_symlink(base_dir, target_name):
-    """Update <ws-dir>/latest to point to target_name."""
-    latest_link = os.path.join(base_dir, "latest")
-    if os.path.lexists(latest_link):
-        if os.path.islink(latest_link) or os.path.isfile(latest_link):
-            os.remove(latest_link)
-        elif os.path.isdir(latest_link):
-            shutil.rmtree(latest_link)
-    os.symlink(target_name, latest_link)
-
-
-def resolve_output_paths(json_path, rmw, ws_dir, force=False):
-    """Resolve and prepare output directory paths and the latest alias."""
+def resolve_output_paths(json_path, ws_dir, force=False):
+    """Resolve and prepare output directory paths for a topology."""
     project_root = os.getcwd()
     perf_ws_dir = os.path.join(project_root, ws_dir)
     os.makedirs(perf_ws_dir, exist_ok=True)
 
     json_basename = os.path.splitext(os.path.basename(json_path))[0]
-    scenario_dir = f"{json_basename}-{rmw}"
-    run_dir = os.path.join(perf_ws_dir, scenario_dir)
+    topology_dir = json_basename
+    run_dir = os.path.join(perf_ws_dir, topology_dir)
     output_dir = os.path.join(run_dir, "exec_scripts")
 
     overwrite = os.path.isdir(output_dir)
@@ -92,4 +81,4 @@ def resolve_output_paths(json_path, rmw, ws_dir, force=False):
         ):
             raise SystemExit("Canceled by user. No files were generated.")
 
-    return project_root, output_dir, scenario_dir, overwrite
+    return project_root, output_dir, topology_dir, overwrite

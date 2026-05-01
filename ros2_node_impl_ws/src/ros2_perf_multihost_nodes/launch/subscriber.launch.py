@@ -1,0 +1,36 @@
+from launch import LaunchDescription
+from launch.actions import DeclareLaunchArgument
+from launch.substitutions import LaunchConfiguration
+from launch_ros.actions import Node
+
+
+def generate_launch_description():
+    return LaunchDescription(
+        [
+            DeclareLaunchArgument("node_name", default_value="sub1"),
+            DeclareLaunchArgument("eval_time", default_value="60"),
+            DeclareLaunchArgument("topic_names", default_value="topic1"),
+            DeclareLaunchArgument("qos_history", default_value="KEEP_LAST"),
+            DeclareLaunchArgument("qos_depth", default_value="1"),
+            DeclareLaunchArgument("qos_reliability", default_value="RELIABLE"),
+            Node(
+                package="ros2_perf_multihost_nodes",
+                executable="subscriber_node",
+                output="screen",
+                arguments=[
+                    "--node-name",
+                    LaunchConfiguration("node_name"),
+                    "--eval-time",
+                    LaunchConfiguration("eval_time"),
+                    "--topic-names",
+                    LaunchConfiguration("topic_names"),
+                    "--qos-history",
+                    LaunchConfiguration("qos_history"),
+                    "--qos-depth",
+                    LaunchConfiguration("qos_depth"),
+                    "--qos-reliability",
+                    LaunchConfiguration("qos_reliability"),
+                ],
+            ),
+        ]
+    )

@@ -10,45 +10,33 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_DIR="$(cd "${SCRIPT_DIR}/.." && pwd)"
 
 DEFAULT_WS_DIR="performance_ws"
-DEFAULT_SCENARIO="latest"
 DEFAULT_REMOTE_REPO_BASE="/home/ubuntu/ros2-perf-multihost"
 
 WS_DIR_INPUT="${DEFAULT_WS_DIR}"
-SCENARIO_INPUT="${DEFAULT_SCENARIO}"
+TOPOLOGY_INPUT=""
 REMOTE_REPO_BASE="${DEFAULT_REMOTE_REPO_BASE}"
 
 print_help() {
     cat <<EOF
-Usage: $(basename "$0") [OPTIONS]
+Usage: $(basename "$0") <topology> [OPTIONS]
 
 Distribute host-specific exec scripts using values from metadata.txt.
 
 Options:
-  -s, --scenario NAME        Scenario directory under ws-dir
-                             (default: ${DEFAULT_SCENARIO})
-  -w, --ws-dir DIR           Workspace directory that contains scenarios
+    -w, --ws-dir DIR           Workspace directory that contains topologies
                              (default: ${DEFAULT_WS_DIR})
   -r, --remote-repo-base DIR Remote repository base directory
                              (default: ${DEFAULT_REMOTE_REPO_BASE})
   -h, --help                 Show this help message and exit
 
 Examples:
-  $(basename "$0")
-  $(basename "$0") --scenario simple-fastdds
-  $(basename "$0") -s simple-cyclonedds -w performance_ws -r /home/ubuntu/ros2-perf-multihost
+    $(basename "$0") simple
+    $(basename "$0") simple -w performance_ws -r /home/ubuntu/ros2-perf-multihost
 EOF
 }
 
 while [[ $# -gt 0 ]]; do
     case "$1" in
-        -s|--scenario)
-            if [[ $# -lt 2 ]]; then
-                echo "ERROR: $1 requires a value" >&2
-                exit 2
-            fi
-            SCENARIO_INPUT="$2"
-            shift 2
-            ;;
         -w|--ws-dir)
             if [[ $# -lt 2 ]]; then
                 echo "ERROR: $1 requires a value" >&2
@@ -69,15 +57,29 @@ while [[ $# -gt 0 ]]; do
             print_help
             exit 0
             ;;
-        *)
+        -* )
             echo "ERROR: unknown option: $1" >&2
             echo "Use --help to see available options." >&2
             exit 2
             ;;
+        *)
+            if [[ -n "${TOPOLOGY_INPUT}" ]]; then
+                echo "ERROR: topology is already set to '${TOPOLOGY_INPUT}', unexpected argument: $1" >&2
+                exit 2
+            fi
+            TOPOLOGY_INPUT="$1"
+            shift
+            ;;
     esac
 done
 
-METADATA_PATH="${REPO_DIR}/${WS_DIR_INPUT}/${SCENARIO_INPUT}/metadata.txt"
+if [[ -z "${TOPOLOGY_INPUT}" ]]; then
+    echo "ERROR: topology is required." >&2
+    echo "Use --help to see usage." >&2
+    exit 2
+fi
+
+METADATA_PATH="${REPO_DIR}/${WS_DIR_INPUT}/${TOPOLOGY_INPUT}/metadata.txt"
 
 trim() {
     local s="$1"
@@ -98,16 +100,16 @@ if [[ ! -f "${METADATA_PATH}" ]]; then
 fi
 
 WS_DIR="$(get_metadata_value "ws_dir" "${METADATA_PATH}")"
-SCENARIO_DIR="$(get_metadata_value "scenario_dir" "${METADATA_PATH}")"
+TOPOLOGY_DIR="$(get_metadata_value "topology_dir" "${METADATA_PATH}")"
 HOSTS_LINE="$(get_metadata_value "hosts" "${METADATA_PATH}")"
 JSON_PATH="$(get_metadata_value "json_path" "${METADATA_PATH}")"
 
-if [[ -z "${WS_DIR}" || -z "${SCENARIO_DIR}" || -z "${HOSTS_LINE}" ]]; then
-    echo "ERROR: metadata is missing one of ws_dir/scenario_dir/hosts in ${METADATA_PATH}" >&2
+if [[ -z "${WS_DIR}" || -z "${TOPOLOGY_DIR}" || -z "${HOSTS_LINE}" ]]; then
+    echo "ERROR: metadata is missing one of ws_dir/topology_dir/hosts in ${METADATA_PATH}" >&2
     exit 1
 fi
 
-LOCAL_RUN_DIR="${REPO_DIR}/${WS_DIR}/${SCENARIO_DIR}"
+LOCAL_RUN_DIR="${REPO_DIR}/${WS_DIR}/${TOPOLOGY_DIR}"
 LOCAL_EXEC_DIR="${LOCAL_RUN_DIR}/exec_scripts"
 
 if [[ ! -d "${LOCAL_EXEC_DIR}" ]]; then
@@ -129,32 +131,28 @@ if [[ "${#HOSTS[@]}" -eq 0 ]]; then
     exit 1
 fi
 
-REMOTE_RUN_DIR="${REMOTE_REPO_BASE}/${WS_DIR}/${SCENARIO_DIR}"
+REMOTE_RUN_DIR="${REMOTE_REPO_BASE}/${WS_DIR}/${TOPOLOGY_DIR}"
 REMOTE_EXEC_DIR="${REMOTE_RUN_DIR}/exec_scripts"
-REMOTE_ALIAS_DIR="${REMOTE_REPO_BASE}/${WS_DIR}/${SCENARIO_INPUT}"
 
 echo "=== Metadata ==="
 echo "metadata_path : ${METADATA_PATH}"
 echo "json_path     : ${JSON_PATH:-N/A}"
 echo "ws_dir        : ${WS_DIR}"
-echo "scenario_dir  : ${SCENARIO_DIR}"
+echo "topology_dir  : ${TOPOLOGY_DIR}"
 echo "hosts         : ${HOSTS[*]}"
 echo "local_exec_dir: ${LOCAL_EXEC_DIR}"
 echo "remote_exec_dir: ${REMOTE_EXEC_DIR}"
-if [[ "${SCENARIO_INPUT}" != "${SCENARIO_DIR}" ]]; then
-    echo "remote_alias_dir: ${REMOTE_ALIAS_DIR} -> ${REMOTE_RUN_DIR}"
-fi
 
 failed_hosts=()
 
 for host in "${HOSTS[@]}"; do
+    host_launch="${host}.launch.py"
     host_exec="${host}_exec.sh"
-    host_run="${host}_run.sh"
     host_compose="${host}_compose.yaml"
 
     echo "=== Validating local files for ${host} ==="
     local_files_ok=true
-    for file in "${host_exec}" "${host_run}" "${host_compose}"; do
+    for file in "${host_launch}" "${host_exec}" "${host_compose}"; do
         if [[ ! -f "${LOCAL_EXEC_DIR}/${file}" ]]; then
             echo "ERROR: missing local file: ${LOCAL_EXEC_DIR}/${file}" >&2
             failed_hosts+=("${host}")
@@ -181,8 +179,8 @@ for host in "${HOSTS[@]}"; do
 
     # Copy exec scripts
     if ! err="$(scp \
+        "${LOCAL_EXEC_DIR}/${host_launch}" \
         "${LOCAL_EXEC_DIR}/${host_exec}" \
-        "${LOCAL_EXEC_DIR}/${host_run}" \
         "${LOCAL_EXEC_DIR}/${host_compose}" \
         "${host}:${REMOTE_EXEC_DIR}/" 2>&1)"; then
         echo "ERROR: Failed to copy scripts to ${host}" >&2
@@ -204,7 +202,7 @@ for host in "${HOSTS[@]}"; do
     fi
 
     # Set execute permissions
-    if ! err="$(ssh "${host}" "chmod +x '${REMOTE_EXEC_DIR}/${host_exec}' '${REMOTE_EXEC_DIR}/${host_run}'" 2>&1)"; then
+    if ! err="$(ssh "${host}" "chmod +x '${REMOTE_EXEC_DIR}/${host_exec}'" 2>&1)"; then
         echo "ERROR: Failed to set permissions on ${host}" >&2
         if [[ -n "${err}" ]]; then
             echo "  ssh: ${err}" >&2
@@ -213,20 +211,6 @@ for host in "${HOSTS[@]}"; do
         continue
     fi
 
-    if [[ "${SCENARIO_INPUT}" != "${SCENARIO_DIR}" ]]; then
-        remote_alias_parent="$(dirname "${REMOTE_ALIAS_DIR}")"
-        remote_alias_name="$(basename "${REMOTE_ALIAS_DIR}")"
-        remote_target_name="$(basename "${REMOTE_RUN_DIR}")"
-        if ! err="$(ssh "${host}" "cd '${remote_alias_parent}' && ln -sfn '${remote_target_name}' '${remote_alias_name}'" 2>&1)"; then
-            echo "ERROR: Failed to update alias ${REMOTE_ALIAS_DIR} on ${host}" >&2
-            if [[ -n "${err}" ]]; then
-                echo "  ssh: ${err}" >&2
-            fi
-            failed_hosts+=("${host}")
-            continue
-        fi
-    fi
-    
     echo "=== Done for ${host} ==="
 done
 
