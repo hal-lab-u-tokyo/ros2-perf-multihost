@@ -2,6 +2,7 @@ from flask import Flask, jsonify, request
 from datetime import datetime
 import logging
 import os
+import shutil
 import socket
 import subprocess
 import sys
@@ -159,7 +160,10 @@ def _prepare_results_timestamp(ctx, rmw):
 
     latest_link = os.path.join(results_dir, f"latest-{rmw}")
     if os.path.lexists(latest_link):
-        os.remove(latest_link)
+        if os.path.isdir(latest_link) and not os.path.islink(latest_link):
+            shutil.rmtree(latest_link)
+        else:
+            os.remove(latest_link)
     os.symlink(run_timestamp, latest_link)
 
     return run_timestamp

@@ -60,9 +60,9 @@ For the JSON schema, see [topology_example/README.md](../topology_example/README
 
 | Option | Short | Description | Default |
 |---|---|---|---|
-| `--rmw` | `-r` | RMW implementation (`fastdds`, `zenoh`, `cyclonedds`) | required |
+| `--rmw` | `-m` | RMW implementation (`fastdds`, `zenoh`, `cyclonedds`) | required |
 | `--eval-time` | `-t` | Evaluation time in seconds | 60 |
-| `--trial-idx` | `-i` | Trial index for local execution | 1 |
+| `--trial-idx` | `-r` | Trial index for local execution | 1 |
 
 Each node launched from `host{N}_exec.sh` or `local_exec.sh` receives a `--log-dir` under `results/YYYY-MM-DD_hh-mm-ss-<rmw>/exec_logs/trial<trial_idx>/` inside the generated topology directory. `results/latest-<rmw>` is updated as a symbolic link to the active run directory.
 

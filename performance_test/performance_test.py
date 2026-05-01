@@ -76,6 +76,15 @@ Examples:
 
     local_latest_link = os.path.join(local_results_root, f"latest-{args.rmw}")
     if os.path.lexists(local_latest_link):
+        if os.path.isdir(local_latest_link) and not os.path.islink(local_latest_link):
+            print(
+                (
+                    f"ERROR: Cannot update latest alias because '{local_latest_link}' exists "
+                    "as a directory. Remove or rename this directory and rerun."
+                ),
+                file=sys.stderr,
+            )
+            sys.exit(1)
         os.remove(local_latest_link)
     os.symlink(run_timestamp, local_latest_link)
 
