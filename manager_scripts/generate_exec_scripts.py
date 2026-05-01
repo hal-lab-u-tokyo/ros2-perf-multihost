@@ -16,7 +16,7 @@ from generate_exec.script_generation import (
     generate_compose,
     generate_compose_per_host,
     generate_exec_scripts,
-    generate_host_run_scripts,
+    generate_host_exec_scripts,
     generate_local_run_script,
 )
 from generate_exec.validation import normalize_ws_dir, validate_topology_json_schema
@@ -98,7 +98,7 @@ Examples:
                          tmp_dir, project_root, settings)
         generate_compose_per_host(
             json_content, args.rmw, tmp_dir, project_root, settings)
-        generate_host_run_scripts(
+        generate_host_exec_scripts(
             json_content, tmp_dir, project_root, settings)
         generate_local_run_script(
             json_content, args.rmw, tmp_dir, project_root, settings)
@@ -126,6 +126,6 @@ Examples:
 
     print(
         f"Generated host*.launch.py, host*_exec.sh, host*_compose.yaml, local_exec.sh, local_compose.yaml "
-        f"in {settings.perf_ws_dir}/{scenario_dir}/exec_scripts (latest: {settings.perf_ws_dir}/latest) "
-        f"for {len(json_content['hosts'])} host(s) with RMW={args.rmw}"
+        f"in {settings.perf_ws_dir}/{scenario_dir}/exec_scripts (latest: {settings.perf_ws_dir}/latest)"
+        f" for {len(json_content['hosts'])} host(s) with RMW={args.rmw}"
     )

@@ -399,7 +399,7 @@ def generate_exec_scripts(json_content, rmw, output_dir, settings):
             "def generate_launch_description():",
             '    eval_time = LaunchConfiguration("eval_time")',
             '    log_dir = LaunchConfiguration("log_dir")',
-            '    project_root = EnvironmentVariable("ROS2_PERF_WS", default_value="/workdir/ros2-perf-multihost")',
+            '    project_root = EnvironmentVariable("ROS2_PERF_REPO_ROOT", default_value=EnvironmentVariable("ROS2_PERF_WS", default_value="/workdir/ros2-perf-multihost"))',
             "",
             *node_var_lines,
         ]
@@ -662,7 +662,7 @@ def run_script_common_prefix(lines, rel_root, eval_time_default, settings):
     )
 
 
-def generate_host_run_scripts(json_content, output_dir, project_root, settings):
+def generate_host_exec_scripts(json_content, output_dir, project_root, settings):
     """Generate host*_exec.sh wrapper scripts for host-specific Compose files."""
     rel_root = os.path.relpath(project_root, output_dir)
     eval_time_default = settings.default_eval_time

@@ -235,6 +235,8 @@ def start_script():
 
         env = os.environ.copy()
         env["LOG_DIR"] = log_dir
+        env.setdefault("ROS2_PERF_REPO_ROOT", REPO_ROOT)
+        env.setdefault("ROS2_PERF_WS", REPO_ROOT)
         if eval_time is not None:
             env["EVAL_TIME"] = str(eval_time)
 
