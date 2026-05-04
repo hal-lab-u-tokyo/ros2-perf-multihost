@@ -180,6 +180,7 @@ Here is the baseline environment we have tested so far.
 - User and repository path assumption:
   - Scripts and examples in this repository assume user `ubuntu` and `/home/ubuntu/ros2-perf-multihost`.
   - If your username and path differ, how to override these settings is described later.
+  - The default `ubuntu` user needs passwordless `sudo` only for `chronyc` (described later).
 
 #### SSH access (on the Manager)
 
@@ -188,12 +189,15 @@ Therefore, configure the following settings on the Manager machine to meet this 
 
 - Generate and register SSH keys (e.g., `ssh-keygen -t ed25519 && ssh-copy-id ubuntu@host1`).
 - Ensure hostnames are resolvable from the Manager.
+- Consider assigning static IP addresses to each Host to avoid SSH connectivity issues after a reboot or DHCP lease renewal.
 - Recommended Manager-side configuration examples:
   - `/etc/hosts`:
     ```text
+    <snipped.>
     192.168.10.11 host1
     192.168.10.12 host2
     192.168.10.13 host3
+    <snipped.>
     ```
   - `~/.ssh/config`:
     ```text
@@ -284,6 +288,39 @@ sudo apt update
 sudo apt install -y python3-requests
 ```
 
+#### Clock synchronization for REST benchmark (chrony)
+
+For remote benchmark reproducibility, the REST server uses [chrony](https://chrony-project.org/) to synchronize the clock between Hosts.
+
+Install and enable chrony as follows:
+
+```bash
+sudo apt install -y chrony
+sudo systemctl enable --now chrony
+```
+
+Because the REST server invokes `sudo -n chronyc` (non-interactive), the `ubuntu` user must be allowed to run `chronyc` via `sudo` without a password.
+The sudoers entry below grants passwordless `sudo` only for `/usr/bin/chronyc`, so no other commands are affected.
+
+Check the permission, and if needed, configure the sudoers entry on each Host as follows:
+
+```bash
+# Check the permission required by rest_server.py (makestep)
+sudo -k
+sudo -n chronyc -a makestep
+
+# If this command fails because a password is required, configure the sudoers entry as follows.
+cat <<'EOF' | sudo tee /etc/sudoers.d/ros2-perf-chrony
+ubuntu ALL=(root) NOPASSWD:/usr/bin/chronyc
+EOF
+sudo chmod 440 /etc/sudoers.d/ros2-perf-chrony
+```
+
+If startup sync fails because `sudo` for `chronyc` requires a password, `rest_server.py` exits and prints guidance with the setup URL.
+For other startup sync failures (for example, temporary NTP reachability issues), the server continues startup by default and reports the error in logs. To fail fast on any startup sync failure, set `ROS2_PERF_CHRONY_FAIL_FAST_ON_STARTUP=1`.
+
+For details on synchronization behavior and environment variables, see [remote_hosts_scripts/README.md](./remote_hosts_scripts/README.md#clock-synchronization-chrony).
+
 ## Usage in Details
 
 Once you have completed the [Preliminaries](#preliminaries), you are ready to start here.
@@ -363,6 +400,10 @@ cd ros2-perf-multihost
 python3 remote_hosts_scripts/rest_server.py
 ```
 
+If the server exits at startup with a chrony sudo permission error, check the chrony sudo setup in [Clock synchronization for REST benchmark (chrony)](#clock-synchronization-for-rest-benchmark-chrony).
+
+For details on the specification of REST server and environment variables, see [remote_hosts_scripts/README.md](./remote_hosts_scripts/README.md#rest_serverpy).
+
 #### Run Benchmark (on the Manager)
 
 Then, run the benchmark script on the Manager.
@@ -436,6 +477,7 @@ For detailed usage in subdomains, see the following documents:
 
 - [topology_example/README.md](./topology_example/README.md): Topology JSON format and modeling guidance.
 - [manager_scripts/README.md](./manager_scripts/README.md): Script usage, generated file details, `metadata.txt` format, and runtime options.
+- [remote_hosts_scripts/README.md](./remote_hosts_scripts/README.md): REST server endpoints, environment variables, and monitor CSV format.
 - [performance_test/README.md](./performance_test/README.md): Output directory structure, CSV formats, and analysis script descriptions.
 - [docker/README.md](./docker/README.md): Docker image build/push details and container workflow notes.
 - [ros2_node_impl_ws/README.md](./ros2_node_impl_ws/README.md): ROS 2 node workspace usage and build instructions.
@@ -450,6 +492,10 @@ Common issues and fixes:
 - Docker mode fails on remote Hosts: pull `ghcr.io/hal-lab-u-tokyo/ros2-perf-multihost:latest` and confirm Docker permissions on each Host.
 - Native mode cannot find workspace paths: set `ROS2_PERF_WS` to the project root before running `host*_exec.sh`.
 - Expected CSV outputs are missing: check `<ws-dir>/<topology>/results/latest-<rmw>/logs/trial<N>/` for trial logs and inspect script stderr for analyzer failures.
+- REST server logs a chrony startup sync error (or fails to start when strict mode is enabled): confirm `chronyd` is running (`systemctl status chrony`) and that the sudoers entry for `chronyc` is in place (see [Clock synchronization for REST benchmark (chrony)](#clock-synchronization-for-rest-benchmark-chrony)).
+- `python3 remote_hosts_scripts/rest_server.py` exits at startup with a chrony sudo permission error: clear cached credentials with `sudo -k` and verify with `sudo -n chronyc -a makestep`; if it fails, configure the `chronyc` sudoers entry as described in [Clock synchronization for REST benchmark (chrony)](#clock-synchronization-for-rest-benchmark-chrony).
+- `prepare_run` returns `chrony check/sync failed` or `timed out`: check that `sudo -n chronyc -a makestep` runs without a password as the REST server user; if the NTP source is unreachable, verify network connectivity or adjust `ROS2_PERF_CHRONY_WAITSYNC_TRIES` and `ROS2_PERF_CHRONY_CMD_TIMEOUT_SEC`.
+- Clock offset between hosts causes unexpectedly large or negative latency values: re-run `chronyc tracking` on each Host to verify synchronization, and restart the REST server to trigger a fresh startup sync.
 
 ## Contributing and License
 

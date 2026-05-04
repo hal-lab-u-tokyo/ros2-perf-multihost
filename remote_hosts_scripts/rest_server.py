@@ -2,6 +2,8 @@ from flask import Flask, jsonify, request
 from datetime import datetime
 import logging
 import os
+import re
+import shlex
 import shutil
 import socket
 import subprocess
@@ -20,6 +22,32 @@ REPO_ROOT = os.environ.get("ROS2_PERF_REPO_ROOT",
                            "/home/ubuntu/ros2-perf-multihost")
 DEFAULT_WS_DIR = os.environ.get("ROS2_PERF_WS_DIR", "performance_ws")
 RUN_SCRIPT_TIMEOUT_SEC = int(os.environ.get("RUN_SCRIPT_TIMEOUT_SEC", "900"))
+CHRONY_SYNC_ON_STARTUP = os.environ.get(
+    "ROS2_PERF_CHRONY_SYNC_ON_STARTUP", "1"
+).strip().lower() in ("1", "true", "yes", "on")
+CHRONY_CHECK_ON_PREPARE = os.environ.get(
+    "ROS2_PERF_CHRONY_CHECK_ON_PREPARE", "1"
+).strip().lower() in ("1", "true", "yes", "on")
+CHRONY_FAIL_FAST_ON_STARTUP = os.environ.get(
+    "ROS2_PERF_CHRONY_FAIL_FAST_ON_STARTUP", "0"
+).strip().lower() in ("1", "true", "yes", "on")
+CHRONY_SETUP_URL = (
+    "https://github.com/hal-lab-u-tokyo/ros2-perf-multihost"
+    "#clock-synchronization-for-rest-benchmark-chrony"
+)
+CHRONYC_CMD_PREFIX = os.environ.get(
+    "ROS2_PERF_CHRONYC_CMD_PREFIX", "sudo -n chronyc"
+).strip()
+CHRONY_WAITSYNC_TRIES = int(os.environ.get(
+    "ROS2_PERF_CHRONY_WAITSYNC_TRIES", "20"))
+CHRONY_WAITSYNC_MAX_CORRECTION_SEC = float(
+    os.environ.get("ROS2_PERF_CHRONY_WAITSYNC_MAX_CORRECTION_SEC", "0.001")
+)
+CHRONY_PREPARE_MAX_OFFSET_SEC = float(
+    os.environ.get("ROS2_PERF_CHRONY_PREPARE_MAX_OFFSET_SEC", "0.001")
+)
+CHRONY_CMD_TIMEOUT_SEC = int(os.environ.get(
+    "ROS2_PERF_CHRONY_CMD_TIMEOUT_SEC", "30"))
 
 
 def _to_int(value, name):
@@ -27,6 +55,135 @@ def _to_int(value, name):
         return int(value)
     except (TypeError, ValueError) as exc:
         raise ValueError(f"{name} must be an integer") from exc
+
+
+def _format_command(argv):
+    return " ".join(shlex.quote(part) for part in argv)
+
+
+def _run_command(argv, timeout_sec):
+    result = subprocess.run(
+        argv,
+        text=True,
+        capture_output=True,
+        timeout=timeout_sec,
+    )
+    if result.returncode != 0:
+        stderr = (result.stderr or "").strip()
+        stdout = (result.stdout or "").strip()
+        detail = stderr if stderr else stdout
+        raise RuntimeError(
+            f"command failed (rc={result.returncode}): {_format_command(argv)}; detail={detail}"
+        )
+    return (result.stdout or "").strip()
+
+
+def _chronyc_command(*args):
+    prefix_parts = shlex.split(CHRONYC_CMD_PREFIX)
+    if not prefix_parts:
+        raise RuntimeError("ROS2_PERF_CHRONYC_CMD_PREFIX must not be empty")
+    return prefix_parts + [str(arg) for arg in args]
+
+
+def _is_sudo_password_required_error(exc):
+    text = str(exc).lower()
+    return "sudo" in text and "a password is required" in text
+
+
+def _chrony_makestep_and_waitsync():
+    makestep_cmd = _chronyc_command("-a", "makestep")
+    waitsync_cmd = _chronyc_command(
+        "waitsync", CHRONY_WAITSYNC_TRIES, CHRONY_WAITSYNC_MAX_CORRECTION_SEC
+    )
+    tracking_cmd = _chronyc_command("tracking")
+
+    makestep_stdout = _run_command(makestep_cmd, CHRONY_CMD_TIMEOUT_SEC)
+    waitsync_stdout = _run_command(waitsync_cmd, CHRONY_CMD_TIMEOUT_SEC)
+    tracking_stdout = _run_command(tracking_cmd, CHRONY_CMD_TIMEOUT_SEC)
+
+    return {
+        "makestep": makestep_stdout,
+        "waitsync": waitsync_stdout,
+        "tracking": tracking_stdout,
+    }
+
+
+def _parse_tracking_offset_seconds(tracking_output):
+    for line in tracking_output.splitlines():
+        stripped = line.strip()
+        if not stripped.lower().startswith("system time"):
+            continue
+        match = re.search(
+            r":\s*([0-9]*\.?[0-9]+)\s+seconds\s+(fast|slow)\b",
+            stripped,
+            flags=re.IGNORECASE,
+        )
+        if match:
+            return abs(float(match.group(1)))
+    raise RuntimeError("failed to parse offset from 'chronyc tracking' output")
+
+
+def _collect_chrony_tracking():
+    tracking_cmd = _chronyc_command("tracking")
+    tracking_stdout = _run_command(tracking_cmd, CHRONY_CMD_TIMEOUT_SEC)
+    offset_sec = _parse_tracking_offset_seconds(tracking_stdout)
+    return {
+        "tracking": tracking_stdout,
+        "offset_seconds": offset_sec,
+    }
+
+
+def _sync_clock_on_startup():
+    if not CHRONY_SYNC_ON_STARTUP:
+        return {
+            "enabled": False,
+            "message": "chrony startup sync disabled by ROS2_PERF_CHRONY_SYNC_ON_STARTUP",
+        }
+
+    sync_result = _chrony_makestep_and_waitsync()
+    offset_sec = _parse_tracking_offset_seconds(sync_result["tracking"])
+    return {
+        "enabled": True,
+        "corrected": True,
+        "startup": True,
+        "offset_seconds": offset_sec,
+        "makestep": sync_result["makestep"],
+        "waitsync": sync_result["waitsync"],
+        "tracking": sync_result["tracking"],
+    }
+
+
+def _guard_clock_on_prepare():
+    if not CHRONY_CHECK_ON_PREPARE:
+        return {
+            "enabled": False,
+            "message": "chrony prepare check disabled by ROS2_PERF_CHRONY_CHECK_ON_PREPARE",
+        }
+
+    tracking_result = _collect_chrony_tracking()
+    offset_sec = tracking_result["offset_seconds"]
+    if offset_sec <= CHRONY_PREPARE_MAX_OFFSET_SEC:
+        return {
+            "enabled": True,
+            "corrected": False,
+            "offset_seconds": offset_sec,
+            "threshold_seconds": CHRONY_PREPARE_MAX_OFFSET_SEC,
+            "tracking": tracking_result["tracking"],
+        }
+
+    sync_result = _chrony_makestep_and_waitsync()
+    offset_sec_after = _parse_tracking_offset_seconds(sync_result["tracking"])
+    return {
+        "enabled": True,
+        "corrected": True,
+        "offset_seconds_before": offset_sec,
+        "offset_seconds_after": offset_sec_after,
+        "threshold_seconds": CHRONY_PREPARE_MAX_OFFSET_SEC,
+        "tracking_before": tracking_result["tracking"],
+        "makestep": sync_result["makestep"],
+        "waitsync": sync_result["waitsync"],
+        "tracking_after": sync_result["tracking"],
+    }
 
 
 def _parse_simple_metadata(path):
@@ -191,18 +348,34 @@ def prepare_run():
         if rmw not in ("fastdds", "cyclonedds", "zenoh"):
             raise ValueError("rmw must be one of: fastdds, cyclonedds, zenoh")
         ctx = _resolve_exec_context(body)
+        chrony_sync = _guard_clock_on_prepare()
         run_timestamp = _prepare_results_timestamp(ctx, rmw)
         app.logger.info(
-            "[prepare_run] topology=%s rmw=%s timestamp=%s",
+            "[prepare_run] topology=%s rmw=%s timestamp=%s chrony_enabled=%s chrony_corrected=%s",
             ctx["topology_dir"],
             rmw,
             run_timestamp,
+            chrony_sync.get("enabled", False),
+            chrony_sync.get("corrected", False),
         )
-        return jsonify({"status": "prepared", "run_timestamp": run_timestamp}), 200
+        return (
+            jsonify(
+                {
+                    "status": "prepared",
+                    "run_timestamp": run_timestamp,
+                    "chrony": chrony_sync,
+                }
+            ),
+            200,
+        )
     except FileNotFoundError as exc:
         return jsonify({"error": str(exc)}), 404
     except ValueError as exc:
         return jsonify({"error": str(exc)}), 400
+    except RuntimeError as exc:
+        return jsonify({"error": f"chrony check/sync failed: {exc}"}), 500
+    except subprocess.TimeoutExpired:
+        return jsonify({"error": "chrony check/sync command timed out"}), 504
     except Exception as exc:
         app.logger.exception("[prepare_run] exception")
         return jsonify({"error": str(exc)}), 500
@@ -340,4 +513,26 @@ def start_docker():
 
 
 if __name__ == "__main__":
+    try:
+        startup_sync = _sync_clock_on_startup()
+        app.logger.info(
+            "[startup] chrony_enabled=%s chrony_corrected=%s offset_seconds=%s",
+            startup_sync.get("enabled", False),
+            startup_sync.get("corrected", False),
+            startup_sync.get("offset_seconds", "N/A"),
+        )
+    except Exception as exc:
+        app.logger.exception("[startup] chrony sync failed")
+        if _is_sudo_password_required_error(exc):
+            message = (
+                "[startup] chrony requires passwordless sudo for /usr/bin/chronyc. "
+                f"See setup steps: {CHRONY_SETUP_URL}"
+            )
+            app.logger.error(message)
+            raise RuntimeError(message) from exc
+        if CHRONY_FAIL_FAST_ON_STARTUP:
+            raise
+        app.logger.warning(
+            "[startup] continuing without startup sync; /prepare_run may fail until chrony is reachable and chronyc permissions are configured"
+        )
     app.run(host="0.0.0.0", port=5000)
