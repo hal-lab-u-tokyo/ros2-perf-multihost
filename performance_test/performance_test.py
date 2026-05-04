@@ -466,7 +466,8 @@ Examples:
     local_raw_logs_dir = os.path.join(local_session_dir, "raw_logs")
     local_analysis_dir = os.path.join(local_session_dir, "analysis")
 
-    os.makedirs(local_coordination_logs_dir, exist_ok=True)
+    if args.exec_policy != "local":
+        os.makedirs(local_coordination_logs_dir, exist_ok=True)
     os.makedirs(local_raw_logs_dir, exist_ok=True)
     os.makedirs(local_analysis_dir, exist_ok=True)
 

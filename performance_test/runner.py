@@ -1,4 +1,5 @@
 import os
+import shlex
 import shutil
 import subprocess
 import sys
@@ -313,23 +314,42 @@ def collect_runtime_logs(
 
     if zenoh_router_kind == "host" and zenoh_router_target_host:
         dst = os.path.join(runtime_logs_dir, "zenohd_router.log")
-        remote_path = (
-            f"{ssh_user}@{zenoh_router_target_host}:{remote_runtime_dir}/zenohd_router.log"
-        )
-        result = subprocess.run(
-            ["scp", remote_path, dst],
-            text=True,
-            capture_output=True,
-        )
-        if result.returncode == 0:
-            print(f"  runtime log -> {dst}")
-        else:
-            print(
-                f"  WARNING: Could not collect zenohd_router.log from {zenoh_router_target_host}: "
-                + (result.stderr or result.stdout or "").strip(),
-                file=sys.stderr,
+        if exec_policy == "native":
+            remote_path = (
+                f"{ssh_user}@{zenoh_router_target_host}:{remote_runtime_dir}/zenohd_router.log"
             )
-    elif zenoh_router_kind == "manager" and local_repo_root and topology_name:
+            result = subprocess.run(
+                ["scp", remote_path, dst],
+                text=True,
+                capture_output=True,
+            )
+            if result.returncode == 0:
+                print(f"  runtime log -> {dst}")
+            else:
+                print(
+                    f"  WARNING: Could not collect zenohd_router.log from {zenoh_router_target_host}: "
+                    + (result.stderr or result.stdout or "").strip(),
+                    file=sys.stderr,
+                )
+        else:  # docker
+            docker_logs_cmd = "docker logs zenohd-service_zenohd-1 2>&1 || docker logs service_zenohd 2>&1 || true"
+            result = subprocess.run(
+                ["ssh", f"{ssh_user}@{zenoh_router_target_host}",
+                 f"bash -lc {shlex.quote(docker_logs_cmd)}"],
+                text=True,
+                capture_output=True,
+            )
+            if result.returncode == 0 and result.stdout.strip():
+                with open(dst, "w", encoding="utf-8") as f:
+                    f.write(result.stdout)
+                print(f"  runtime log -> {dst}")
+            else:
+                print(
+                    f"  WARNING: Could not collect zenohd_router.log (docker logs) from {zenoh_router_target_host}: "
+                    + (result.stderr or result.stdout or "").strip(),
+                    file=sys.stderr,
+                )
+    elif zenoh_router_kind == "manager" and local_repo_root and topology_name and exec_policy == "native":
         src = os.path.join(
             local_repo_root, ws_dir, topology_name, "results", "runtime", "zenohd_router.log"
         )
