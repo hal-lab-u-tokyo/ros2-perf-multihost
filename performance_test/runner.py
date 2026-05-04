@@ -332,33 +332,62 @@ def collect_runtime_logs(
                     file=sys.stderr,
                 )
         else:  # docker
-            docker_logs_cmd = "docker logs zenohd-service_zenohd-1 2>&1 || docker logs service_zenohd 2>&1 || true"
-            result = subprocess.run(
-                ["ssh", f"{ssh_user}@{zenoh_router_target_host}",
-                 f"bash -lc {shlex.quote(docker_logs_cmd)}"],
-                text=True,
-                capture_output=True,
+            collected = False
+            last_error = ""
+            for container_name in ("zenohd-service_zenohd-1", "service_zenohd"):
+                docker_logs_cmd = f"docker logs {shlex.quote(container_name)}"
+                result = subprocess.run(
+                    ["ssh", f"{ssh_user}@{zenoh_router_target_host}",
+                     f"bash -lc {shlex.quote(docker_logs_cmd)}"],
+                    text=True,
+                    capture_output=True,
+                )
+                if result.returncode == 0:
+                    with open(dst, "w", encoding="utf-8") as f:
+                        f.write((result.stdout or "") + (result.stderr or ""))
+                    print(f"  runtime log -> {dst}")
+                    collected = True
+                    break
+                last_error = (result.stderr or result.stdout or "").strip()
+
+            if not collected:
+                print(
+                    f"  WARNING: Could not collect zenohd_router.log (docker logs) from {zenoh_router_target_host}: {last_error}",
+                    file=sys.stderr,
+                )
+    elif zenoh_router_kind == "manager" and local_repo_root and topology_name:
+        dst = os.path.join(runtime_logs_dir, "zenohd_router.log")
+        if exec_policy == "native":
+            src = os.path.join(
+                local_repo_root, ws_dir, topology_name, "results", "runtime", "zenohd_router.log"
             )
-            if result.returncode == 0 and result.stdout.strip():
-                with open(dst, "w", encoding="utf-8") as f:
-                    f.write(result.stdout)
+            if os.path.exists(src):
+                shutil.copy2(src, dst)
                 print(f"  runtime log -> {dst}")
             else:
                 print(
-                    f"  WARNING: Could not collect zenohd_router.log (docker logs) from {zenoh_router_target_host}: "
-                    + (result.stderr or result.stdout or "").strip(),
+                    f"  WARNING: zenohd_router.log not found at {src}",
                     file=sys.stderr,
                 )
-    elif zenoh_router_kind == "manager" and local_repo_root and topology_name and exec_policy == "native":
-        src = os.path.join(
-            local_repo_root, ws_dir, topology_name, "results", "runtime", "zenohd_router.log"
-        )
-        dst = os.path.join(runtime_logs_dir, "zenohd_router.log")
-        if os.path.exists(src):
-            shutil.copy2(src, dst)
-            print(f"  runtime log -> {dst}")
-        else:
-            print(
-                f"  WARNING: zenohd_router.log not found at {src}",
-                file=sys.stderr,
-            )
+        else:  # docker
+            collected = False
+            last_error = ""
+            for container_name in ("zenohd-service_zenohd-1", "service_zenohd"):
+                result = subprocess.run(
+                    ["docker", "logs", container_name],
+                    text=True,
+                    capture_output=True,
+                )
+                if result.returncode == 0:
+                    with open(dst, "w", encoding="utf-8") as f:
+                        f.write((result.stdout or "") + (result.stderr or ""))
+                    print(f"  runtime log -> {dst}")
+                    collected = True
+                    break
+                last_error = (result.stderr or result.stdout or "").strip()
+
+            if not collected:
+                print(
+                    f"  WARNING: Could not collect zenohd_router.log (docker logs) on manager: {last_error}",
+                    file=sys.stderr,
+                )

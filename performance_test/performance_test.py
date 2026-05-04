@@ -344,6 +344,21 @@ Examples:
             topology_name=args.topology_name,
         )
     finally:
+        if args.exec_policy in ("docker", "native"):
+            print("Collecting runtime logs (rest_server, zenohd router)...")
+            collect_runtime_logs(
+                local_session_dir,
+                hosts,
+                ssh_user=args.ssh_user,
+                remote_repo_base=args.remote_repo_base,
+                ws_dir=args.ws_dir,
+                topology_name=args.topology_name,
+                exec_policy=args.exec_policy,
+                zenoh_router_kind=zenoh_router_kind,
+                zenoh_router_target_host=zenoh_router_target_host,
+                local_repo_root=repo_root,
+            )
+
         if zenoh_router_started:
             print("Stopping Zenoh router...")
             try:
@@ -360,20 +375,5 @@ Examples:
             except RuntimeError as exc:
                 print(
                     f"WARNING: Failed to stop Zenoh router cleanly: {exc}", file=sys.stderr)
-
-        if args.exec_policy in ("docker", "native"):
-            print("Collecting runtime logs (rest_server, zenohd router)...")
-            collect_runtime_logs(
-                local_session_dir,
-                hosts,
-                ssh_user=args.ssh_user,
-                remote_repo_base=args.remote_repo_base,
-                ws_dir=args.ws_dir,
-                topology_name=args.topology_name,
-                exec_policy=args.exec_policy,
-                zenoh_router_kind=zenoh_router_kind,
-                zenoh_router_target_host=zenoh_router_target_host,
-                local_repo_root=repo_root,
-            )
 
     print("All tests and aggregation complete.")
