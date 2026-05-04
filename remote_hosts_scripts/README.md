@@ -31,8 +31,8 @@ python3 remote_hosts_scripts/rest_server.py
 | Method | Path | Description |
 |---|---|---|
 | `POST` | `/prepare_run` | Synchronizes the clock (if needed) and creates the run timestamp directory |
-| `POST` | `/start` | Runs the host-specific ROS 2 launch file (native execution mode) |
-| `POST` | `/start_docker` | Runs the host-specific `exec.sh` script (Docker execution mode) |
+| `POST` | `/start_native` | Runs the host-specific `{hostname}_exec_native.sh` script (native execution mode) |
+| `POST` | `/start_docker` | Runs the host-specific `{hostname}_exec_docker.sh` script (Docker execution mode) |
 
 All endpoints accept a JSON body. Common request fields:
 
@@ -91,7 +91,7 @@ python3 remote_hosts_scripts/start_exec_scripts.py <topology> \
 |---|---|---|---|
 | `topology` | — | Topology directory name under `ws-dir` (required) | — |
 | `--rmw` | `-m` | RMW implementation | `fastdds` |
-| `--exec-policy` | `-p` | Execution mode: `docker` sends `/start_docker`, `native` sends `/start` | `docker` |
+| `--exec-policy` | `-p` | Execution mode: `docker` sends `/start_docker`, `native` sends `/start_native` | `docker` |
 | `--trial-idx` | `-i` | Trial index | `1` |
 | `--ws-dir` | `-w` | Workspace directory | `performance_ws` |
 | `--prepare-run` | — | Send `/prepare_run` instead of a start request | — |

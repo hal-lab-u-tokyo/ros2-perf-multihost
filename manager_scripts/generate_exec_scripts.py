@@ -15,6 +15,7 @@ from generate_exec.script_generation import (
     generate_compose,
     generate_compose_per_host,
     generate_exec_scripts,
+    generate_host_exec_native_scripts,
     generate_host_exec_scripts,
     generate_local_run_script,
 )
@@ -90,6 +91,8 @@ Examples:
             json_content, tmp_dir, project_root, settings)
         generate_host_exec_scripts(
             json_content, tmp_dir, project_root, settings)
+        generate_host_exec_native_scripts(
+            json_content, tmp_dir, project_root, settings)
         generate_local_run_script(
             json_content, tmp_dir, project_root, settings)
 
@@ -111,7 +114,7 @@ Examples:
     )
 
     print(
-        f"Generated host*.launch.py, host*_exec.sh, host*_compose.yaml, local_exec.sh, local_compose.yaml "
+        f"Generated host*.launch.py, host*_exec_docker.sh, host*_exec_native.sh, host*_compose.yaml, local_exec.sh, local_compose.yaml "
         f"in {settings.perf_ws_dir}/{topology_dir}/exec_scripts "
         f"for {len(json_content['hosts'])} host(s)"
     )

@@ -147,7 +147,7 @@ failed_hosts=()
 
 for host in "${HOSTS[@]}"; do
     host_launch="${host}.launch.py"
-    host_exec="${host}_exec.sh"
+    host_exec="${host}_exec_docker.sh"
     host_compose="${host}_compose.yaml"
 
     echo "=== Validating local files for ${host} ==="
