@@ -115,7 +115,7 @@ def run_test(
         env=env,
     )
     if log_dir is not None:
-        log_path = os.path.join(log_dir, f"trial{trial_idx + 1}_exec.log")
+        log_path = os.path.join(log_dir, f"exec_trial{trial_idx + 1}.log")
         os.makedirs(log_dir, exist_ok=True)
         with open(log_path, "w", encoding="utf-8") as f:
             f.write(result.stdout or "")
@@ -143,6 +143,7 @@ def prepare_run(
     exec_policy="docker",
     run_timestamp=None,
     ssh_user="ubuntu",
+    log_dir=None,
 ):
     """Initialize run timestamp/latest-rmw on all hosts before trial loop."""
     _ = ssh_user
@@ -171,10 +172,27 @@ def prepare_run(
         hosts_str,
     ]
 
-    result = subprocess.run(cmd, text=True)
-    print(result)
+    result = subprocess.run(cmd, text=True, capture_output=True)
+    log_path = None
+    if log_dir is not None:
+        os.makedirs(log_dir, exist_ok=True)
+        log_path = os.path.join(log_dir, "prepare_run.log")
+        with open(log_path, "w", encoding="utf-8") as f:
+            f.write(result.stdout or "")
+            if result.stderr:
+                f.write("\n--- stderr ---\n")
+                f.write(result.stderr)
     if result.returncode != 0:
+        if log_path is not None:
+            print(f"  prepare log -> {log_path}")
+        if result.stdout:
+            print(result.stdout.strip())
+        if result.stderr:
+            print(result.stderr.strip(), file=sys.stderr)
         raise RuntimeError(f"prepare_run failed: rc={result.returncode}")
+    print(f"Prepare run complete on all {len(hosts)} hosts")
+    if log_path is not None:
+        print(f"  prepare log -> {log_path}")
 
 
 def collect_logs(

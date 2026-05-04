@@ -365,6 +365,7 @@ For details on generated files in `exec_scripts/`, `metadata.txt` format, runtim
 #### Start REST Servers
 
 Start the REST server on all Hosts from the Manager in one command.
+Note that the target Hosts are automatically resolved from `<ws-dir>/<topology>/metadata.txt`.
 
 ```bash
 ./manager_scripts/manage_rest_servers.sh \
@@ -390,14 +391,14 @@ Example:
   simple \
   --remote-repo-base /home/ubuntu/ros2-perf-multihost
 
-# Optional: check and stop
-./manager_scripts/manage_rest_servers.sh restart simple
+# Optional: check status, stop and restart
 ./manager_scripts/manage_rest_servers.sh status simple
 ./manager_scripts/manage_rest_servers.sh stop simple
+./manager_scripts/manage_rest_servers.sh restart simple
 ```
 
-The target Host list is resolved from `<ws-dir>/<topology>/metadata.txt`.
 If SSH startup or readiness check fails on any Host, this command exits with a non-zero status.
+The REST server log and PID file are stored on each Host under `<remote-repo-base>/<ws-dir>/<topology>/results/runtime/`.
 For full subcommand and option details (including `wait`, `monitor`, `logs`, and related options), see [manager_scripts/README.md](./manager_scripts/README.md#manage_rest_serverssh).
 
 If the server exits at startup with a chrony sudo permission error, check the chrony sudo setup in [Clock synchronization for REST benchmark (chrony)](#clock-synchronization-for-rest-benchmark-chrony).

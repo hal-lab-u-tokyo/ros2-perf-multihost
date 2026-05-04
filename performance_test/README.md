@@ -27,14 +27,15 @@ results/
 ├── latest-zenoh   -> 2026-04-26_14-02-10-zenoh/
 └── 2026-04-26_13-21-45-fastdds/
     ├── logs/
+    │   ├── prepare_run.log             # stdout/stderr of the prepare_run REST phase (docker/native mode)
     │   ├── trial1/
     │   │   ├── <node>_log/              # per-node log directory
     │   │   │   └── <topic>_log.txt      # raw latency log per topic
     │   │   ├── <host>_monitor_host.csv  # per-Host resource usage time series
     │   │   └── ...
-    │   ├── trial1_exec.log              # stdout/stderr of the REST call for trial 1 (docker/native mode)
+    │   ├── exec_trial1.log              # stdout/stderr of the REST call for trial 1 (docker/native mode)
     │   ├── trial2/
-    │   ├── trial2_exec.log
+    │   ├── exec_trial2.log
     │   └── ...
     └── csv/
         ├── total_latency.csv

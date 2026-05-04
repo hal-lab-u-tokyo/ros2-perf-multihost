@@ -113,6 +113,13 @@ It resolves host names from `<ws-dir>/<topology>/metadata.txt`.
 `start` launches REST servers in the background over SSH and waits until each server port is reachable.
 If command execution or readiness check fails on any Host, the script exits with a non-zero status.
 
+Runtime files created by this script are stored on each Host under:
+
+- `<remote-repo-base>/<ws-dir>/<topology>/results/runtime/rest_server.log`
+- `<remote-repo-base>/<ws-dir>/<topology>/results/runtime/rest_server.pid`
+
+The `logs` subcommand reads `rest_server.log`, and `stop` / `status` use `rest_server.pid`.
+
 ```bash
 ./manager_scripts/manage_rest_servers.sh \
 	<command> \

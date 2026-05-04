@@ -167,6 +167,7 @@ Examples:
         exec_policy=args.exec_policy,
         run_timestamp=run_timestamp,
         ssh_user=args.ssh_user,
+        log_dir=local_logs_dir,
     )
 
     for trial_idx in range(args.trials):
