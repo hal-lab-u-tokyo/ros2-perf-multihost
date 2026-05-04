@@ -17,14 +17,14 @@ Our purpose is to provide a "scientific scale" for optimizing distributed system
   - [Observable Metrics](#observable-metrics-)
 - [Quick Start](#quick-start)
   - [What You Need](#what-you-need)
-  - [Steps](#steps)
+  - [Quick Steps](#quick-steps)
 - [Preliminaries](#preliminaries)
   - [Directory Structure](#directory-structure)
   - [Preparation of Hosts](#preparation-of-hosts)
 - [Usage in Details](#usage-in-details)
   - [Step1: Define Topology](#step1-define-topology)
-  - [Step2: Generate and Distribute Execution Scripts](#step2-generate-and-distribute-execution-scripts)
-  - [Step3: Automated Benchmark via REST](#step3-automated-benchmark-via-rest)
+  - [Step2: Generate Execution Scripts](#step2-generate-execution-scripts)
+  - [Step3: Run Benchmark via REST](#step3-run-benchmark-via-rest)
   - [Step4: Results and Analysis](#step4-results-and-analysis)
 - [Related Documents](#related-documents)
 - [Troubleshooting](#troubleshooting)
@@ -134,7 +134,7 @@ python3 performance_test/performance_test.py \
 
 This runs 3 trials, each lasting 10 seconds, using Fast DDS (default RMW).
 
-#### Step4: Results
+#### Step4: Results and Analysis
 
 As a quick check, confirm that the following outputs are generated:
 
@@ -360,7 +360,7 @@ python3 manager_scripts/generate_exec_scripts.py \
 
 For details on generated files in `exec_scripts/`, `metadata.txt` format, runtime options supported by generated scripts, see [manager_scripts/README.md](./manager_scripts/README.md).
 
-### Step3: Automated Benchmark via REST
+### Step3: Run Benchmark via REST
 
 #### Start REST Servers (on each Host)
 
