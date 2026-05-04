@@ -24,7 +24,6 @@ from generate_exec.validation import normalize_ws_dir, validate_topology_json_sc
 
 PROJECT_ROOT_IN_CONTAINER = "/workdir/ros2-perf-multihost"
 ROS_WS_IN_CONTAINER = f"{PROJECT_ROOT_IN_CONTAINER}/ros2_node_impl_ws"
-ZENOH_CONFIG_DIR_IN_CONTAINER = f"{ROS_WS_IN_CONTAINER}/zenoh_config"
 IMAGE_NAME = "ghcr.io/hal-lab-u-tokyo/ros2-perf-multihost:latest"
 DEFAULT_PERF_WS_DIR = "performance_ws"
 DEFAULT_EVAL_TIME = 60
@@ -63,7 +62,6 @@ Examples:
     settings = GenerationSettings(
         project_root_in_container=PROJECT_ROOT_IN_CONTAINER,
         ros_ws_in_container=ROS_WS_IN_CONTAINER,
-        zenoh_config_dir_in_container=ZENOH_CONFIG_DIR_IN_CONTAINER,
         image_name=IMAGE_NAME,
         perf_ws_dir=args.ws_dir,
         default_eval_time=DEFAULT_EVAL_TIME,

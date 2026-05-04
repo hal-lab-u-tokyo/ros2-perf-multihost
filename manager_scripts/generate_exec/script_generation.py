@@ -12,7 +12,6 @@ class GenerationSettings:
 
     project_root_in_container: str
     ros_ws_in_container: str
-    zenoh_config_dir_in_container: str
     image_name: str
     perf_ws_dir: str
     default_eval_time: int

@@ -398,7 +398,7 @@ Example:
 ```
 
 If SSH startup or readiness check fails on any Host, this command exits with a non-zero status.
-The REST server log and PID file are stored on each Host under `<remote-repo-base>/<ws-dir>/<topology>/results/runtime/`.
+The REST server log is stored on each Host under `<remote-repo-base>/<ws-dir>/<topology>/results/runtime/rest_server.log`.
 For full subcommand and option details (including `wait`, `monitor`, `logs`, and related options), see [manager_scripts/README.md](./manager_scripts/README.md#manage_rest_serverssh).
 
 If the server exits at startup with a chrony sudo permission error, check the chrony sudo setup in [Clock synchronization for REST benchmark (chrony)](#clock-synchronization-for-rest-benchmark-chrony).

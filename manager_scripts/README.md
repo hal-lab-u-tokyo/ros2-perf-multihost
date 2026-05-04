@@ -8,7 +8,7 @@ This directory contains scripts for generating and distributing topology-specifi
 |---|---|
 | `generate_exec_scripts.py` | Generates execution scripts and Compose files from a topology JSON file |
 | `distribute_exec_scripts.sh` | Distributes generated scripts to each host via SCP |
-| `manage_rest_servers.sh` | Manages `remote_hosts_scripts/rest_server.py` on all Hosts via SSH from the manager |
+| `manage_rest_servers.sh` | Manages `remote_hosts_scripts/rest_server.py` on all Hosts via SSH from the Manager |
 
 For usage of each script, see the [Usage in Details](../README.md#usage-in-details) section in the top-level README.
 
@@ -108,17 +108,17 @@ Example:
 
 ## manage_rest_servers.sh
 
-`manage_rest_servers.sh` manages `remote_hosts_scripts/rest_server.py` on all target Hosts from the manager machine.
+`manage_rest_servers.sh` manages `remote_hosts_scripts/rest_server.py` on all target Hosts from the Manager machine.
 It resolves host names from `<ws-dir>/<topology>/metadata.txt`.
 `start` launches REST servers in the background over SSH and waits until each server port is reachable.
 If command execution or readiness check fails on any Host, the script exits with a non-zero status.
 
-Runtime files created by this script are stored on each Host under:
+Runtime log files created by this script are stored on each Host under:
 
 - `<remote-repo-base>/<ws-dir>/<topology>/results/runtime/rest_server.log`
-- `<remote-repo-base>/<ws-dir>/<topology>/results/runtime/rest_server.pid`
 
-The `logs` subcommand reads `rest_server.log`, and `stop` / `status` use `rest_server.pid`.
+The `logs` subcommand reads `rest_server.log`.
+`start` / `stop` / `status` operate on the process listening on fixed REST port `5000` (no PID file management).
 
 ```bash
 ./manager_scripts/manage_rest_servers.sh \
@@ -127,7 +127,7 @@ The `logs` subcommand reads `rest_server.log`, and `stop` / `status` use `rest_s
 	[--ws-dir|-w <dir>] \
 	[--remote-repo-base|-b <dir>] \
 	[--ssh-user|-u <user>] \
-	[--port|-p <port>] \
+	[--force|-f] \
 	[--wait-retries <n>] \
 	[--wait-interval <sec>]
 ```
@@ -135,9 +135,9 @@ The `logs` subcommand reads `rest_server.log`, and `stop` / `status` use `rest_s
 Commands:
 
 - `start`: start REST servers on all Hosts and wait until each Host is ready
-- `stop`: stop REST servers on all Hosts using PID files
+- `stop`: stop REST servers on all Hosts using port `5000`
 - `restart`: stop and then start REST servers on all Hosts
-- `status`: show per-Host state (`PID` and port reachability)
+- `status`: show per-Host state based on port `5000`
 - `wait`: wait until all Hosts expose the REST port
 - `monitor`: periodically run status checks
 - `logs`: show REST server logs from all Hosts
@@ -149,7 +149,7 @@ Commands:
 | `--ws-dir` | `-w` | Workspace directory that contains generated topologies | `performance_ws` |
 | `--remote-repo-base` | `-b` | Remote repository base directory on each Host | `/home/ubuntu/ros2-perf-multihost` |
 | `--ssh-user` | `-u` | SSH user for all Hosts | `ubuntu` |
-| `--port` | `-p` | REST server port to wait for | `5000` |
+| `--force` | `-f` | Skip confirmation prompts for process termination | off |
 | `--wait-retries` | — | Number of readiness checks per Host | `30` |
 | `--wait-interval` | — | Seconds between readiness checks | `2` |
 | `--monitor-interval` | — | Seconds between monitor samples | `5` |
