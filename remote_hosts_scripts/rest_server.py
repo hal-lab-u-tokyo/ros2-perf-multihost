@@ -381,6 +381,55 @@ def prepare_run():
         return jsonify({"error": str(exc)}), 500
 
 
+@app.route("/start_docker", methods=["POST"])
+def start_docker():
+    body = request.get_json(silent=True) or {}
+    trial_idx = body.get("trial_idx", 1)
+    eval_time = body.get("eval_time")
+    rmw = body.get("rmw")
+
+    try:
+        trial_idx = _to_int(trial_idx, "trial_idx")
+        if eval_time is not None:
+            eval_time = _to_int(eval_time, "eval_time")
+        if rmw not in ("fastdds", "cyclonedds", "zenoh"):
+            raise ValueError("rmw must be one of: fastdds, cyclonedds, zenoh")
+
+        ctx = _resolve_exec_context(body)
+        resolved_host, script_path = _resolve_host_script(
+            ctx["exec_dir"], ctx["hosts"], "exec_docker.sh")
+        run_timestamp = _resolve_active_timestamp(ctx, rmw)
+
+        cmd = ["bash", script_path, "--rmw", rmw]
+        if eval_time is not None:
+            cmd.extend(["--eval-time", str(eval_time)])
+        cmd.extend(["--trial-idx", str(trial_idx)])
+
+        env = os.environ.copy()
+        env["RUN_TIMESTAMP"] = run_timestamp
+        env["RMW_CHOICE"] = rmw
+
+        app.logger.info(
+            "[start_docker] host=%s topology=%s rmw=%s trial=%s timestamp=%s script=%s",
+            resolved_host,
+            ctx["topology_dir"],
+            rmw,
+            trial_idx,
+            run_timestamp,
+            script_path,
+        )
+        return _run_script(cmd, env=env)
+    except ValueError as exc:
+        return jsonify({"error": str(exc)}), 400
+    except FileNotFoundError as exc:
+        return jsonify({"error": str(exc)}), 404
+    except subprocess.TimeoutExpired:
+        return jsonify({"error": f"script timeout after {RUN_SCRIPT_TIMEOUT_SEC}s"}), 504
+    except Exception as exc:
+        app.logger.exception("[start_docker] exception")
+        return jsonify({"error": str(exc)}), 500
+
+
 @app.route("/start_native", methods=["POST"])
 def start_native():
     body = request.get_json(silent=True) or {}
@@ -429,55 +478,6 @@ def start_native():
         return jsonify({"error": f"script timeout after {RUN_SCRIPT_TIMEOUT_SEC}s"}), 504
     except Exception as exc:
         app.logger.exception("[start_native] exception")
-        return jsonify({"error": str(exc)}), 500
-
-
-@app.route("/start_docker", methods=["POST"])
-def start_docker():
-    body = request.get_json(silent=True) or {}
-    trial_idx = body.get("trial_idx", 1)
-    eval_time = body.get("eval_time")
-    rmw = body.get("rmw")
-
-    try:
-        trial_idx = _to_int(trial_idx, "trial_idx")
-        if eval_time is not None:
-            eval_time = _to_int(eval_time, "eval_time")
-        if rmw not in ("fastdds", "cyclonedds", "zenoh"):
-            raise ValueError("rmw must be one of: fastdds, cyclonedds, zenoh")
-
-        ctx = _resolve_exec_context(body)
-        resolved_host, script_path = _resolve_host_script(
-            ctx["exec_dir"], ctx["hosts"], "exec_docker.sh")
-        run_timestamp = _resolve_active_timestamp(ctx, rmw)
-
-        cmd = ["bash", script_path, "--rmw", rmw]
-        if eval_time is not None:
-            cmd.extend(["--eval-time", str(eval_time)])
-        cmd.extend(["--trial-idx", str(trial_idx)])
-
-        env = os.environ.copy()
-        env["RUN_TIMESTAMP"] = run_timestamp
-        env["RMW_CHOICE"] = rmw
-
-        app.logger.info(
-            "[start_docker] host=%s topology=%s rmw=%s trial=%s timestamp=%s script=%s",
-            resolved_host,
-            ctx["topology_dir"],
-            rmw,
-            trial_idx,
-            run_timestamp,
-            script_path,
-        )
-        return _run_script(cmd, env=env)
-    except ValueError as exc:
-        return jsonify({"error": str(exc)}), 400
-    except FileNotFoundError as exc:
-        return jsonify({"error": str(exc)}), 404
-    except subprocess.TimeoutExpired:
-        return jsonify({"error": f"script timeout after {RUN_SCRIPT_TIMEOUT_SEC}s"}), 504
-    except Exception as exc:
-        app.logger.exception("[start_docker] exception")
         return jsonify({"error": str(exc)}), 500
 
 
