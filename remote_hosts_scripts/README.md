@@ -52,8 +52,9 @@ All endpoints accept a JSON body. Common request fields:
 - **At `/prepare_run`**: checks the current offset; runs correction only when offset exceeds the configured threshold
 
 Because these operations use `sudo -n chronyc` internally, the Host user must be able to run `chronyc` via `sudo` without a password.
+If startup sync fails due to missing passwordless sudo for `chronyc`, the server exits with a setup URL in the error message.
 See [Clock synchronization for REST benchmark (chrony)](../README.md#clock-synchronization-for-rest-benchmark-chrony) in the top-level README for setup steps.
-By default, if startup sync fails, the server keeps running and reports the issue; set `ROS2_PERF_CHRONY_FAIL_FAST_ON_STARTUP=1` to exit immediately on startup sync failure.
+For other startup sync failures, the server keeps running by default and reports the issue; set `ROS2_PERF_CHRONY_FAIL_FAST_ON_STARTUP=1` to exit immediately on startup sync failure.
 
 ### Environment variables
 

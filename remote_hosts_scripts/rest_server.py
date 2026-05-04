@@ -31,6 +31,10 @@ CHRONY_CHECK_ON_PREPARE = os.environ.get(
 CHRONY_FAIL_FAST_ON_STARTUP = os.environ.get(
     "ROS2_PERF_CHRONY_FAIL_FAST_ON_STARTUP", "0"
 ).strip().lower() in ("1", "true", "yes", "on")
+CHRONY_SETUP_URL = (
+    "https://github.com/hal-lab-u-tokyo/ros2-perf-multihost"
+    "#clock-synchronization-for-rest-benchmark-chrony"
+)
 CHRONYC_CMD_PREFIX = os.environ.get(
     "ROS2_PERF_CHRONYC_CMD_PREFIX", "sudo -n chronyc"
 ).strip()
@@ -79,6 +83,11 @@ def _chronyc_command(*args):
     if not prefix_parts:
         raise RuntimeError("ROS2_PERF_CHRONYC_CMD_PREFIX must not be empty")
     return prefix_parts + [str(arg) for arg in args]
+
+
+def _is_sudo_password_required_error(exc):
+    text = str(exc).lower()
+    return "sudo" in text and "a password is required" in text
 
 
 def _chrony_makestep_and_waitsync():
@@ -514,15 +523,16 @@ if __name__ == "__main__":
         )
     except Exception as exc:
         app.logger.exception("[startup] chrony sync failed")
+        if _is_sudo_password_required_error(exc):
+            message = (
+                "[startup] chrony requires passwordless sudo for /usr/bin/chronyc. "
+                f"See setup steps: {CHRONY_SETUP_URL}"
+            )
+            app.logger.error(message)
+            raise RuntimeError(message) from exc
         if CHRONY_FAIL_FAST_ON_STARTUP:
             raise
-        if isinstance(exc, RuntimeError) and "a password is required" in str(exc):
-            app.logger.warning(
-                "[startup] continuing without startup sync because sudo for chronyc requires a password; "
-                "configure passwordless sudo for /usr/bin/chronyc or set ROS2_PERF_CHRONY_SYNC_ON_STARTUP=0"
-            )
-        else:
-            app.logger.warning(
-                "[startup] continuing without startup sync; /prepare_run may fail until chrony is reachable and chronyc permissions are configured"
-            )
+        app.logger.warning(
+            "[startup] continuing without startup sync; /prepare_run may fail until chrony is reachable and chronyc permissions are configured"
+        )
     app.run(host="0.0.0.0", port=5000)
