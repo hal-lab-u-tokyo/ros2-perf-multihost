@@ -2,6 +2,8 @@ from flask import Flask, jsonify, request
 from datetime import datetime
 import logging
 import os
+import re
+import shlex
 import shutil
 import socket
 import subprocess
@@ -20,6 +22,32 @@ REPO_ROOT = os.environ.get("ROS2_PERF_REPO_ROOT",
                            "/home/ubuntu/ros2-perf-multihost")
 DEFAULT_WS_DIR = os.environ.get("ROS2_PERF_WS_DIR", "performance_ws")
 RUN_SCRIPT_TIMEOUT_SEC = int(os.environ.get("RUN_SCRIPT_TIMEOUT_SEC", "900"))
+CHRONY_SYNC_ON_STARTUP = os.environ.get(
+    "ROS2_PERF_CHRONY_SYNC_ON_STARTUP", "1"
+).strip().lower() in ("1", "true", "yes", "on")
+CHRONY_CHECK_ON_PREPARE = os.environ.get(
+    "ROS2_PERF_CHRONY_CHECK_ON_PREPARE", "1"
+).strip().lower() in ("1", "true", "yes", "on")
+CHRONY_FAIL_FAST_ON_STARTUP = os.environ.get(
+    "ROS2_PERF_CHRONY_FAIL_FAST_ON_STARTUP", "0"
+).strip().lower() in ("1", "true", "yes", "on")
+CHRONY_SETUP_URL = (
+    "https://github.com/hal-lab-u-tokyo/ros2-perf-multihost"
+    "#clock-synchronization-for-rest-benchmark-chrony"
+)
+CHRONYC_CMD_PREFIX = os.environ.get(
+    "ROS2_PERF_CHRONYC_CMD_PREFIX", "sudo -n chronyc"
+).strip()
+CHRONY_WAITSYNC_TRIES = int(os.environ.get(
+    "ROS2_PERF_CHRONY_WAITSYNC_TRIES", "20"))
+CHRONY_WAITSYNC_MAX_CORRECTION_SEC = float(
+    os.environ.get("ROS2_PERF_CHRONY_WAITSYNC_MAX_CORRECTION_SEC", "0.001")
+)
+CHRONY_PREPARE_MAX_OFFSET_SEC = float(
+    os.environ.get("ROS2_PERF_CHRONY_PREPARE_MAX_OFFSET_SEC", "0.001")
+)
+CHRONY_CMD_TIMEOUT_SEC = int(os.environ.get(
+    "ROS2_PERF_CHRONY_CMD_TIMEOUT_SEC", "30"))
 
 
 def _to_int(value, name):
@@ -27,6 +55,135 @@ def _to_int(value, name):
         return int(value)
     except (TypeError, ValueError) as exc:
         raise ValueError(f"{name} must be an integer") from exc
+
+
+def _format_command(argv):
+    return " ".join(shlex.quote(part) for part in argv)
+
+
+def _run_command(argv, timeout_sec):
+    result = subprocess.run(
+        argv,
+        text=True,
+        capture_output=True,
+        timeout=timeout_sec,
+    )
+    if result.returncode != 0:
+        stderr = (result.stderr or "").strip()
+        stdout = (result.stdout or "").strip()
+        detail = stderr if stderr else stdout
+        raise RuntimeError(
+            f"command failed (rc={result.returncode}): {_format_command(argv)}; detail={detail}"
+        )
+    return (result.stdout or "").strip()
+
+
+def _chronyc_command(*args):
+    prefix_parts = shlex.split(CHRONYC_CMD_PREFIX)
+    if not prefix_parts:
+        raise RuntimeError("ROS2_PERF_CHRONYC_CMD_PREFIX must not be empty")
+    return prefix_parts + [str(arg) for arg in args]
+
+
+def _is_sudo_password_required_error(exc):
+    text = str(exc).lower()
+    return "sudo" in text and "a password is required" in text
+
+
+def _chrony_makestep_and_waitsync():
+    makestep_cmd = _chronyc_command("-a", "makestep")
+    waitsync_cmd = _chronyc_command(
+        "waitsync", CHRONY_WAITSYNC_TRIES, CHRONY_WAITSYNC_MAX_CORRECTION_SEC
+    )
+    tracking_cmd = _chronyc_command("tracking")
+
+    makestep_stdout = _run_command(makestep_cmd, CHRONY_CMD_TIMEOUT_SEC)
+    waitsync_stdout = _run_command(waitsync_cmd, CHRONY_CMD_TIMEOUT_SEC)
+    tracking_stdout = _run_command(tracking_cmd, CHRONY_CMD_TIMEOUT_SEC)
+
+    return {
+        "makestep": makestep_stdout,
+        "waitsync": waitsync_stdout,
+        "tracking": tracking_stdout,
+    }
+
+
+def _parse_tracking_offset_seconds(tracking_output):
+    for line in tracking_output.splitlines():
+        stripped = line.strip()
+        if not stripped.lower().startswith("system time"):
+            continue
+        match = re.search(
+            r":\s*([0-9]*\.?[0-9]+)\s+seconds\s+(fast|slow)\b",
+            stripped,
+            flags=re.IGNORECASE,
+        )
+        if match:
+            return abs(float(match.group(1)))
+    raise RuntimeError("failed to parse offset from 'chronyc tracking' output")
+
+
+def _collect_chrony_tracking():
+    tracking_cmd = _chronyc_command("tracking")
+    tracking_stdout = _run_command(tracking_cmd, CHRONY_CMD_TIMEOUT_SEC)
+    offset_sec = _parse_tracking_offset_seconds(tracking_stdout)
+    return {
+        "tracking": tracking_stdout,
+        "offset_seconds": offset_sec,
+    }
+
+
+def _sync_clock_on_startup():
+    if not CHRONY_SYNC_ON_STARTUP:
+        return {
+            "enabled": False,
+            "message": "chrony startup sync disabled by ROS2_PERF_CHRONY_SYNC_ON_STARTUP",
+        }
+
+    sync_result = _chrony_makestep_and_waitsync()
+    offset_sec = _parse_tracking_offset_seconds(sync_result["tracking"])
+    return {
+        "enabled": True,
+        "corrected": True,
+        "startup": True,
+        "offset_seconds": offset_sec,
+        "makestep": sync_result["makestep"],
+        "waitsync": sync_result["waitsync"],
+        "tracking": sync_result["tracking"],
+    }
+
+
+def _guard_clock_on_prepare():
+    if not CHRONY_CHECK_ON_PREPARE:
+        return {
+            "enabled": False,
+            "message": "chrony prepare check disabled by ROS2_PERF_CHRONY_CHECK_ON_PREPARE",
+        }
+
+    tracking_result = _collect_chrony_tracking()
+    offset_sec = tracking_result["offset_seconds"]
+    if offset_sec <= CHRONY_PREPARE_MAX_OFFSET_SEC:
+        return {
+            "enabled": True,
+            "corrected": False,
+            "offset_seconds": offset_sec,
+            "threshold_seconds": CHRONY_PREPARE_MAX_OFFSET_SEC,
+            "tracking": tracking_result["tracking"],
+        }
+
+    sync_result = _chrony_makestep_and_waitsync()
+    offset_sec_after = _parse_tracking_offset_seconds(sync_result["tracking"])
+    return {
+        "enabled": True,
+        "corrected": True,
+        "offset_seconds_before": offset_sec,
+        "offset_seconds_after": offset_sec_after,
+        "threshold_seconds": CHRONY_PREPARE_MAX_OFFSET_SEC,
+        "tracking_before": tracking_result["tracking"],
+        "makestep": sync_result["makestep"],
+        "waitsync": sync_result["waitsync"],
+        "tracking_after": sync_result["tracking"],
+    }
 
 
 def _parse_simple_metadata(path):
@@ -161,7 +318,7 @@ def _prepare_results_timestamp(ctx, rmw):
 
     run_timestamp = f"{datetime.now().strftime('%Y-%m-%d_%H-%M-%S')}-{rmw}"
     run_dir = os.path.join(results_dir, run_timestamp)
-    os.makedirs(os.path.join(run_dir, "exec_logs"), exist_ok=True)
+    os.makedirs(os.path.join(run_dir, "raw_logs"), exist_ok=True)
 
     latest_link = os.path.join(results_dir, f"latest-{rmw}")
     if os.path.lexists(latest_link):
@@ -191,102 +348,36 @@ def prepare_run():
         if rmw not in ("fastdds", "cyclonedds", "zenoh"):
             raise ValueError("rmw must be one of: fastdds, cyclonedds, zenoh")
         ctx = _resolve_exec_context(body)
+        chrony_sync = _guard_clock_on_prepare()
         run_timestamp = _prepare_results_timestamp(ctx, rmw)
         app.logger.info(
-            "[prepare_run] topology=%s rmw=%s timestamp=%s",
+            "[prepare_run] topology=%s rmw=%s timestamp=%s chrony_enabled=%s chrony_corrected=%s",
             ctx["topology_dir"],
             rmw,
             run_timestamp,
+            chrony_sync.get("enabled", False),
+            chrony_sync.get("corrected", False),
         )
-        return jsonify({"status": "prepared", "run_timestamp": run_timestamp}), 200
+        return (
+            jsonify(
+                {
+                    "status": "prepared",
+                    "run_timestamp": run_timestamp,
+                    "chrony": chrony_sync,
+                }
+            ),
+            200,
+        )
     except FileNotFoundError as exc:
         return jsonify({"error": str(exc)}), 404
     except ValueError as exc:
         return jsonify({"error": str(exc)}), 400
+    except RuntimeError as exc:
+        return jsonify({"error": f"chrony check/sync failed: {exc}"}), 500
+    except subprocess.TimeoutExpired:
+        return jsonify({"error": "chrony check/sync command timed out"}), 504
     except Exception as exc:
         app.logger.exception("[prepare_run] exception")
-        return jsonify({"error": str(exc)}), 500
-
-
-@app.route("/start", methods=["POST"])
-def start_script():
-    body = request.get_json(silent=True) or {}
-    trial_idx = body.get("trial_idx", 1)
-    eval_time = body.get("eval_time")
-    rmw = body.get("rmw")
-
-    try:
-        trial_idx = _to_int(trial_idx, "trial_idx")
-        if eval_time is not None:
-            eval_time = _to_int(eval_time, "eval_time")
-        if rmw not in ("fastdds", "cyclonedds", "zenoh"):
-            raise ValueError("rmw must be one of: fastdds, cyclonedds, zenoh")
-
-        ctx = _resolve_exec_context(body)
-        resolved_host, script_path = _resolve_host_script(
-            ctx["exec_dir"], ctx["hosts"], "launch.py", joiner=".")
-        run_timestamp = _resolve_active_timestamp(ctx, rmw)
-        log_dir = os.path.join(
-            REPO_ROOT,
-            ctx["ws_dir"],
-            ctx["topology_dir"],
-            "results",
-            run_timestamp,
-            "exec_logs",
-            f"trial{trial_idx}",
-        )
-        os.makedirs(log_dir, exist_ok=True)
-
-        launch_cmd = (
-            f'set +u; . /opt/ros/jazzy/setup.bash; '
-            ' . "${ROS2_NODE_IMPL_WS:-' + REPO_ROOT +
-            '/ros2_node_impl_ws}/install/setup.bash"; '
-            f' set -u; ros2 launch "{script_path}" '
-            'eval_time:="${EVAL_TIME:-60}" log_dir:="${LOG_DIR}"'
-        )
-        cmd = ["bash", "-lc", launch_cmd]
-
-        env = os.environ.copy()
-        env["LOG_DIR"] = log_dir
-        env.setdefault("ROS2_PERF_REPO_ROOT", REPO_ROOT)
-        env.setdefault("ROS2_PERF_WS", REPO_ROOT)
-        env["RMW_CHOICE"] = rmw
-        if rmw == "fastdds":
-            env["RMW_IMPLEMENTATION"] = "rmw_fastrtps_cpp"
-            env.pop("ZENOH_ROUTER_CHECK_ATTEMPTS", None)
-            env.pop("ZENOH_SESSION_CONFIG_URI", None)
-        elif rmw == "zenoh":
-            env["RMW_IMPLEMENTATION"] = "rmw_zenoh_cpp"
-            env["ZENOH_ROUTER_CHECK_ATTEMPTS"] = "5"
-            env["ZENOH_SESSION_CONFIG_URI"] = (
-                f"{REPO_ROOT}/ros2_node_impl_ws/zenoh_config/DEFAULT_RMW_ZENOH_SESSION_CONFIG.json5"
-            )
-            env.setdefault("RUST_LOG", "zenoh=warn,zenoh_transport=warn")
-        else:
-            env["RMW_IMPLEMENTATION"] = "rmw_cyclonedds_cpp"
-            env.pop("ZENOH_ROUTER_CHECK_ATTEMPTS", None)
-            env.pop("ZENOH_SESSION_CONFIG_URI", None)
-        if eval_time is not None:
-            env["EVAL_TIME"] = str(eval_time)
-
-        app.logger.info(
-            "[start] host=%s topology=%s rmw=%s trial=%s timestamp=%s script=%s",
-            resolved_host,
-            ctx["topology_dir"],
-            rmw,
-            trial_idx,
-            run_timestamp,
-            script_path,
-        )
-        return _run_script(cmd, env=env)
-    except ValueError as exc:
-        return jsonify({"error": str(exc)}), 400
-    except FileNotFoundError as exc:
-        return jsonify({"error": str(exc)}), 404
-    except subprocess.TimeoutExpired:
-        return jsonify({"error": f"script timeout after {RUN_SCRIPT_TIMEOUT_SEC}s"}), 504
-    except Exception as exc:
-        app.logger.exception("[start] exception")
         return jsonify({"error": str(exc)}), 500
 
 
@@ -296,6 +387,7 @@ def start_docker():
     trial_idx = body.get("trial_idx", 1)
     eval_time = body.get("eval_time")
     rmw = body.get("rmw")
+    zenoh_config_override = body.get("zenoh_config_override")
 
     try:
         trial_idx = _to_int(trial_idx, "trial_idx")
@@ -306,7 +398,7 @@ def start_docker():
 
         ctx = _resolve_exec_context(body)
         resolved_host, script_path = _resolve_host_script(
-            ctx["exec_dir"], ctx["hosts"], "exec.sh")
+            ctx["exec_dir"], ctx["hosts"], "exec_docker.sh")
         run_timestamp = _resolve_active_timestamp(ctx, rmw)
 
         cmd = ["bash", script_path, "--rmw", rmw]
@@ -317,6 +409,8 @@ def start_docker():
         env = os.environ.copy()
         env["RUN_TIMESTAMP"] = run_timestamp
         env["RMW_CHOICE"] = rmw
+        if zenoh_config_override is not None:
+            env["ZENOH_CONFIG_OVERRIDE"] = str(zenoh_config_override)
 
         app.logger.info(
             "[start_docker] host=%s topology=%s rmw=%s trial=%s timestamp=%s script=%s",
@@ -339,5 +433,81 @@ def start_docker():
         return jsonify({"error": str(exc)}), 500
 
 
+@app.route("/start_native", methods=["POST"])
+def start_native():
+    body = request.get_json(silent=True) or {}
+    trial_idx = body.get("trial_idx", 1)
+    eval_time = body.get("eval_time")
+    rmw = body.get("rmw")
+    zenoh_config_override = body.get("zenoh_config_override")
+
+    try:
+        trial_idx = _to_int(trial_idx, "trial_idx")
+        if eval_time is not None:
+            eval_time = _to_int(eval_time, "eval_time")
+        if rmw not in ("fastdds", "cyclonedds", "zenoh"):
+            raise ValueError("rmw must be one of: fastdds, cyclonedds, zenoh")
+
+        ctx = _resolve_exec_context(body)
+        resolved_host, script_path = _resolve_host_script(
+            ctx["exec_dir"], ctx["hosts"], "exec_native.sh")
+        run_timestamp = _resolve_active_timestamp(ctx, rmw)
+
+        cmd = ["bash", script_path, "--rmw", rmw]
+        if eval_time is not None:
+            cmd.extend(["--eval-time", str(eval_time)])
+        cmd.extend(["--trial-idx", str(trial_idx)])
+
+        env = os.environ.copy()
+        env["RUN_TIMESTAMP"] = run_timestamp
+        env["RMW_CHOICE"] = rmw
+        if zenoh_config_override is not None:
+            env["ZENOH_CONFIG_OVERRIDE"] = str(zenoh_config_override)
+        env.setdefault("ROS2_PERF_REPO_ROOT", REPO_ROOT)
+        env.setdefault("ROS2_PERF_WS", REPO_ROOT)
+
+        app.logger.info(
+            "[start_native] host=%s topology=%s rmw=%s trial=%s timestamp=%s script=%s",
+            resolved_host,
+            ctx["topology_dir"],
+            rmw,
+            trial_idx,
+            run_timestamp,
+            script_path,
+        )
+        return _run_script(cmd, env=env)
+    except ValueError as exc:
+        return jsonify({"error": str(exc)}), 400
+    except FileNotFoundError as exc:
+        return jsonify({"error": str(exc)}), 404
+    except subprocess.TimeoutExpired:
+        return jsonify({"error": f"script timeout after {RUN_SCRIPT_TIMEOUT_SEC}s"}), 504
+    except Exception as exc:
+        app.logger.exception("[start_native] exception")
+        return jsonify({"error": str(exc)}), 500
+
+
 if __name__ == "__main__":
+    try:
+        startup_sync = _sync_clock_on_startup()
+        app.logger.info(
+            "[startup] chrony_enabled=%s chrony_corrected=%s offset_seconds=%s",
+            startup_sync.get("enabled", False),
+            startup_sync.get("corrected", False),
+            startup_sync.get("offset_seconds", "N/A"),
+        )
+    except Exception as exc:
+        app.logger.exception("[startup] chrony sync failed")
+        if _is_sudo_password_required_error(exc):
+            message = (
+                "[startup] chrony requires passwordless sudo for /usr/bin/chronyc. "
+                f"See setup steps: {CHRONY_SETUP_URL}"
+            )
+            app.logger.error(message)
+            raise RuntimeError(message) from exc
+        if CHRONY_FAIL_FAST_ON_STARTUP:
+            raise
+        app.logger.warning(
+            "[startup] continuing without startup sync; /prepare_run may fail until chrony is reachable and chronyc permissions are configured"
+        )
     app.run(host="0.0.0.0", port=5000)

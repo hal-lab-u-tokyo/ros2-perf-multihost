@@ -17,14 +17,14 @@ Our purpose is to provide a "scientific scale" for optimizing distributed system
   - [Observable Metrics](#observable-metrics-)
 - [Quick Start](#quick-start)
   - [What You Need](#what-you-need)
-  - [Steps](#steps)
+  - [Quick Steps](#quick-steps)
 - [Preliminaries](#preliminaries)
   - [Directory Structure](#directory-structure)
   - [Preparation of Hosts](#preparation-of-hosts)
 - [Usage in Details](#usage-in-details)
   - [Step1: Define Topology](#step1-define-topology)
-  - [Step2: Generate and Distribute Execution Scripts](#step2-generate-and-distribute-execution-scripts)
-  - [Step3: Automated Benchmark via REST](#step3-automated-benchmark-via-rest)
+  - [Step2: Generate Execution Scripts](#step2-generate-execution-scripts)
+  - [Step3: Run Benchmark via REST](#step3-run-benchmark-via-rest)
   - [Step4: Results and Analysis](#step4-results-and-analysis)
 - [Related Documents](#related-documents)
 - [Troubleshooting](#troubleshooting)
@@ -134,12 +134,12 @@ python3 performance_test/performance_test.py \
 
 This runs 3 trials, each lasting 10 seconds, using Fast DDS (default RMW).
 
-#### Step4: Results
+#### Step4: Results and Analysis
 
 As a quick check, confirm that the following outputs are generated:
 
-- Logs: `<ws-dir>/<topology>/results/latest-<rmw>/logs/trial<N>/`
-- CSV: `<ws-dir>/<topology>/results/latest-<rmw>/csv/`
+- Raw trial logs: `<ws-dir>/<topology>/results/latest-<rmw>/raw_logs/trial<N>/`
+- Analysis CSV: `<ws-dir>/<topology>/results/latest-<rmw>/analysis/`
 
 For example with the command above: `performance_ws/simple/results/latest-fastdds/`
 
@@ -180,6 +180,7 @@ Here is the baseline environment we have tested so far.
 - User and repository path assumption:
   - Scripts and examples in this repository assume user `ubuntu` and `/home/ubuntu/ros2-perf-multihost`.
   - If your username and path differ, how to override these settings is described later.
+  - The default `ubuntu` user needs passwordless `sudo` only for `chronyc` (described later).
 
 #### SSH access (on the Manager)
 
@@ -188,12 +189,15 @@ Therefore, configure the following settings on the Manager machine to meet this 
 
 - Generate and register SSH keys (e.g., `ssh-keygen -t ed25519 && ssh-copy-id ubuntu@host1`).
 - Ensure hostnames are resolvable from the Manager.
+- Consider assigning static IP addresses to each Host to avoid SSH connectivity issues after a reboot or DHCP lease renewal.
 - Recommended Manager-side configuration examples:
   - `/etc/hosts`:
     ```text
+    <snipped.>
     192.168.10.11 host1
     192.168.10.12 host2
     192.168.10.13 host3
+    <snipped.>
     ```
   - `~/.ssh/config`:
     ```text
@@ -284,6 +288,39 @@ sudo apt update
 sudo apt install -y python3-requests
 ```
 
+#### Clock synchronization for REST benchmark (chrony)
+
+For remote benchmark reproducibility, the REST server uses [chrony](https://chrony-project.org/) to synchronize the clock between Hosts.
+
+Install and enable chrony as follows:
+
+```bash
+sudo apt install -y chrony
+sudo systemctl enable --now chrony
+```
+
+Because the REST server invokes `sudo -n chronyc` (non-interactive), the `ubuntu` user must be allowed to run `chronyc` via `sudo` without a password.
+The sudoers entry below grants passwordless `sudo` only for `/usr/bin/chronyc`, so no other commands are affected.
+
+Check the permission, and if needed, configure the sudoers entry on each Host as follows:
+
+```bash
+# Check the permission required by rest_server.py (makestep)
+sudo -k
+sudo -n chronyc -a makestep
+
+# If this command fails because a password is required, configure the sudoers entry as follows.
+cat <<'EOF' | sudo tee /etc/sudoers.d/ros2-perf-chrony
+ubuntu ALL=(root) NOPASSWD:/usr/bin/chronyc
+EOF
+sudo chmod 440 /etc/sudoers.d/ros2-perf-chrony
+```
+
+If startup sync fails because `sudo` for `chronyc` requires a password, `rest_server.py` exits and prints guidance with the setup URL.
+For other startup sync failures (for example, temporary NTP reachability issues), the server continues startup by default and reports the error in logs. To fail fast on any startup sync failure, set `ROS2_PERF_CHRONY_FAIL_FAST_ON_STARTUP=1`.
+
+For details on synchronization behavior and environment variables, see [remote_hosts_scripts/README.md](./remote_hosts_scripts/README.md#clock-synchronization-chrony).
+
 ## Usage in Details
 
 Once you have completed the [Preliminaries](#preliminaries), you are ready to start here.
@@ -292,14 +329,13 @@ This section walks you through the full usage of the framework in detail, from g
 
 ### Step1: Define Topology
 
-Define node placement, topic relationships, and QoS configuration in a topology JSON file.
+Define node placement, topic relationships, and QoS configuration in a JSON topology file.
 See [topology_example/README.md](./topology_example/README.md) for the JSON schema and definition guidance.
 
-### Step2: Generate and Distribute Execution Scripts
+### Step2: Generate Execution Scripts
 
-#### Generate Execution Scripts
+Generate execution scripts and Docker Compose files from a JSON topology file into `<ws-dir>/<json-file-name>/exec_scripts/`.
 
-Generate execution scripts (`host*.launch.py`, `host*_exec.sh`) and Docker Compose files from a JSON topology file.
 
 ```bash
 python3 manager_scripts/generate_exec_scripts.py \
@@ -314,46 +350,64 @@ Arguments:
 - `--ws-dir` (`-w`): Base directory for generated artifacts (default: `performance_ws`)
 - `--force` (`-f`): Overwrite an existing output directory without confirmation; useful in CI or scripts
 
-Generated files are written to `<ws-dir>/<json-file-name>/exec_scripts/`.
+Example:
 
 ```bash
-# Example: generate common exec scripts for topology_example/simple.json
+# Generate exec scripts for topology_example/simple.json
 python3 manager_scripts/generate_exec_scripts.py \
   topology_example/simple.json
 ```
 
-For details on generated files in `exec_scripts/`, `metadata.txt` format, and runtime options supported by generated scripts, see [manager_scripts/README.md](./manager_scripts/README.md).
+For details on generated files in `exec_scripts/`, `metadata.txt` format, runtime options supported by generated scripts, see [manager_scripts/README.md](./manager_scripts/README.md).
 
-#### Distribute to Hosts
+### Step3: Run Benchmark via REST
 
-Distribute the generated `exec_scripts/` directory to each Host.
-`manager_scripts/distribute_exec_scripts.sh` reads `hosts`, `ws_dir`, and `topology_dir` from `performance_ws/<topology>/metadata.txt` and distributes the corresponding file in `exec_scripts/` to each Host.
+#### Start REST Servers
+
+Start the REST server on all Hosts from the Manager in one command.
+Note that the target Hosts are automatically resolved from `<ws-dir>/<topology>/metadata.txt`.
 
 ```bash
-./manager_scripts/distribute_exec_scripts.sh \
+./manager_scripts/manage_rest_servers.sh \
+  start \
   <topology> \
   [--ws-dir|-w <dir>] \
-  [--remote-repo-base|-r <dir>]
+  [--remote-repo-base|-b <dir>] \
+  [--ssh-user|-u <user>]
 ```
 
 Arguments:
 
-- `<topology>`: Topology directory under `ws-dir` (required)
-- `--ws-dir` (`-w`): Workspace directory that contains topologies (default: `performance_ws`)
-- `--remote-repo-base` (`-r`): Remote repository base directory (default: `/home/ubuntu/ros2-perf-multihost`)
+- `<topology>`: Topology directory to use (required)
+- `--ws-dir` (`-w`): Workspace directory that contains generated topologies (default: `performance_ws`)
+- `--remote-repo-base` (`-b`): Remote repository base directory on each Host (default: `/home/ubuntu/ros2-perf-multihost`)
+- `--ssh-user` (`-u`): SSH username used to connect to each Host (default: `ubuntu`)
+
+Example:
 
 ```bash
-# Example: specify topology and remote path
-./manager_scripts/distribute_exec_scripts.sh \
+./manager_scripts/manage_rest_servers.sh \
+  start \
   simple \
   --remote-repo-base /home/ubuntu/ros2-perf-multihost
+
+# Optional: check status, stop and restart
+./manager_scripts/manage_rest_servers.sh status simple
+./manager_scripts/manage_rest_servers.sh stop simple
+./manager_scripts/manage_rest_servers.sh restart simple
 ```
 
-### Step3: Automated Benchmark via REST
+If SSH startup or readiness check fails on any Host, this command exits with a non-zero status.
+The REST server log is stored on each Host under `<remote-repo-base>/<ws-dir>/<topology>/results/runtime/rest_server.log`.
+For full subcommand and option details (including `wait`, `monitor`, `logs`, and related options), see [manager_scripts/README.md](./manager_scripts/README.md#manage_rest_serverssh).
 
-#### Start REST Servers (on each Host)
+If the server exits at startup with a chrony sudo permission error, check the chrony sudo setup in [Clock synchronization for REST benchmark (chrony)](#clock-synchronization-for-rest-benchmark-chrony).
 
-SSH into each Host from the Manager and start the REST server.
+For details on the specification of REST server and environment variables, see [remote_hosts_scripts/README.md](./remote_hosts_scripts/README.md#rest_serverpy).
+
+##### Alternative method (manual startup on each Host):
+
+If you prefer to control startup host by host (for example, when debugging a specific Host or when centralized SSH fan-out is not available), you can start `rest_server.py` manually on each target Host.
 
 ```bash
 # on the Manager
@@ -363,9 +417,11 @@ cd ros2-perf-multihost
 python3 remote_hosts_scripts/rest_server.py
 ```
 
-#### Run Benchmark (on the Manager)
+#### Run Benchmark
 
 Then, run the benchmark script on the Manager.
+For `docker` and `native` modes, `performance_test.py` automatically distributes the generated host-specific execution files to each Host.
+It then prepares the run and executes each trial via the REST APIs, collects logs from each Host, and aggregates the CSV outputs.
 
 ```bash
 python3 performance_test/performance_test.py \
@@ -374,10 +430,28 @@ python3 performance_test/performance_test.py \
   [--exec-policy|-p <mode>] \
   [--eval-time|-e <sec>] \
   [--trials|-t <n>] \
-  [--ws-dir|-w <dir>]
+  [--ws-dir|-w <dir>] \
+  [--remote-repo-base|-b <dir>] \
+  [--ssh-user|-u <user>] \
+  [--zenoh-router|-z <target>]
 ```
 
-Examples:
+Arguments:
+
+- `<topology>`: Topology directory to use (required)
+- `--rmw` (`-m`): RMW implementation (`fastdds`, `cyclonedds`, or `zenoh`) (default: `fastdds`)
+- `--exec-policy` (`-p`): Execution mode, one of `docker`, `native`, or `local` (default: `docker`)
+- `--eval-time` (`-e`): Override evaluation time; if omitted, the default from generated `*_exec_docker.sh` / `*_exec_native.sh` / `local_exec.sh` scripts is used
+- `--trials` (`-t`): Number of trials (default: `3`)
+- `--ws-dir` (`-w`): Base directory that contains generated execution scripts (default: `performance_ws`)
+- `--remote-repo-base` (`-b`): Remote repository base directory used for automatic distribution and log collection in `docker`/`native` modes (default: `/home/ubuntu/ros2-perf-multihost`)
+- `--ssh-user` (`-u`): SSH username used for distribution and log collection in `docker`/`native` modes (default: `ubuntu`)
+- `--zenoh-router` (`-z`): Router target used only when `--rmw zenoh`.
+  - (default): first host listed in the JSON topology file (e.g., `host1`)
+  - `<host-name>` / `<ipv4>`: explicit host name or IPv4 address (e.g., `host2` / `192.168.1.10`)
+  - `Manager`: the manager machine running `performance_test.py`
+
+Example:
 
 ```bash
 # Docker execution on remote Hosts (default policy, default RMW: fastdds)
@@ -386,38 +460,47 @@ python3 performance_test/performance_test.py \
   --exec-policy docker \
   --eval-time 10 --trials 3
 
-# Native execution on remote Hosts with Zenoh
+# Docker execution on remote Hosts with Zenoh Router on the default location
 python3 performance_test/performance_test.py \
   simple \
   --rmw zenoh \
+  --exec-policy docker \
+  --eval-time 10 --trials 3
+
+# Native execution on remote Hosts with Zenoh Router on the Manager
+python3 performance_test/performance_test.py \
+  simple \
+  --rmw zenoh \
+  --zenoh-router Manager \
   --exec-policy native \
   --eval-time 10 --trials 3
 ```
 
-Arguments:
+If you want to distribute the generated host-specific execution files to each Host manually in advance, use `manager_scripts/distribute_exec_scripts.sh` as documented in [manager_scripts/README.md](./manager_scripts/README.md), then run `performance_test.py` normally.
 
-- `<topology>`: Topology directory to use (required)
-- `--rmw` (`-m`): RMW implementation (`fastdds`, `cyclonedds`, or `zenoh`) (default: `fastdds`)
-- `--exec-policy` (`-p`): Execution mode, one of `docker`, `native`, or `local` (default: `docker`)
-- `--eval-time` (`-e`): Override evaluation time; if omitted, the default from generated `*_exec.sh` scripts is used
-- `--trials` (`-t`): Number of trials (default: `3`)
-- `--ws-dir` (`-w`): Base directory that contains generated execution scripts (default: `performance_ws`)
+#### Note: Zenoh Router Setting [Zenoh only]
 
-#### Zenoh Router (on the Manager) [Zenoh only]
+When using Zenoh as the RMW, `performance_test.py` automatically manages `rmw_zenohd` according to `--exec-policy` and `--zenoh-router`.
 
-When using Zenoh as the RMW, start the router on the Manager before running the benchmark.
+For `docker` and `native` modes, `--zenoh-router` selects the target:
+- (default): first host in the JSON topology (e.g., `host1`)
+- `<host-name>` / `<ipv4>`: explicit hostname or IPv4 address
+- `Manager`: the machine running `performance_test.py`
 
-```bash
-./manager_scripts/operate_zenoh_router.sh start
-```
+The specified target (hostname or `Manager`) is automatically resolved to an IP address, which is then used as the `connect/endpoints` value in `ZENOH_CONFIG_OVERRIDE`.
 
-Available subcommands:
+`performance_test.py` also sets `ZENOH_CONFIG_OVERRIDE` so that every bench node connects to the router as a client:
 
-- `start`: start the router in the background with nohup, PID, and log management
-- `foreground`: start in the foreground (blocks the terminal; stop with `Ctrl-C`)
-- `stop`: stop the running router using the saved PID
-- `status`: show process and listening port status
-- `wait`: wait until the router port starts listening
+- `mode="client"`
+- `connect/endpoints=["tcp/<router-target>:7447"]`
+
+The table below summarizes how zenohd is placed and managed for each exec-policy:
+
+| exec-policy | zenohd placement | How it is managed |
+|---|---|---|
+| `local` | Manager (Docker container) | Managed internally by `local_exec.sh` via the `service_zenohd` service in `local_compose.yaml`; `performance_test.py` does not start or stop it separately |
+| `docker` | Router target host (Docker container) | `performance_test.py` runs `docker compose -f zenohd_compose.yaml up/down service_zenohd` on the target. No native ROS 2 installation required on the target host |
+| `native` | Router target host (native process) | `performance_test.py` SSHes to the target and starts/stops `rmw_zenohd` directly; requires ROS 2 and `rmw_zenoh_cpp` to be installed natively on the target host |
 
 ### Step4: Results and Analysis
 
@@ -425,8 +508,11 @@ Available subcommands:
 
 On prepare, the Manager creates `<ws-dir>/<topology>/results/<session_timestamp>-<rmw>/` and updates `<ws-dir>/<topology>/results/latest-<rmw>` to point to it.
 
-- Trial logs are collected under `<ws-dir>/<topology>/results/latest-<rmw>/logs/trial<N>/`.
-- Aggregated outputs such as `total_latency.csv`, `throughput.csv`, `host_trials_usage.csv`, and `host_usage_summary.csv` are written under `<ws-dir>/<topology>/results/latest-<rmw>/csv/`.
+- In `docker`/`native` modes, coordination logs are written under `<ws-dir>/<topology>/results/latest-<rmw>/coordination_logs/`.
+- Trial logs are collected under `<ws-dir>/<topology>/results/latest-<rmw>/raw_logs/trial<N>/`.
+- Aggregated outputs such as `total_latency.csv`, `throughput.csv`, `host_trials_usage.csv`, and `host_usage_summary.csv` are written under `<ws-dir>/<topology>/results/latest-<rmw>/analysis/`.
+- In `docker`/`native` modes, runtime service logs are collected under `<ws-dir>/<topology>/results/latest-<rmw>/runtime_logs/` (for example, `<host>_rest_server.log`; and `zenohd_router.log` for Zenoh router runs).
+  - Note: `<host>_rest_server.log` is copied from the long-lived REST service log (`results/runtime/rest_server.log`), so it may include entries from earlier benchmark runs unless the REST server was restarted.
 
 For details on output directory structure and CSV column definitions, see [performance_test/README.md](./performance_test/README.md).
 
@@ -436,6 +522,7 @@ For detailed usage in subdomains, see the following documents:
 
 - [topology_example/README.md](./topology_example/README.md): Topology JSON format and modeling guidance.
 - [manager_scripts/README.md](./manager_scripts/README.md): Script usage, generated file details, `metadata.txt` format, and runtime options.
+- [remote_hosts_scripts/README.md](./remote_hosts_scripts/README.md): REST server endpoints, environment variables, and monitor CSV format.
 - [performance_test/README.md](./performance_test/README.md): Output directory structure, CSV formats, and analysis script descriptions.
 - [docker/README.md](./docker/README.md): Docker image build/push details and container workflow notes.
 - [ros2_node_impl_ws/README.md](./ros2_node_impl_ws/README.md): ROS 2 node workspace usage and build instructions.
@@ -446,10 +533,14 @@ Common issues and fixes:
 
 - `python3 manager_scripts/generate_exec_scripts.py ...` fails because output exists: rerun with `--force` or remove the existing topology directory under `performance_ws/`.
 - `distribute_exec_scripts.sh` fails with SSH/SCP errors: verify hostnames, SSH keys, and that repository paths are identical across Hosts.
-- REST benchmark does not start remote execution: ensure `python3 remote_hosts_scripts/rest_server.py` is running on every target Host before calling `performance_test.py`.
+- REST benchmark does not start remote execution: ensure REST servers are running on every target Host (for example, run `./manager_scripts/manage_rest_servers.sh start <topology>` from the Manager before calling `performance_test.py`).
 - Docker mode fails on remote Hosts: pull `ghcr.io/hal-lab-u-tokyo/ros2-perf-multihost:latest` and confirm Docker permissions on each Host.
-- Native mode cannot find workspace paths: set `ROS2_PERF_WS` to the project root before running `host*_exec.sh`.
-- Expected CSV outputs are missing: check `<ws-dir>/<topology>/results/latest-<rmw>/logs/trial<N>/` for trial logs and inspect script stderr for analyzer failures.
+- Native mode cannot find workspace paths: set `ROS2_PERF_WS` to the project root before running `<host_name>_exec_native.sh`.
+- Expected CSV outputs are missing: check `<ws-dir>/<topology>/results/latest-<rmw>/raw_logs/trial<N>/` for trial logs and analyzer error output from the CSV-generation step; `coordination_logs/` only covers the REST prepare/start phases.
+- REST server logs a chrony startup sync error (or fails to start when strict mode is enabled): confirm `chronyd` is running (`systemctl status chrony`) and that the sudoers entry for `chronyc` is in place (see [Clock synchronization for REST benchmark (chrony)](#clock-synchronization-for-rest-benchmark-chrony)).
+- `python3 remote_hosts_scripts/rest_server.py` exits at startup with a chrony sudo permission error: clear cached credentials with `sudo -k` and verify with `sudo -n chronyc -a makestep`; if it fails, configure the `chronyc` sudoers entry as described in [Clock synchronization for REST benchmark (chrony)](#clock-synchronization-for-rest-benchmark-chrony).
+- `prepare_run` returns `chrony check/sync failed` or `timed out`: check that `sudo -n chronyc -a makestep` runs without a password as the REST server user; if the NTP source is unreachable, verify network connectivity or adjust `ROS2_PERF_CHRONY_WAITSYNC_TRIES` and `ROS2_PERF_CHRONY_CMD_TIMEOUT_SEC`.
+- Clock offset between hosts causes unexpectedly large or negative latency values: re-run `chronyc tracking` on each Host to verify synchronization, and restart the REST server to trigger a fresh startup sync.
 
 ## Contributing and License
 

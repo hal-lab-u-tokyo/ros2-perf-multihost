@@ -9,7 +9,7 @@ Usage:
     python3 start_exec_scripts.py simple --exec-policy docker --trial-idx 1 --ws-dir performance_ws --hosts-list host1,host2,host3
     short: python3 start_exec_scripts.py simple -p docker -i 1 -w performance_ws -l host1,host2,host3
 
-    # Native mode with non-default RMW (sends /start requests)
+    # Native mode with non-default RMW (sends /start_native requests)
     python3 start_exec_scripts.py simple --rmw zenoh --exec-policy native --trial-idx 1 --ws-dir performance_ws --hosts-list host1,host2,host3
     short: python3 start_exec_scripts.py simple -m zenoh -p native -i 1 -w performance_ws -l host1,host2,host3
 """
@@ -96,7 +96,7 @@ Examples:
         "--exec-policy",
         choices=["docker", "native"],
         default="docker",
-        help="Execution mode. docker sends /start_docker, native sends /start (default: docker)",
+        help="Execution mode. docker sends /start_docker, native sends /start_native (default: docker)",
     )
     parser.add_argument("-i", "--trial-idx", type=int, default=1,
                         help="Trial index")
@@ -136,6 +136,7 @@ Examples:
 
     # Read optional test parameters from environment.
     eval_time = os.environ.get("EVAL_TIME")
+    zenoh_config_override = os.environ.get("ZENOH_CONFIG_OVERRIDE")
 
     # Determine endpoint and timeout based on mode
     if args.prepare_run:
@@ -148,10 +149,12 @@ Examples:
         timeout = (5, 300)  # (connect, read) in seconds
         print(f"Using Docker mode: {endpoint} endpoint with timeout {timeout}")
     else:
-        endpoint = "/start"
-        timeout = 100  # seconds
+        endpoint = "/start_native"
+        _read_timeout = max(100, int(eval_time) +
+                            30) if eval_time is not None else 100
+        timeout = (5, _read_timeout)  # (connect, read) in seconds
         print(
-            f"Using native mode: {endpoint} endpoint with timeout {timeout}s")
+            f"Using native mode: {endpoint} endpoint with timeout {timeout}")
 
     failed_hosts = []
     lock = threading.Lock()
@@ -176,6 +179,8 @@ Examples:
                 request_body["trial_idx"] = trial_idx
             if eval_time is not None and not args.prepare_run:
                 request_body["eval_time"] = eval_time
+            if zenoh_config_override is not None and not args.prepare_run:
+                request_body["zenoh_config_override"] = zenoh_config_override
 
             r = requests.post(
                 f"http://{host}:5000{endpoint}",

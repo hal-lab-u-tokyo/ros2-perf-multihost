@@ -12,7 +12,6 @@ class GenerationSettings:
 
     project_root_in_container: str
     ros_ws_in_container: str
-    zenoh_config_dir_in_container: str
     image_name: str
     perf_ws_dir: str
     default_eval_time: int
@@ -111,7 +110,7 @@ def append_intermediate_block(lines, node_name, pub_defs, sub_topics, qos_opts):
 
 
 def append_host_script_epilogue(lines, host_name):
-    """Append the shared epilogue used by host*_exec.sh."""
+    """Append the shared epilogue used by host*_exec_docker.sh."""
     lines.extend(
         [
             "",
@@ -359,15 +358,13 @@ def append_common_service(
     lines.append('      - ".:/exec_scripts:ro"')
     lines.append(
         f'      - "{rel_project_root}/{settings.perf_ws_dir}:{settings.project_root_in_container}/{settings.perf_ws_dir}"')
-    lines.append(
-        f'      - "{rel_project_root}/ros2_node_impl_ws/zenoh_config:{settings.zenoh_config_dir_in_container}:ro"')
     lines.append("    environment:")
     lines.append(f"      - ROS2_PERF_WS={settings.project_root_in_container}")
     lines.append(f"      - ROS2_NODE_IMPL_WS={settings.ros_ws_in_container}")
     lines.append("      - RMW_CHOICE=${RMW_CHOICE:-}")
     lines.append("      - RMW_IMPLEMENTATION=${RMW_IMPLEMENTATION:-}")
     lines.append(
-        "      - ZENOH_SESSION_CONFIG_URI=${ZENOH_SESSION_CONFIG_URI:-}")
+        "      - ZENOH_CONFIG_OVERRIDE=${ZENOH_CONFIG_OVERRIDE:-}")
     lines.append(
         "      - ZENOH_ROUTER_CHECK_ATTEMPTS=${ZENOH_ROUTER_CHECK_ATTEMPTS:-}")
     lines.append("      - RUST_LOG=${RUST_LOG:-}")
@@ -392,15 +389,10 @@ def append_zenohd_service(lines, project_root, output_dir, settings):
     lines.append("    volumes:")
     lines.append(
         f'      - "{rel_project_root}/{settings.perf_ws_dir}:{settings.project_root_in_container}/{settings.perf_ws_dir}"')
-    lines.append(
-        f'      - "{rel_project_root}/ros2_node_impl_ws/zenoh_config:{settings.zenoh_config_dir_in_container}:ro"')
     lines.append("    environment:")
     lines.append(f"      - ROS2_PERF_WS={settings.project_root_in_container}")
     lines.append(f"      - ROS2_NODE_IMPL_WS={settings.ros_ws_in_container}")
     lines.append("      - RMW_IMPLEMENTATION=rmw_zenoh_cpp")
-    lines.append(
-        f"      - ZENOH_ROUTER_CONFIG_URI={settings.zenoh_config_dir_in_container}/DEFAULT_RMW_ZENOH_ROUTER_CONFIG.json5"
-    )
     lines.append("      - RUST_LOG=zenoh=warn,zenoh_transport=warn")
     lines.append("    healthcheck:")
     lines.append(
@@ -410,8 +402,28 @@ def append_zenohd_service(lines, project_root, output_dir, settings):
     lines.append("      timeout: 1s")
     lines.append("      retries: 30")
     lines.append(
-        f"    command: [ \"/bin/bash\", \"{settings.project_root_in_container}/manager_scripts/operate_zenoh_router.sh\", \"foreground\" ]"
+        '    command: [ "/bin/bash", "-lc", "ros2 run rmw_zenoh_cpp rmw_zenohd" ]'
     )
+
+
+def generate_zenohd_compose(output_dir, settings):
+    """Generate standalone zenohd_compose.yaml for use with --exec-policy docker."""
+    lines = [
+        # Use a dedicated project name so that 'docker compose down --remove-orphans'
+        # in host exec scripts does not treat service_zenohd as an orphan.
+        "name: zenohd",
+        "services:",
+        "  service_zenohd:",
+        f"    image: {settings.image_name}",
+        "    network_mode: host",
+        "    environment:",
+        "      - RMW_IMPLEMENTATION=rmw_zenoh_cpp",
+        "      - RUST_LOG=${RUST_LOG:-zenoh=warn,zenoh_transport=warn}",
+        '    command: ["ros2", "run", "rmw_zenoh_cpp", "rmw_zenohd"]',
+    ]
+    compose_path = os.path.join(output_dir, "zenohd_compose.yaml")
+    with open(compose_path, "w") as f:
+        f.write("\n".join(lines) + "\n")
 
 
 def generate_compose(json_content, output_dir, project_root, settings):
@@ -523,18 +535,18 @@ def run_script_common_prefix(lines, rel_root, eval_time_default, settings):
             'case "$RMW_CHOICE" in',
             '  fastdds)',
             '    export RMW_IMPLEMENTATION=rmw_fastrtps_cpp',
-            '    unset ZENOH_ROUTER_CHECK_ATTEMPTS ZENOH_SESSION_CONFIG_URI',
+            '    unset ZENOH_ROUTER_CHECK_ATTEMPTS ZENOH_CONFIG_OVERRIDE',
             '    export RUST_LOG=${RUST_LOG:-}',
             '    ;;',
             '  zenoh)',
             '    export RMW_IMPLEMENTATION=rmw_zenoh_cpp',
             '    export ZENOH_ROUTER_CHECK_ATTEMPTS=5',
             '    export RUST_LOG=${RUST_LOG:-zenoh=warn,zenoh_transport=warn}',
-            f'    export ZENOH_SESSION_CONFIG_URI="{settings.zenoh_config_dir_in_container}/DEFAULT_RMW_ZENOH_SESSION_CONFIG.json5"',
+            '    export ZENOH_CONFIG_OVERRIDE=${ZENOH_CONFIG_OVERRIDE:-}',
             '    ;;',
             '  cyclonedds)',
             '    export RMW_IMPLEMENTATION=rmw_cyclonedds_cpp',
-            '    unset ZENOH_ROUTER_CHECK_ATTEMPTS ZENOH_SESSION_CONFIG_URI',
+            '    unset ZENOH_ROUTER_CHECK_ATTEMPTS ZENOH_CONFIG_OVERRIDE',
             '    export RUST_LOG=${RUST_LOG:-}',
             '    ;;',
             '  *)',
@@ -550,10 +562,10 @@ def run_script_common_prefix(lines, rel_root, eval_time_default, settings):
             'RUN_RESULTS_HOST_DIR="$RESULTS_HOST_DIR/$RUN_TIMESTAMP"',
             'mkdir -p "$RUN_RESULTS_HOST_DIR"',
             'ln -sfn "$RUN_TIMESTAMP" "$RESULTS_HOST_DIR/latest-${RMW_CHOICE}"',
-            'EXEC_LOGS_HOST_DIR="$RUN_RESULTS_HOST_DIR/exec_logs/trial${TRIAL_IDX}"',
-            'mkdir -p "$EXEC_LOGS_HOST_DIR"',
+            'RAW_LOGS_HOST_DIR="$RUN_RESULTS_HOST_DIR/raw_logs/trial${TRIAL_IDX}"',
+            'mkdir -p "$RAW_LOGS_HOST_DIR"',
             (
-                f'LOG_DIR="${{LOG_DIR:-{settings.project_root_in_container}/{settings.perf_ws_dir}/${{RUN_DIR_NAME}}/results/${{RUN_TIMESTAMP}}/exec_logs/trial${{TRIAL_IDX}}}}"'
+                f'LOG_DIR="${{LOG_DIR:-{settings.project_root_in_container}/{settings.perf_ws_dir}/${{RUN_DIR_NAME}}/results/${{RUN_TIMESTAMP}}/raw_logs/trial${{TRIAL_IDX}}}}"'
             ),
             "",
             'cd "$PROJECT_ROOT"',
@@ -568,12 +580,12 @@ def run_script_common_prefix(lines, rel_root, eval_time_default, settings):
 
 
 def generate_host_exec_scripts(json_content, output_dir, project_root, settings):
-    """Generate host*_exec.sh wrapper scripts for host-specific Compose files."""
+    """Generate host*_exec_docker.sh wrapper scripts for host-specific Compose files."""
     rel_root = os.path.relpath(project_root, output_dir)
     eval_time_default = settings.default_eval_time
     for host_dict in json_content["hosts"]:
         host_name = host_dict["host_name"]
-        script_path = os.path.join(output_dir, f"{host_name}_exec.sh")
+        script_path = os.path.join(output_dir, f"{host_name}_exec_docker.sh")
         compose_file = f"$SCRIPT_DIR/{host_name}_compose.yaml"
         lines = []
         run_script_common_prefix(lines, rel_root, eval_time_default, settings)
@@ -587,7 +599,7 @@ def generate_host_exec_scripts(json_content, output_dir, project_root, settings)
                     'EVAL_TIME="$EVAL_TIME" '
                     'RMW_CHOICE="$RMW_CHOICE" '
                     'RMW_IMPLEMENTATION="$RMW_IMPLEMENTATION" '
-                    'ZENOH_SESSION_CONFIG_URI="${ZENOH_SESSION_CONFIG_URI:-}" '
+                    'ZENOH_CONFIG_OVERRIDE="${ZENOH_CONFIG_OVERRIDE:-}" '
                     'ZENOH_ROUTER_CHECK_ATTEMPTS="${ZENOH_ROUTER_CHECK_ATTEMPTS:-}" '
                     'RUST_LOG="${RUST_LOG:-}" '
                     'LOG_DIR="$LOG_DIR" '
@@ -598,12 +610,44 @@ def generate_host_exec_scripts(json_content, output_dir, project_root, settings)
                     'EVAL_TIME="$EVAL_TIME" '
                     'RMW_CHOICE="$RMW_CHOICE" '
                     'RMW_IMPLEMENTATION="$RMW_IMPLEMENTATION" '
-                    'ZENOH_SESSION_CONFIG_URI="${ZENOH_SESSION_CONFIG_URI:-}" '
+                    'ZENOH_CONFIG_OVERRIDE="${ZENOH_CONFIG_OVERRIDE:-}" '
                     'ZENOH_ROUTER_CHECK_ATTEMPTS="${ZENOH_ROUTER_CHECK_ATTEMPTS:-}" '
                     'RUST_LOG="${RUST_LOG:-}" '
                     'LOG_DIR="$LOG_DIR" '
                     f'docker compose -f "$COMPOSE_FILE" up service_{host_name}'
                 ),
+            ]
+        )
+
+        with open(script_path, "w") as f:
+            f.write("\n".join(lines) + "\n")
+
+        os.chmod(script_path, 0o755)
+
+
+def generate_host_exec_native_scripts(json_content, output_dir, project_root, settings):
+    """Generate host*_exec_native.sh wrapper scripts for native ROS 2 execution."""
+    rel_root = os.path.relpath(project_root, output_dir)
+    eval_time_default = settings.default_eval_time
+    for host_dict in json_content["hosts"]:
+        host_name = host_dict["host_name"]
+        script_path = os.path.join(output_dir, f"{host_name}_exec_native.sh")
+        launch_file = f"$SCRIPT_DIR/{host_name}.launch.py"
+        lines = []
+        run_script_common_prefix(lines, rel_root, eval_time_default, settings)
+        lines.extend(
+            [
+                "# --- Native mode: LOG_DIR is the host filesystem path ---",
+                'LOG_DIR="$RAW_LOGS_HOST_DIR"',
+                'echo "LOG_DIR (host): $LOG_DIR"',
+                "",
+                "# Source ROS 2 environment",
+                "set +u",
+                ". /opt/ros/jazzy/setup.bash",
+                f'. "${{ROS2_NODE_IMPL_WS:-$PROJECT_ROOT/ros2_node_impl_ws}}/install/setup.bash"',
+                "set -u",
+                "",
+                f'ros2 launch "{launch_file}" eval_time:="$EVAL_TIME" log_dir:="$LOG_DIR"',
             ]
         )
 
@@ -633,7 +677,7 @@ def generate_local_run_script(json_content, output_dir, project_root, settings):
                 'EVAL_TIME="$EVAL_TIME" '
                 'RMW_CHOICE="$RMW_CHOICE" '
                 'RMW_IMPLEMENTATION="$RMW_IMPLEMENTATION" '
-                'ZENOH_SESSION_CONFIG_URI="${ZENOH_SESSION_CONFIG_URI:-}" '
+                'ZENOH_CONFIG_OVERRIDE="${ZENOH_CONFIG_OVERRIDE:-}" '
                 'ZENOH_ROUTER_CHECK_ATTEMPTS="${ZENOH_ROUTER_CHECK_ATTEMPTS:-}" '
                 'RUST_LOG="${RUST_LOG:-}" '
                 'LOG_DIR="$LOG_DIR" '
@@ -661,7 +705,7 @@ def generate_local_run_script(json_content, output_dir, project_root, settings):
                 'EVAL_TIME="$EVAL_TIME" '
                 'RMW_CHOICE="$RMW_CHOICE" '
                 'RMW_IMPLEMENTATION="$RMW_IMPLEMENTATION" '
-                'ZENOH_SESSION_CONFIG_URI="${ZENOH_SESSION_CONFIG_URI:-}" '
+                'ZENOH_CONFIG_OVERRIDE="${ZENOH_CONFIG_OVERRIDE:-}" '
                 'ZENOH_ROUTER_CHECK_ATTEMPTS="${ZENOH_ROUTER_CHECK_ATTEMPTS:-}" '
                 'RUST_LOG="${RUST_LOG:-}" '
                 'LOG_DIR="$LOG_DIR" '
@@ -675,7 +719,7 @@ def generate_local_run_script(json_content, output_dir, project_root, settings):
                 'EVAL_TIME="$EVAL_TIME" '
                 'RMW_CHOICE="$RMW_CHOICE" '
                 'RMW_IMPLEMENTATION="$RMW_IMPLEMENTATION" '
-                'ZENOH_SESSION_CONFIG_URI="${ZENOH_SESSION_CONFIG_URI:-}" '
+                'ZENOH_CONFIG_OVERRIDE="${ZENOH_CONFIG_OVERRIDE:-}" '
                 'ZENOH_ROUTER_CHECK_ATTEMPTS="${ZENOH_ROUTER_CHECK_ATTEMPTS:-}" '
                 'RUST_LOG="${RUST_LOG:-}" '
                 'LOG_DIR="$LOG_DIR" '
@@ -687,7 +731,7 @@ def generate_local_run_script(json_content, output_dir, project_root, settings):
                 'EVAL_TIME="$EVAL_TIME" '
                 'RMW_CHOICE="$RMW_CHOICE" '
                 'RMW_IMPLEMENTATION="$RMW_IMPLEMENTATION" '
-                'ZENOH_SESSION_CONFIG_URI="${ZENOH_SESSION_CONFIG_URI:-}" '
+                'ZENOH_CONFIG_OVERRIDE="${ZENOH_CONFIG_OVERRIDE:-}" '
                 'ZENOH_ROUTER_CHECK_ATTEMPTS="${ZENOH_ROUTER_CHECK_ATTEMPTS:-}" '
                 'RUST_LOG="${RUST_LOG:-}" '
                 'LOG_DIR="$LOG_DIR" '
@@ -701,7 +745,7 @@ def generate_local_run_script(json_content, output_dir, project_root, settings):
                 'EVAL_TIME="$EVAL_TIME" '
                 'RMW_CHOICE="$RMW_CHOICE" '
                 'RMW_IMPLEMENTATION="$RMW_IMPLEMENTATION" '
-                'ZENOH_SESSION_CONFIG_URI="${ZENOH_SESSION_CONFIG_URI:-}" '
+                'ZENOH_CONFIG_OVERRIDE="${ZENOH_CONFIG_OVERRIDE:-}" '
                 'ZENOH_ROUTER_CHECK_ATTEMPTS="${ZENOH_ROUTER_CHECK_ATTEMPTS:-}" '
                 'RUST_LOG="${RUST_LOG:-}" '
                 'LOG_DIR="$LOG_DIR" '

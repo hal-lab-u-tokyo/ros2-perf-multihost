@@ -1,4 +1,5 @@
 import os
+import shlex
 import shutil
 import subprocess
 import sys
@@ -53,8 +54,9 @@ def run_test(
     exec_policy="docker",
     eval_time=None,
     run_timestamp=None,
+    coordination_log_dir=None,
+    zenoh_config_override=None,
 ):
-    print(f"=== Run trial={trial_idx + 1} ===")
 
     if exec_policy == "local":
         local_exec_sh = os.path.join(
@@ -77,6 +79,8 @@ def run_test(
         env = os.environ.copy()
         if run_timestamp:
             env["RUN_TIMESTAMP"] = str(run_timestamp)
+        if zenoh_config_override is not None:
+            env["ZENOH_CONFIG_OVERRIDE"] = str(zenoh_config_override)
 
         result = subprocess.run(cmd, text=True, env=env)
         print(result)
@@ -106,14 +110,36 @@ def run_test(
     env = os.environ.copy()
     if eval_time is not None:
         env["EVAL_TIME"] = str(eval_time)
+    if zenoh_config_override is not None:
+        env["ZENOH_CONFIG_OVERRIDE"] = str(zenoh_config_override)
 
+    if coordination_log_dir is not None:
+        log_path = os.path.join(coordination_log_dir,
+                                f"exec_trial{trial_idx + 1}.log")
+        os.makedirs(coordination_log_dir, exist_ok=True)
+    else:
+        log_path = None
+
+    print(
+        f"  Waiting for all hosts to complete trial {trial_idx + 1}...", flush=True)
     result = subprocess.run(
         cmd,
         text=True,
+        capture_output=True,
         env=env,
     )
-    print(result)
+    if log_path:
+        with open(log_path, "w", encoding="utf-8") as f:
+            f.write(result.stdout or "")
+            if result.stderr:
+                f.write("\n--- stderr ---\n")
+                f.write(result.stderr)
+        print(f"  exec log -> {log_path}")
     if result.returncode != 0:
+        if result.stdout:
+            print(result.stdout.strip())
+        if result.stderr:
+            print(result.stderr.strip(), file=sys.stderr)
         raise RuntimeError(
             f"run_test failed for exec_policy={exec_policy}: "
             f"rc={result.returncode}, cmd={cmd}"
@@ -128,6 +154,7 @@ def prepare_run(
     rmw,
     exec_policy="docker",
     run_timestamp=None,
+    coordination_log_dir=None,
 ):
     """Initialize run timestamp/latest-rmw on all hosts before trial loop."""
     if exec_policy == "local":
@@ -155,14 +182,31 @@ def prepare_run(
         hosts_str,
     ]
 
-    result = subprocess.run(cmd, text=True)
-    print(result)
+    result = subprocess.run(cmd, text=True, capture_output=True)
+    log_path = None
+    if coordination_log_dir is not None:
+        os.makedirs(coordination_log_dir, exist_ok=True)
+        log_path = os.path.join(coordination_log_dir, "prepare_run.log")
+        with open(log_path, "w", encoding="utf-8") as f:
+            f.write(result.stdout or "")
+            if result.stderr:
+                f.write("\n--- stderr ---\n")
+                f.write(result.stderr)
     if result.returncode != 0:
+        if log_path is not None:
+            print(f"  prepare log -> {log_path}")
+        if result.stdout:
+            print(result.stdout.strip())
+        if result.stderr:
+            print(result.stderr.strip(), file=sys.stderr)
         raise RuntimeError(f"prepare_run failed: rc={result.returncode}")
+    print(f"Prepare run complete on all {len(hosts)} hosts")
+    if log_path is not None:
+        print(f"  prepare log -> {log_path}")
 
 
 def collect_logs(
-    local_logs_dir,
+    local_raw_logs_dir,
     num_trials,
     hosts,
     ws_dir="performance_ws",
@@ -170,47 +214,15 @@ def collect_logs(
     rmw=None,
     exec_policy="docker",
     run_timestamp=None,
+    ssh_user="ubuntu",
 ):
     """Collect trial logs from remote hosts into a local logs directory."""
-    src_log_dir = os.path.abspath(local_logs_dir)
+    src_log_dir = os.path.abspath(local_raw_logs_dir)
 
     if exec_policy == "local":
-        if not topology_name:
-            raise ValueError("topology is required when exec_policy=local")
-        if not run_timestamp:
-            raise ValueError(
-                "run_timestamp is required when exec_policy=local")
-
-        topology_root = os.path.join(ws_dir, topology_name)
-        local_exec_logs_root = os.path.join(
-            topology_root,
-            "results",
-            str(run_timestamp),
-            "exec_logs",
-        )
-
-        for trial_idx in range(num_trials):
-            trial_name = f"trial{trial_idx + 1}"
-            trial_log_dir = os.path.join(src_log_dir, trial_name)
-            os.makedirs(trial_log_dir, exist_ok=True)
-
-            src_trial_dir = os.path.join(local_exec_logs_root, trial_name)
-            if not os.path.isdir(src_trial_dir):
-                raise FileNotFoundError(
-                    f"Local trial log directory not found: {src_trial_dir}"
-                )
-
-            for entry in os.listdir(src_trial_dir):
-                src = os.path.join(src_trial_dir, entry)
-                dst = os.path.join(trial_log_dir, entry)
-                if os.path.isdir(src):
-                    if os.path.exists(dst):
-                        shutil.rmtree(dst)
-                    shutil.copytree(src, dst)
-                else:
-                    shutil.copy2(src, dst)
-
-            print(f"Copied local logs: {src_trial_dir} -> {trial_log_dir}")
+        # For local exec_policy, node logs are written directly into
+        # raw_logs/trial{N}/ by local_exec.sh, so no copying is needed.
+        print(f"Local exec: logs already in {src_log_dir}")
         return
 
     for trial_idx in range(num_trials):
@@ -228,7 +240,7 @@ def collect_logs(
         )
         remote_log_dir = (
             f"{remote_repo_root}/{ws_dir}/{topology_name}"
-            f"/results/latest-{rmw}/exec_logs/trial{trial_idx + 1}"
+            f"/results/latest-{rmw}/raw_logs/trial{trial_idx + 1}"
         )
 
         for host in hosts:
@@ -238,7 +250,7 @@ def collect_logs(
                     [
                         "scp",
                         "-r",
-                        f"ubuntu@{host}:{remote_log_dir}/*",
+                        f"{ssh_user}@{host}:{remote_log_dir}/*",
                         trial_log_dir + "/",
                     ],
                     text=True,
@@ -257,3 +269,125 @@ def collect_logs(
                 elif exc.stdout:
                     print(exc.stdout.strip(), file=sys.stderr)
                 raise
+
+
+def collect_runtime_logs(
+    local_session_dir,
+    hosts,
+    ssh_user="ubuntu",
+    remote_repo_base="/home/ubuntu/ros2-perf-multihost",
+    ws_dir="performance_ws",
+    topology_name=None,
+    exec_policy="docker",
+    zenoh_router_kind=None,
+    zenoh_router_target_host=None,
+    local_repo_root=None,
+):
+    """Collect rest_server.log and zenohd_router.log from remote hosts into runtime_logs/."""
+    if exec_policy == "local":
+        return
+
+    runtime_logs_dir = os.path.join(local_session_dir, "runtime_logs")
+    os.makedirs(runtime_logs_dir, exist_ok=True)
+
+    remote_repo_root = os.environ.get("ROS2_PERF_REPO_ROOT", remote_repo_base)
+    remote_runtime_dir = (
+        f"{remote_repo_root}/{ws_dir}/{topology_name}/results/runtime"
+    )
+
+    for host in hosts:
+        dst = os.path.join(runtime_logs_dir, f"{host}_rest_server.log")
+        remote_path = f"{ssh_user}@{host}:{remote_runtime_dir}/rest_server.log"
+        result = subprocess.run(
+            ["scp", remote_path, dst],
+            text=True,
+            capture_output=True,
+        )
+        if result.returncode == 0:
+            print(f"  runtime log -> {dst}")
+        else:
+            print(
+                f"  WARNING: Could not collect rest_server.log from {host}: "
+                + (result.stderr or result.stdout or "").strip(),
+                file=sys.stderr,
+            )
+
+    if zenoh_router_kind == "host" and zenoh_router_target_host:
+        dst = os.path.join(runtime_logs_dir, "zenohd_router.log")
+        if exec_policy == "native":
+            remote_path = (
+                f"{ssh_user}@{zenoh_router_target_host}:{remote_runtime_dir}/zenohd_router.log"
+            )
+            result = subprocess.run(
+                ["scp", remote_path, dst],
+                text=True,
+                capture_output=True,
+            )
+            if result.returncode == 0:
+                print(f"  runtime log -> {dst}")
+            else:
+                print(
+                    f"  WARNING: Could not collect zenohd_router.log from {zenoh_router_target_host}: "
+                    + (result.stderr or result.stdout or "").strip(),
+                    file=sys.stderr,
+                )
+        else:  # docker
+            collected = False
+            last_error = ""
+            for container_name in ("zenohd-service_zenohd-1", "service_zenohd"):
+                docker_logs_cmd = f"docker logs {shlex.quote(container_name)}"
+                result = subprocess.run(
+                    ["ssh", f"{ssh_user}@{zenoh_router_target_host}",
+                     f"bash -lc {shlex.quote(docker_logs_cmd)}"],
+                    text=True,
+                    capture_output=True,
+                )
+                if result.returncode == 0:
+                    with open(dst, "w", encoding="utf-8") as f:
+                        f.write((result.stdout or "") + (result.stderr or ""))
+                    print(f"  runtime log -> {dst}")
+                    collected = True
+                    break
+                last_error = (result.stderr or result.stdout or "").strip()
+
+            if not collected:
+                print(
+                    f"  WARNING: Could not collect zenohd_router.log (docker logs) from {zenoh_router_target_host}: {last_error}",
+                    file=sys.stderr,
+                )
+    elif zenoh_router_kind == "manager" and local_repo_root and topology_name:
+        dst = os.path.join(runtime_logs_dir, "zenohd_router.log")
+        if exec_policy == "native":
+            src = os.path.join(
+                local_repo_root, ws_dir, topology_name, "results", "runtime", "zenohd_router.log"
+            )
+            if os.path.exists(src):
+                shutil.copy2(src, dst)
+                print(f"  runtime log -> {dst}")
+            else:
+                print(
+                    f"  WARNING: zenohd_router.log not found at {src}",
+                    file=sys.stderr,
+                )
+        else:  # docker
+            collected = False
+            last_error = ""
+            for container_name in ("zenohd-service_zenohd-1", "service_zenohd"):
+                result = subprocess.run(
+                    ["docker", "logs", container_name],
+                    text=True,
+                    capture_output=True,
+                )
+                if result.returncode == 0:
+                    with open(dst, "w", encoding="utf-8") as f:
+                        f.write((result.stdout or "") + (result.stderr or ""))
+                    print(f"  runtime log -> {dst}")
+                    collected = True
+                    break
+                last_error = (result.stderr or result.stdout or "").strip()
+
+            if not collected:
+                print(
+                    f"  WARNING: Could not collect zenohd_router.log (docker logs) on manager: {last_error}",
+                    file=sys.stderr,
+                )
