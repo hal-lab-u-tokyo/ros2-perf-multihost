@@ -387,6 +387,7 @@ def start_docker():
     trial_idx = body.get("trial_idx", 1)
     eval_time = body.get("eval_time")
     rmw = body.get("rmw")
+    zenoh_config_override = body.get("zenoh_config_override")
 
     try:
         trial_idx = _to_int(trial_idx, "trial_idx")
@@ -408,6 +409,8 @@ def start_docker():
         env = os.environ.copy()
         env["RUN_TIMESTAMP"] = run_timestamp
         env["RMW_CHOICE"] = rmw
+        if zenoh_config_override is not None:
+            env["ZENOH_CONFIG_OVERRIDE"] = str(zenoh_config_override)
 
         app.logger.info(
             "[start_docker] host=%s topology=%s rmw=%s trial=%s timestamp=%s script=%s",
@@ -436,6 +439,7 @@ def start_native():
     trial_idx = body.get("trial_idx", 1)
     eval_time = body.get("eval_time")
     rmw = body.get("rmw")
+    zenoh_config_override = body.get("zenoh_config_override")
 
     try:
         trial_idx = _to_int(trial_idx, "trial_idx")
@@ -457,6 +461,8 @@ def start_native():
         env = os.environ.copy()
         env["RUN_TIMESTAMP"] = run_timestamp
         env["RMW_CHOICE"] = rmw
+        if zenoh_config_override is not None:
+            env["ZENOH_CONFIG_OVERRIDE"] = str(zenoh_config_override)
         env.setdefault("ROS2_PERF_REPO_ROOT", REPO_ROOT)
         env.setdefault("ROS2_PERF_WS", REPO_ROOT)
 

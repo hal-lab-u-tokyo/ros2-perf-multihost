@@ -54,6 +54,7 @@ def run_test(
     eval_time=None,
     run_timestamp=None,
     log_dir=None,
+    zenoh_config_override=None,
 ):
     print(f"=== Run trial={trial_idx + 1} ===")
 
@@ -78,6 +79,8 @@ def run_test(
         env = os.environ.copy()
         if run_timestamp:
             env["RUN_TIMESTAMP"] = str(run_timestamp)
+        if zenoh_config_override is not None:
+            env["ZENOH_CONFIG_OVERRIDE"] = str(zenoh_config_override)
 
         result = subprocess.run(cmd, text=True, env=env)
         print(result)
@@ -107,6 +110,8 @@ def run_test(
     env = os.environ.copy()
     if eval_time is not None:
         env["EVAL_TIME"] = str(eval_time)
+    if zenoh_config_override is not None:
+        env["ZENOH_CONFIG_OVERRIDE"] = str(zenoh_config_override)
 
     result = subprocess.run(
         cmd,

@@ -136,6 +136,7 @@ Examples:
 
     # Read optional test parameters from environment.
     eval_time = os.environ.get("EVAL_TIME")
+    zenoh_config_override = os.environ.get("ZENOH_CONFIG_OVERRIDE")
 
     # Determine endpoint and timeout based on mode
     if args.prepare_run:
@@ -176,6 +177,8 @@ Examples:
                 request_body["trial_idx"] = trial_idx
             if eval_time is not None and not args.prepare_run:
                 request_body["eval_time"] = eval_time
+            if zenoh_config_override is not None and not args.prepare_run:
+                request_body["zenoh_config_override"] = zenoh_config_override
 
             r = requests.post(
                 f"http://{host}:5000{endpoint}",

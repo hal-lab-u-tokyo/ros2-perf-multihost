@@ -329,7 +329,7 @@ This section walks you through the full usage of the framework in detail, from g
 
 ### Step1: Define Topology
 
-Define node placement, topic relationships, and QoS configuration in a topology JSON file.
+Define node placement, topic relationships, and QoS configuration in a JSON topology file.
 See [topology_example/README.md](./topology_example/README.md) for the JSON schema and definition guidance.
 
 ### Step2: Generate Execution Scripts
@@ -432,7 +432,8 @@ python3 performance_test/performance_test.py \
   [--trials|-t <n>] \
   [--ws-dir|-w <dir>] \
   [--remote-repo-base|-b <dir>] \
-  [--ssh-user|-u <user>]
+  [--ssh-user|-u <user>] \
+  [--zenoh-router <target>]
 ```
 
 Arguments:
@@ -445,6 +446,10 @@ Arguments:
 - `--ws-dir` (`-w`): Base directory that contains generated execution scripts (default: `performance_ws`)
 - `--remote-repo-base` (`-b`): Remote repository base directory used for automatic distribution and log collection in `docker`/`native` modes (default: `/home/ubuntu/ros2-perf-multihost`)
 - `--ssh-user` (`-u`): SSH username used for distribution and log collection in `docker`/`native` modes (default: `ubuntu`)
+- `--zenoh-router`: Router target used only when `--rmw zenoh`.
+  - (default): first host listed in the JSON topology file (e.g., `host1`)
+  - `<host-name>` / `<ipv4>`: explicit host name or IPv4 address (e.g., `host2` / `192.168.1.10`)
+  - `manager`: the manager machine running `performance_test.py` (IP address auto-detected)
 
 Example:
 
@@ -455,23 +460,34 @@ python3 performance_test/performance_test.py \
   --exec-policy docker \
   --eval-time 10 --trials 3
 
-# Native execution on remote Hosts with Zenoh
+# Docker execution on remote Hosts with Zenoh Router on the default location
 python3 performance_test/performance_test.py \
   simple \
   --rmw zenoh \
+  --exec-policy docker \
+  --eval-time 10 --trials 3
+
+# Native execution on remote Hosts with Zenoh Router on the Manager
+python3 performance_test/performance_test.py \
+  simple \
+  --rmw zenoh \
+  --zenoh-router manager \
   --exec-policy native \
   --eval-time 10 --trials 3
 ```
 
 If you want to distribute the generated host-specific execution files to each Host manually in advance, use `manager_scripts/distribute_exec_scripts.sh` as documented in [manager_scripts/README.md](./manager_scripts/README.md), then run `performance_test.py` normally.
 
-#### Zenoh Router (on the Manager) [Zenoh only]
+#### Zenoh Router Lifecycle [Zenoh only]
 
-When using Zenoh as the RMW, start the router on the Manager before running the benchmark.
+When using Zenoh as the RMW, `performance_test.py` automatically starts and stops `rmw_zenohd` on the specified router target (`--zenoh-router ...`).
 
-```bash
-./manager_scripts/operate_zenoh_router.sh start
-```
+It also sets `ZENOH_CONFIG_OVERRIDE` for each node run. By default this includes:
+
+- `mode="client"`
+- `connect/endpoints=["tcp/<router-target>:7447"]`
+
+You can still operate the router manually when needed:
 
 Available subcommands:
 

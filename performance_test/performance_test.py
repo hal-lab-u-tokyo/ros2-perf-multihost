@@ -1,12 +1,107 @@
 import argparse
 from datetime import datetime
 import os
+import socket
 import subprocess
 import sys
 import time
 
 from analyzer import aggregate_total_latency
 from runner import collect_logs, prepare_run, resolve_host_list, run_test
+
+
+def _looks_like_ipv4(value):
+    try:
+        socket.inet_aton(value)
+        return True
+    except OSError:
+        return False
+
+
+def _detect_manager_ip(host_hint):
+    # Determine the local source IP used to reach one of the test hosts.
+    with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as sock:
+        sock.connect((host_hint, 9))
+        local_ip = sock.getsockname()[0]
+    if not local_ip:
+        raise RuntimeError("Failed to detect manager IPv4 address")
+    return local_ip
+
+
+def _resolve_zenoh_router_target(target, hosts):
+    if not target:
+        return "host", hosts[0], hosts[0]
+    normalized = target.strip()
+    if normalized == "manager":
+        return "manager", None, _detect_manager_ip(hosts[0])
+
+    if normalized in hosts or _looks_like_ipv4(normalized):
+        return "host", normalized, normalized
+
+    raise ValueError(
+        "--zenoh-router must be one of: manager, <host-name>, <ipv4>"
+    )
+
+
+def _build_zenoh_config_override(connect_host):
+    return f'mode="client";connect/endpoints=["tcp/{connect_host}:7447"]'
+
+
+def _run_router_control(action, target_kind, target_host, repo_root, remote_repo_base, ssh_user):
+    if target_kind == "manager":
+        cmd = [
+            os.path.join(repo_root, "manager_scripts",
+                         "operate_zenoh_router.sh"),
+            action,
+        ]
+    else:
+        remote_script = f"{remote_repo_base}/manager_scripts/operate_zenoh_router.sh"
+        cmd = ["ssh", f"{ssh_user}@{target_host}",
+               "bash", remote_script, action]
+
+    try:
+        result = subprocess.run(
+            cmd, text=True, capture_output=True, check=True)
+        if result.stdout:
+            print(result.stdout.strip())
+    except subprocess.CalledProcessError as exc:
+        stderr = (exc.stderr or "").strip()
+        stdout = (exc.stdout or "").strip()
+        detail = stderr or stdout or f"return code {exc.returncode}"
+        raise RuntimeError(
+            f"Zenoh router action '{action}' failed on "
+            f"{'manager' if target_kind == 'manager' else target_host}: {detail}"
+        ) from exc
+
+
+def _start_zenoh_router(target_kind, target_host, repo_root, remote_repo_base, ssh_user):
+    _run_router_control(
+        "start",
+        target_kind,
+        target_host,
+        repo_root,
+        remote_repo_base,
+        ssh_user,
+    )
+    _run_router_control(
+        "wait",
+        target_kind,
+        target_host,
+        repo_root,
+        remote_repo_base,
+        ssh_user,
+    )
+
+
+def _stop_zenoh_router(target_kind, target_host, repo_root, remote_repo_base, ssh_user):
+    _run_router_control(
+        "stop",
+        target_kind,
+        target_host,
+        repo_root,
+        remote_repo_base,
+        ssh_user,
+    )
 
 
 if __name__ == "__main__":
@@ -16,7 +111,8 @@ if __name__ == "__main__":
         usage=(
             "%(prog)s <topology> [--rmw|-m {fastdds,cyclonedds,zenoh}] "
             "[--exec-policy|-p {docker,native,local}] [--eval-time|-e SEC] "
-            "[--trials|-t N] [--ws-dir|-w DIR] [--remote-repo-base|-b DIR] [--ssh-user|-u USER] [--help|-h]"
+            "[--trials|-t N] [--ws-dir|-w DIR] [--remote-repo-base|-b DIR] [--ssh-user|-u USER] "
+            "[--zenoh-router TARGET] [--help|-h]"
         ),
         epilog="""
 Examples:
@@ -66,6 +162,16 @@ Examples:
         type=str,
         default="ubuntu",
         help="SSH username for distribution and log collection in docker/native modes (default: ubuntu)",
+    )
+    parser.add_argument(
+        "--zenoh-router",
+        type=str,
+        default=None,
+        help=(
+            "Router target for --rmw zenoh: manager | <host-name> | <ipv4> "
+            "(default: first host in topology). "
+            "Examples: --zenoh-router manager | --zenoh-router host2 | --zenoh-router 192.168.1.10"
+        ),
     )
     args = parser.parse_args()
 
@@ -121,6 +227,11 @@ Examples:
     print(f"Local latest alias: {local_latest_link} -> {run_timestamp}")
     print(f"SSH user for remote ops: {args.ssh_user}")
 
+    zenoh_config_override = None
+    zenoh_router_started = False
+    zenoh_router_kind = None
+    zenoh_router_target_host = None
+
     if args.exec_policy in ("docker", "native"):
         distribute_cmd = [
             distribute_exec_scripts_sh,
@@ -158,51 +269,100 @@ Examples:
         # Keep log collection path aligned with distribution destination.
         os.environ["ROS2_PERF_REPO_ROOT"] = args.remote_repo_base
 
-    prepare_run(
-        start_exec_scripts_py,
-        hosts,
-        args.ws_dir,
-        args.topology_name,
-        rmw=args.rmw,
-        exec_policy=args.exec_policy,
-        run_timestamp=run_timestamp,
-        log_dir=local_logs_dir,
-    )
+    if args.rmw == "zenoh":
+        try:
+            zenoh_router_kind, zenoh_router_target_host, connect_host = _resolve_zenoh_router_target(
+                args.zenoh_router,
+                hosts,
+            )
+        except (ValueError, RuntimeError) as exc:
+            print(f"ERROR: {exc}", file=sys.stderr)
+            sys.exit(1)
 
-    for trial_idx in range(args.trials):
-        run_test(
-            trial_idx,
+        zenoh_config_override = _build_zenoh_config_override(connect_host)
+        os.environ["ZENOH_CONFIG_OVERRIDE"] = zenoh_config_override
+
+        target_label = "manager" if zenoh_router_kind == "manager" else zenoh_router_target_host
+        print(f"Zenoh router target: {target_label}")
+        print(f"ZENOH_CONFIG_OVERRIDE={zenoh_config_override}")
+        print("Starting Zenoh router automatically...")
+        try:
+            _start_zenoh_router(
+                zenoh_router_kind,
+                zenoh_router_target_host,
+                repo_root,
+                args.remote_repo_base,
+                args.ssh_user,
+            )
+            zenoh_router_started = True
+        except RuntimeError as exc:
+            print(f"ERROR: {exc}", file=sys.stderr)
+            sys.exit(1)
+    else:
+        os.environ.pop("ZENOH_CONFIG_OVERRIDE", None)
+
+    try:
+        prepare_run(
             start_exec_scripts_py,
             hosts,
             args.ws_dir,
             args.topology_name,
             rmw=args.rmw,
             exec_policy=args.exec_policy,
-            eval_time=eval_time,
             run_timestamp=run_timestamp,
             log_dir=local_logs_dir,
         )
-        time.sleep(10)
 
-    collect_logs(
-        local_logs_dir,
-        args.trials,
-        hosts,
-        ws_dir=args.ws_dir,
-        topology_name=args.topology_name,
-        rmw=args.rmw,
-        exec_policy=args.exec_policy,
-        run_timestamp=run_timestamp,
-        ssh_user=args.ssh_user,
-    )
+        for trial_idx in range(args.trials):
+            run_test(
+                trial_idx,
+                start_exec_scripts_py,
+                hosts,
+                args.ws_dir,
+                args.topology_name,
+                rmw=args.rmw,
+                exec_policy=args.exec_policy,
+                eval_time=eval_time,
+                run_timestamp=run_timestamp,
+                log_dir=local_logs_dir,
+                zenoh_config_override=zenoh_config_override,
+            )
+            time.sleep(10)
 
-    aggregate_total_latency(
-        local_logs_dir,
-        local_csv_dir,
-        args.trials,
-        hosts,
-        eval_time=eval_time,
-        ws_dir=args.ws_dir,
-        topology_name=args.topology_name,
-    )
+        collect_logs(
+            local_logs_dir,
+            args.trials,
+            hosts,
+            ws_dir=args.ws_dir,
+            topology_name=args.topology_name,
+            rmw=args.rmw,
+            exec_policy=args.exec_policy,
+            run_timestamp=run_timestamp,
+            ssh_user=args.ssh_user,
+        )
+
+        aggregate_total_latency(
+            local_logs_dir,
+            local_csv_dir,
+            args.trials,
+            hosts,
+            eval_time=eval_time,
+            ws_dir=args.ws_dir,
+            topology_name=args.topology_name,
+        )
+    finally:
+        if zenoh_router_started:
+            print("Stopping Zenoh router...")
+            try:
+                _stop_zenoh_router(
+                    zenoh_router_kind,
+                    zenoh_router_target_host,
+                    repo_root,
+                    args.remote_repo_base,
+                    args.ssh_user,
+                )
+            except RuntimeError as exc:
+                print(
+                    f"WARNING: Failed to stop Zenoh router cleanly: {exc}", file=sys.stderr)
+
     print("All tests and aggregation complete.")

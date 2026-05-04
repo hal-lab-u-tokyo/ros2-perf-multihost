@@ -5,8 +5,6 @@ set -eo pipefail
 # TODO: adjust as needed for your environment
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
-CONFIG_DEFAULT="${REPO_ROOT}/ros2_node_impl_ws/zenoh_config/DEFAULT_RMW_ZENOH_ROUTER_CONFIG.json5"
-CONFIG="${ZENOH_ROUTER_CONFIG_URI:-$CONFIG_DEFAULT}"
 LOG_DIR="${REPO_ROOT}/logs"
 PID_FILE="$LOG_DIR/zenoh_router.pid"
 OUT_FILE="$LOG_DIR/zenoh_router.out"
@@ -19,7 +17,7 @@ usage() {
     echo "  stop        : stop the router process using the PID if available"
     echo "  status      : show process and listening port status"
     echo "  wait        : wait until port ${PORT} starts listening"
-    echo "Env: ZENOH_ROUTER_CONFIG_URI, RUST_LOG, ZENOH_PORT"
+    echo "Env: ZENOH_CONFIG_OVERRIDE, RUST_LOG, ZENOH_PORT"
 }
 
 ensure_env() {
@@ -28,7 +26,6 @@ ensure_env() {
         source /opt/ros/jazzy/setup.bash
     fi
     export RMW_IMPLEMENTATION=rmw_zenoh_cpp
-    export ZENOH_ROUTER_CONFIG_URI="$CONFIG"
     export RUST_LOG="${RUST_LOG:-zenoh=warn,zenoh_transport=warn}"
 }
 
@@ -41,7 +38,7 @@ start_bg() {
         pkill -x rmw_zenohd || true
         sleep 1
     fi
-    echo "Starting rmw_zenohd with config: $ZENOH_ROUTER_CONFIG_URI"
+    echo "Starting rmw_zenohd with ZENOH_CONFIG_OVERRIDE='${ZENOH_CONFIG_OVERRIDE:-}'"
     nohup ros2 run rmw_zenoh_cpp rmw_zenohd >"$OUT_FILE" 2>&1 &
     echo $! >"$PID_FILE"
     echo "rmw_zenohd started (PID $(cat "$PID_FILE")), log: $OUT_FILE"
@@ -49,7 +46,7 @@ start_bg() {
 
 start_fg() {
     ensure_env
-    echo "Starting rmw_zenohd (foreground) with config: $ZENOH_ROUTER_CONFIG_URI"
+    echo "Starting rmw_zenohd (foreground) with ZENOH_CONFIG_OVERRIDE='${ZENOH_CONFIG_OVERRIDE:-}'"
     ros2 run rmw_zenoh_cpp rmw_zenohd
 }
 
