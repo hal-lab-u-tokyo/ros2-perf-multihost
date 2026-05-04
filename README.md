@@ -336,7 +336,8 @@ See [topology_example/README.md](./topology_example/README.md) for the JSON sche
 
 #### Generate Execution Scripts
 
-Generate execution scripts (`host*.launch.py`, `host*_exec_docker.sh`, `host*_exec_native.sh`) and Docker Compose files for Docker execution (`host*_compose.yaml`) from a JSON topology file.
+Generate execution scripts and Docker Compose files from a JSON topology file into `<ws-dir>/<json-file-name>/exec_scripts/`.
+
 
 ```bash
 python3 manager_scripts/generate_exec_scripts.py \
@@ -351,10 +352,10 @@ Arguments:
 - `--ws-dir` (`-w`): Base directory for generated artifacts (default: `performance_ws`)
 - `--force` (`-f`): Overwrite an existing output directory without confirmation; useful in CI or scripts
 
-Generated files are written to `<ws-dir>/<json-file-name>/exec_scripts/`.
+Example:
 
 ```bash
-# Example: generate common exec scripts for topology_example/simple.json
+# Generate exec scripts for topology_example/simple.json
 python3 manager_scripts/generate_exec_scripts.py \
   topology_example/simple.json
 ```
@@ -379,8 +380,10 @@ Arguments:
 - `--ws-dir` (`-w`): Workspace directory that contains topologies (default: `performance_ws`)
 - `--remote-repo-base` (`-r`): Remote repository base directory (default: `/home/ubuntu/ros2-perf-multihost`)
 
+Example:
+
 ```bash
-# Example: specify topology and remote path
+# Specify topology and remote path
 ./manager_scripts/distribute_exec_scripts.sh \
   simple \
   --remote-repo-base /home/ubuntu/ros2-perf-multihost
@@ -418,7 +421,16 @@ python3 performance_test/performance_test.py \
   [--ws-dir|-w <dir>]
 ```
 
-Examples:
+Arguments:
+
+- `<topology>`: Topology directory to use (required)
+- `--rmw` (`-m`): RMW implementation (`fastdds`, `cyclonedds`, or `zenoh`) (default: `fastdds`)
+- `--exec-policy` (`-p`): Execution mode, one of `docker`, `native`, or `local` (default: `docker`)
+- `--eval-time` (`-e`): Override evaluation time; if omitted, the default from generated `*_exec_docker.sh` / `*_exec_native.sh` scripts is used
+- `--trials` (`-t`): Number of trials (default: `3`)
+- `--ws-dir` (`-w`): Base directory that contains generated execution scripts (default: `performance_ws`)
+
+Example:
 
 ```bash
 # Docker execution on remote Hosts (default policy, default RMW: fastdds)
@@ -434,15 +446,6 @@ python3 performance_test/performance_test.py \
   --exec-policy native \
   --eval-time 10 --trials 3
 ```
-
-Arguments:
-
-- `<topology>`: Topology directory to use (required)
-- `--rmw` (`-m`): RMW implementation (`fastdds`, `cyclonedds`, or `zenoh`) (default: `fastdds`)
-- `--exec-policy` (`-p`): Execution mode, one of `docker`, `native`, or `local` (default: `docker`)
-- `--eval-time` (`-e`): Override evaluation time; if omitted, the default from generated `*_exec_docker.sh` / `*_exec_native.sh` scripts is used
-- `--trials` (`-t`): Number of trials (default: `3`)
-- `--ws-dir` (`-w`): Base directory that contains generated execution scripts (default: `performance_ws`)
 
 #### Zenoh Router (on the Manager) [Zenoh only]
 
@@ -490,7 +493,7 @@ Common issues and fixes:
 - `distribute_exec_scripts.sh` fails with SSH/SCP errors: verify hostnames, SSH keys, and that repository paths are identical across Hosts.
 - REST benchmark does not start remote execution: ensure `python3 remote_hosts_scripts/rest_server.py` is running on every target Host before calling `performance_test.py`.
 - Docker mode fails on remote Hosts: pull `ghcr.io/hal-lab-u-tokyo/ros2-perf-multihost:latest` and confirm Docker permissions on each Host.
-- Native mode cannot find workspace paths: set `ROS2_PERF_WS` to the project root before running `host*_exec_native.sh`.
+- Native mode cannot find workspace paths: set `ROS2_PERF_WS` to the project root before running `<host_name>_exec_native.sh`.
 - Expected CSV outputs are missing: check `<ws-dir>/<topology>/results/latest-<rmw>/logs/trial<N>/` for trial logs and inspect script stderr for analyzer failures.
 - REST server logs a chrony startup sync error (or fails to start when strict mode is enabled): confirm `chronyd` is running (`systemctl status chrony`) and that the sudoers entry for `chronyc` is in place (see [Clock synchronization for REST benchmark (chrony)](#clock-synchronization-for-rest-benchmark-chrony)).
 - `python3 remote_hosts_scripts/rest_server.py` exits at startup with a chrony sudo permission error: clear cached credentials with `sudo -k` and verify with `sudo -n chronyc -a makestep`; if it fails, configure the `chronyc` sudoers entry as described in [Clock synchronization for REST benchmark (chrony)](#clock-synchronization-for-rest-benchmark-chrony).

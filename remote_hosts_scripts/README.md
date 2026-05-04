@@ -31,8 +31,8 @@ python3 remote_hosts_scripts/rest_server.py
 | Method | Path | Description |
 |---|---|---|
 | `POST` | `/prepare_run` | Synchronizes the clock (if needed) and creates the run timestamp directory |
-| `POST` | `/start_docker` | Runs the host-specific `{hostname}_exec_docker.sh` script (Docker execution mode) |
-| `POST` | `/start_native` | Runs the host-specific `{hostname}_exec_native.sh` script (native execution mode) |
+| `POST` | `/start_docker` | Runs the host-specific `<host_name>_exec_docker.sh` script (Docker execution mode) |
+| `POST` | `/start_native` | Runs the host-specific `<host_name>_exec_native.sh` script (native execution mode) |
 
 All endpoints accept a JSON body. Common request fields:
 
