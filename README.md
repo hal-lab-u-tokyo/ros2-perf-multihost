@@ -480,7 +480,7 @@ If you want to distribute the generated host-specific execution files to each Ho
 
 #### Zenoh Router Lifecycle [Zenoh only]
 
-When using Zenoh as the RMW, `performance_test.py` automatically starts and stops `rmw_zenohd` on the specified router target (`--zenoh-router ...`).
+When using Zenoh as the RMW, `performance_test.py` automatically operates `rmw_zenohd` on the target specified by `--zenoh-router`.
 
 It also sets `ZENOH_CONFIG_OVERRIDE` for each node run. By default this includes:
 
