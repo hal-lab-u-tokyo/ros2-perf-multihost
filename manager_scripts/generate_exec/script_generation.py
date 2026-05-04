@@ -562,10 +562,10 @@ def run_script_common_prefix(lines, rel_root, eval_time_default, settings):
             'RUN_RESULTS_HOST_DIR="$RESULTS_HOST_DIR/$RUN_TIMESTAMP"',
             'mkdir -p "$RUN_RESULTS_HOST_DIR"',
             'ln -sfn "$RUN_TIMESTAMP" "$RESULTS_HOST_DIR/latest-${RMW_CHOICE}"',
-            'EXEC_LOGS_HOST_DIR="$RUN_RESULTS_HOST_DIR/exec_logs/trial${TRIAL_IDX}"',
-            'mkdir -p "$EXEC_LOGS_HOST_DIR"',
+            'RAW_LOGS_HOST_DIR="$RUN_RESULTS_HOST_DIR/raw_logs/trial${TRIAL_IDX}"',
+            'mkdir -p "$RAW_LOGS_HOST_DIR"',
             (
-                f'LOG_DIR="${{LOG_DIR:-{settings.project_root_in_container}/{settings.perf_ws_dir}/${{RUN_DIR_NAME}}/results/${{RUN_TIMESTAMP}}/exec_logs/trial${{TRIAL_IDX}}}}"'
+                f'LOG_DIR="${{LOG_DIR:-{settings.project_root_in_container}/{settings.perf_ws_dir}/${{RUN_DIR_NAME}}/results/${{RUN_TIMESTAMP}}/raw_logs/trial${{TRIAL_IDX}}}}"'
             ),
             "",
             'cd "$PROJECT_ROOT"',
@@ -638,7 +638,7 @@ def generate_host_exec_native_scripts(json_content, output_dir, project_root, se
         lines.extend(
             [
                 "# --- Native mode: LOG_DIR is the host filesystem path ---",
-                'LOG_DIR="$EXEC_LOGS_HOST_DIR"',
+                'LOG_DIR="$RAW_LOGS_HOST_DIR"',
                 'echo "LOG_DIR (host): $LOG_DIR"',
                 "",
                 "# Source ROS 2 environment",

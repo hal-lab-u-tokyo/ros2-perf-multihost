@@ -8,7 +8,7 @@ import sys
 import time
 
 from analyzer import aggregate_total_latency
-from runner import collect_logs, prepare_run, resolve_host_list, run_test
+from runner import collect_logs, collect_runtime_logs, prepare_run, resolve_host_list, run_test
 
 
 def _looks_like_ipv4(value):
@@ -675,5 +675,20 @@ Examples:
             except RuntimeError as exc:
                 print(
                     f"WARNING: Failed to stop Zenoh router cleanly: {exc}", file=sys.stderr)
+
+        if args.exec_policy in ("docker", "native"):
+            print("Collecting runtime logs (rest_server, zenohd router)...")
+            collect_runtime_logs(
+                local_session_dir,
+                hosts,
+                ssh_user=args.ssh_user,
+                remote_repo_base=args.remote_repo_base,
+                ws_dir=args.ws_dir,
+                topology_name=args.topology_name,
+                exec_policy=args.exec_policy,
+                zenoh_router_kind=zenoh_router_kind,
+                zenoh_router_target_host=zenoh_router_target_host,
+                local_repo_root=repo_root,
+            )
 
     print("All tests and aggregation complete.")

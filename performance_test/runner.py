@@ -230,7 +230,7 @@ def collect_logs(
             topology_root,
             "results",
             str(run_timestamp),
-            "exec_logs",
+            "raw_logs",
         )
 
         for trial_idx in range(num_trials):
@@ -272,7 +272,7 @@ def collect_logs(
         )
         remote_log_dir = (
             f"{remote_repo_root}/{ws_dir}/{topology_name}"
-            f"/results/latest-{rmw}/exec_logs/trial{trial_idx + 1}"
+            f"/results/latest-{rmw}/raw_logs/trial{trial_idx + 1}"
         )
 
         for host in hosts:
@@ -301,3 +301,77 @@ def collect_logs(
                 elif exc.stdout:
                     print(exc.stdout.strip(), file=sys.stderr)
                 raise
+
+
+def collect_runtime_logs(
+    local_session_dir,
+    hosts,
+    ssh_user="ubuntu",
+    remote_repo_base="/home/ubuntu/ros2-perf-multihost",
+    ws_dir="performance_ws",
+    topology_name=None,
+    exec_policy="docker",
+    zenoh_router_kind=None,
+    zenoh_router_target_host=None,
+    local_repo_root=None,
+):
+    """Collect rest_server.log and zenohd_router.log from remote hosts into runtime_logs/."""
+    if exec_policy == "local":
+        return
+
+    runtime_logs_dir = os.path.join(local_session_dir, "runtime_logs")
+    os.makedirs(runtime_logs_dir, exist_ok=True)
+
+    remote_repo_root = os.environ.get("ROS2_PERF_REPO_ROOT", remote_repo_base)
+    remote_runtime_dir = (
+        f"{remote_repo_root}/{ws_dir}/{topology_name}/results/runtime"
+    )
+
+    for host in hosts:
+        dst = os.path.join(runtime_logs_dir, f"{host}_rest_server.log")
+        remote_path = f"{ssh_user}@{host}:{remote_runtime_dir}/rest_server.log"
+        result = subprocess.run(
+            ["scp", remote_path, dst],
+            text=True,
+            capture_output=True,
+        )
+        if result.returncode == 0:
+            print(f"  runtime log -> {dst}")
+        else:
+            print(
+                f"  WARNING: Could not collect rest_server.log from {host}: "
+                + (result.stderr or result.stdout or "").strip(),
+                file=sys.stderr,
+            )
+
+    if zenoh_router_kind == "host" and zenoh_router_target_host:
+        dst = os.path.join(runtime_logs_dir, "zenohd_router.log")
+        remote_path = (
+            f"{ssh_user}@{zenoh_router_target_host}:{remote_runtime_dir}/zenohd_router.log"
+        )
+        result = subprocess.run(
+            ["scp", remote_path, dst],
+            text=True,
+            capture_output=True,
+        )
+        if result.returncode == 0:
+            print(f"  runtime log -> {dst}")
+        else:
+            print(
+                f"  WARNING: Could not collect zenohd_router.log from {zenoh_router_target_host}: "
+                + (result.stderr or result.stdout or "").strip(),
+                file=sys.stderr,
+            )
+    elif zenoh_router_kind == "manager" and local_repo_root and topology_name:
+        src = os.path.join(
+            local_repo_root, ws_dir, topology_name, "results", "runtime", "zenohd_router.log"
+        )
+        dst = os.path.join(runtime_logs_dir, "zenohd_router.log")
+        if os.path.exists(src):
+            shutil.copy2(src, dst)
+            print(f"  runtime log -> {dst}")
+        else:
+            print(
+                f"  WARNING: zenohd_router.log not found at {src}",
+                file=sys.stderr,
+            )
