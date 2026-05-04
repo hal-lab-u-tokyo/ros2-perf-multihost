@@ -138,7 +138,6 @@ This runs 3 trials, each lasting 10 seconds, using Fast DDS (default RMW).
 
 As a quick check, confirm that the following outputs are generated:
 
-- Coordination logs: `<ws-dir>/<topology>/results/latest-<rmw>/coordination_logs/`
 - Raw trial logs: `<ws-dir>/<topology>/results/latest-<rmw>/raw_logs/trial<N>/`
 - Analysis CSV: `<ws-dir>/<topology>/results/latest-<rmw>/analysis/`
 
@@ -434,7 +433,7 @@ python3 performance_test/performance_test.py \
   [--ws-dir|-w <dir>] \
   [--remote-repo-base|-b <dir>] \
   [--ssh-user|-u <user>] \
-  [--zenoh-router <target>]
+  [--zenoh-router|-z <target>]
 ```
 
 Arguments:
@@ -447,7 +446,7 @@ Arguments:
 - `--ws-dir` (`-w`): Base directory that contains generated execution scripts (default: `performance_ws`)
 - `--remote-repo-base` (`-b`): Remote repository base directory used for automatic distribution and log collection in `docker`/`native` modes (default: `/home/ubuntu/ros2-perf-multihost`)
 - `--ssh-user` (`-u`): SSH username used for distribution and log collection in `docker`/`native` modes (default: `ubuntu`)
-- `--zenoh-router`: Router target used only when `--rmw zenoh`.
+- `--zenoh-router` (`-z`): Router target used only when `--rmw zenoh`.
   - (default): first host listed in the JSON topology file (e.g., `host1`)
   - `<host-name>` / `<ipv4>`: explicit host name or IPv4 address (e.g., `host2` / `192.168.1.10`)
   - `Manager`: the manager machine running `performance_test.py`
@@ -509,9 +508,10 @@ The table below summarizes how zenohd is placed and managed for each exec-policy
 
 On prepare, the Manager creates `<ws-dir>/<topology>/results/<session_timestamp>-<rmw>/` and updates `<ws-dir>/<topology>/results/latest-<rmw>` to point to it.
 
-- Coordination logs are written under `<ws-dir>/<topology>/results/latest-<rmw>/coordination_logs/`.
+- In `docker`/`native` modes, coordination logs are written under `<ws-dir>/<topology>/results/latest-<rmw>/coordination_logs/`.
 - Trial logs are collected under `<ws-dir>/<topology>/results/latest-<rmw>/raw_logs/trial<N>/`.
 - Aggregated outputs such as `total_latency.csv`, `throughput.csv`, `host_trials_usage.csv`, and `host_usage_summary.csv` are written under `<ws-dir>/<topology>/results/latest-<rmw>/analysis/`.
+- In `docker`/`native` modes, runtime service logs are collected under `<ws-dir>/<topology>/results/latest-<rmw>/runtime_logs/` (for example, `<host>_rest_server.log`; and `zenohd_router.log` for Zenoh router runs).
 
 For details on output directory structure and CSV column definitions, see [performance_test/README.md](./performance_test/README.md).
 

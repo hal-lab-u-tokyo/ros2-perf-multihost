@@ -29,9 +29,9 @@ results/
 │   ├── rest_server.log              # managed by manage_rest_servers.sh
 │   └── zenohd_router.log            # created when rmw_zenohd is started natively
 └── 2026-04-26_13-21-45-fastdds/
-    ├── coordination_logs/
-    │   ├── prepare_run.log          # stdout/stderr of the prepare_run REST phase (docker/native mode)
-    │   ├── exec_trial1.log          # stdout/stderr of the REST call for trial 1 (docker/native mode)
+    ├── coordination_logs/           # created in docker/native mode
+    │   ├── prepare_run.log          # stdout/stderr of the prepare_run REST phase
+    │   ├── exec_trial1.log          # stdout/stderr of the REST call for trial 1
     │   ├── exec_trial2.log
     │   └── ...
     ├── raw_logs/
@@ -47,6 +47,11 @@ results/
         ├── throughput.csv
         ├── host_trials_usage.csv
         └── host_usage_summary.csv
+    └── runtime_logs/                # created in docker/native mode
+        ├── host1_rest_server.log
+        ├── host2_rest_server.log
+        ├── ...
+        └── zenohd_router.log        # when zenoh router logs are collectable
 ```
 
 ## CSV Formats
