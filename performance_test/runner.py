@@ -219,42 +219,9 @@ def collect_logs(
     src_log_dir = os.path.abspath(local_raw_logs_dir)
 
     if exec_policy == "local":
-        if not topology_name:
-            raise ValueError("topology is required when exec_policy=local")
-        if not run_timestamp:
-            raise ValueError(
-                "run_timestamp is required when exec_policy=local")
-
-        topology_root = os.path.join(ws_dir, topology_name)
-        local_exec_logs_root = os.path.join(
-            topology_root,
-            "results",
-            str(run_timestamp),
-            "raw_logs",
-        )
-
-        for trial_idx in range(num_trials):
-            trial_name = f"trial{trial_idx + 1}"
-            trial_log_dir = os.path.join(src_log_dir, trial_name)
-            os.makedirs(trial_log_dir, exist_ok=True)
-
-            src_trial_dir = os.path.join(local_exec_logs_root, trial_name)
-            if not os.path.isdir(src_trial_dir):
-                raise FileNotFoundError(
-                    f"Local trial log directory not found: {src_trial_dir}"
-                )
-
-            for entry in os.listdir(src_trial_dir):
-                src = os.path.join(src_trial_dir, entry)
-                dst = os.path.join(trial_log_dir, entry)
-                if os.path.isdir(src):
-                    if os.path.exists(dst):
-                        shutil.rmtree(dst)
-                    shutil.copytree(src, dst)
-                else:
-                    shutil.copy2(src, dst)
-
-            print(f"Copied local logs: {src_trial_dir} -> {trial_log_dir}")
+        # For local exec_policy, node logs are written directly into
+        # raw_logs/trial{N}/ by local_exec.sh, so no copying is needed.
+        print(f"Local exec: logs already in {src_log_dir}")
         return
 
     for trial_idx in range(num_trials):
