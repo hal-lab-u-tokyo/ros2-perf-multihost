@@ -142,8 +142,10 @@ def prepare_run(
     rmw,
     exec_policy="docker",
     run_timestamp=None,
+    ssh_user="ubuntu",
 ):
     """Initialize run timestamp/latest-rmw on all hosts before trial loop."""
+    _ = ssh_user
     if exec_policy == "local":
         if not run_timestamp:
             raise ValueError(

@@ -193,6 +193,7 @@ Examples:
         rmw=args.rmw,
         exec_policy=args.exec_policy,
         run_timestamp=run_timestamp,
+        ssh_user=args.ssh_user,
     )
 
     aggregate_total_latency(
