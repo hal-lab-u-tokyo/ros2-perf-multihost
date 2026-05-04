@@ -31,8 +31,10 @@ results/
     │   │   ├── <node>_log/              # per-node log directory
     │   │   │   └── <topic>_log.txt      # raw latency log per topic
     │   │   ├── <host>_monitor_host.csv  # per-Host resource usage time series
-    │   │   └── ...                      # stdout/stderr logs copied from exec_logs/
+    │   │   └── ...
+    │   ├── trial1_exec.log              # stdout/stderr of the REST call for trial 1 (docker/native mode)
     │   ├── trial2/
+    │   ├── trial2_exec.log
     │   └── ...
     └── csv/
         ├── total_latency.csv

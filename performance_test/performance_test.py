@@ -169,6 +169,7 @@ Examples:
             exec_policy=args.exec_policy,
             eval_time=eval_time,
             run_timestamp=run_timestamp,
+            log_dir=local_logs_dir,
         )
         time.sleep(10)
 

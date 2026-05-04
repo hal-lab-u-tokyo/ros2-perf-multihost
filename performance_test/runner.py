@@ -53,6 +53,7 @@ def run_test(
     exec_policy="docker",
     eval_time=None,
     run_timestamp=None,
+    log_dir=None,
 ):
     print(f"=== Run trial={trial_idx + 1} ===")
 
@@ -110,10 +111,23 @@ def run_test(
     result = subprocess.run(
         cmd,
         text=True,
+        capture_output=True,
         env=env,
     )
-    print(result)
+    if log_dir is not None:
+        log_path = os.path.join(log_dir, f"trial{trial_idx + 1}_exec.log")
+        os.makedirs(log_dir, exist_ok=True)
+        with open(log_path, "w", encoding="utf-8") as f:
+            f.write(result.stdout or "")
+            if result.stderr:
+                f.write("\n--- stderr ---\n")
+                f.write(result.stderr)
+        print(f"  exec log -> {log_path}")
     if result.returncode != 0:
+        if result.stdout:
+            print(result.stdout.strip())
+        if result.stderr:
+            print(result.stderr.strip(), file=sys.stderr)
         raise RuntimeError(
             f"run_test failed for exec_policy={exec_policy}: "
             f"rc={result.returncode}, cmd={cmd}"
