@@ -239,7 +239,6 @@ NC_TIMEOUT_OPT=(-w 1)
 
 REMOTE_LOG_PATH="${REMOTE_RUNTIME_DIR}/rest_server.log"
 REMOTE_PID_PATH="${REMOTE_RUNTIME_DIR}/rest_server.pid"
-LEGACY_REMOTE_LOG_PATH="${REMOTE_REPO_BASE}/remote_hosts_scripts/rest_server.log"
 LEGACY_REMOTE_PID_PATH="${REMOTE_REPO_BASE}/remote_hosts_scripts/rest_server.pid"
 
 echo "=== REST server command: ${SUBCOMMAND} ==="
@@ -264,7 +263,7 @@ echo "follow_logs   : ${FOLLOW_LOGS}"
 SSH_OPTS=(
     -n
     -o BatchMode=yes
-    -o StrictHostKeyChecking=no
+    -o StrictHostKeyChecking=accept-new
     -o ConnectTimeout=5
 )
 
@@ -313,6 +312,8 @@ start_host() {
             rm -f \"${LEGACY_REMOTE_PID_PATH}\"; \
         fi; \
         : > \"${REMOTE_LOG_PATH}\"; \
+        export ROS2_PERF_REPO_ROOT=\"${REMOTE_REPO_BASE}\"; \
+        export ROS2_PERF_WS_DIR=\"${WS_DIR}\"; \
         nohup python3 remote_hosts_scripts/rest_server.py >>\"${REMOTE_LOG_PATH}\" 2>&1 < /dev/null & \
         echo \$! > \"${REMOTE_PID_PATH}\"'"; then
         echo "[${host}] ERROR: failed to execute remote start command." >&2

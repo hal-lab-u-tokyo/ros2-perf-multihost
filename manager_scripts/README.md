@@ -78,6 +78,7 @@ It distributes the following files for each `<host_name>`:
 
 - `<host_name>.launch.py`
 - `<host_name>_exec_docker.sh`
+- `<host_name>_exec_native.sh`
 - `<host_name>_compose.yaml`
 - `metadata.txt`
 

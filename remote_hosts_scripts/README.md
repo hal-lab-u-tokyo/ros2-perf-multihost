@@ -49,7 +49,7 @@ All endpoints accept a JSON body. Common request fields:
 | `topology` | string | Topology directory name under `ws_dir` (required) |
 | `rmw` | string | RMW implementation: `fastdds`, `cyclonedds`, or `zenoh` (required) |
 | `ws_dir` | string | Workspace directory (default: `performance_ws`) |
-| `trial_idx` | integer | Trial index, used by `/start` and `/start_docker` (default: `1`) |
+| `trial_idx` | integer | Trial index, used by `/start_native` and `/start_docker` (default: `1`) |
 | `eval_time` | integer | Override evaluation duration in seconds (optional) |
 
 ### Clock synchronization (chrony)
