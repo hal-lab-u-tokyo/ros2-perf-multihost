@@ -11,10 +11,12 @@ REPO_DIR="$(cd "${SCRIPT_DIR}/.." && pwd)"
 
 DEFAULT_WS_DIR="performance_ws"
 DEFAULT_REMOTE_REPO_BASE="/home/ubuntu/ros2-perf-multihost"
+DEFAULT_SSH_USER="ubuntu"
 
 WS_DIR_INPUT="${DEFAULT_WS_DIR}"
 TOPOLOGY_INPUT=""
 REMOTE_REPO_BASE="${DEFAULT_REMOTE_REPO_BASE}"
+SSH_USER="${DEFAULT_SSH_USER}"
 
 print_help() {
     cat <<EOF
@@ -25,13 +27,15 @@ Distribute host-specific exec scripts using values from metadata.txt.
 Options:
     -w, --ws-dir DIR           Workspace directory that contains topologies
                              (default: ${DEFAULT_WS_DIR})
-  -r, --remote-repo-base DIR Remote repository base directory
+    -b, --remote-repo-base DIR Remote repository base directory
                              (default: ${DEFAULT_REMOTE_REPO_BASE})
+    -u, --ssh-user USER        SSH username for each Host
+                             (default: ${DEFAULT_SSH_USER})
   -h, --help                 Show this help message and exit
 
 Examples:
     $(basename "$0") simple
-    $(basename "$0") simple -w performance_ws -r /home/ubuntu/ros2-perf-multihost
+    $(basename "$0") simple -w performance_ws -b /home/ubuntu/ros2-perf-multihost
 EOF
 }
 
@@ -45,12 +49,20 @@ while [[ $# -gt 0 ]]; do
             WS_DIR_INPUT="$2"
             shift 2
             ;;
-        -r|--remote-repo-base)
+        -b|--remote-repo-base)
             if [[ $# -lt 2 ]]; then
                 echo "ERROR: $1 requires a value" >&2
                 exit 2
             fi
             REMOTE_REPO_BASE="$2"
+            shift 2
+            ;;
+        -u|--ssh-user)
+            if [[ $# -lt 2 ]]; then
+                echo "ERROR: $1 requires a value" >&2
+                exit 2
+            fi
+            SSH_USER="$2"
             shift 2
             ;;
         -h|--help)
@@ -140,6 +152,7 @@ echo "json_path     : ${JSON_PATH:-N/A}"
 echo "ws_dir        : ${WS_DIR}"
 echo "topology_dir  : ${TOPOLOGY_DIR}"
 echo "hosts         : ${HOSTS[*]}"
+echo "ssh_user      : ${SSH_USER}"
 echo "local_exec_dir: ${LOCAL_EXEC_DIR}"
 echo "remote_exec_dir: ${REMOTE_EXEC_DIR}"
 
@@ -147,12 +160,13 @@ failed_hosts=()
 
 for host in "${HOSTS[@]}"; do
     host_launch="${host}.launch.py"
-    host_exec="${host}_exec.sh"
+    host_exec_docker="${host}_exec_docker.sh"
+    host_exec_native="${host}_exec_native.sh"
     host_compose="${host}_compose.yaml"
 
     echo "=== Validating local files for ${host} ==="
     local_files_ok=true
-    for file in "${host_launch}" "${host_exec}" "${host_compose}"; do
+    for file in "${host_launch}" "${host_exec_docker}" "${host_exec_native}" "${host_compose}"; do
         if [[ ! -f "${LOCAL_EXEC_DIR}/${file}" ]]; then
             echo "ERROR: missing local file: ${LOCAL_EXEC_DIR}/${file}" >&2
             failed_hosts+=("${host}")
@@ -168,7 +182,7 @@ for host in "${HOSTS[@]}"; do
     echo "=== Copying exec scripts to ${host} ==="
     
     # Create remote directory
-    if ! err="$(ssh "${host}" "mkdir -p '${REMOTE_EXEC_DIR}'" 2>&1)"; then
+    if ! err="$(ssh "${SSH_USER}@${host}" "mkdir -p '${REMOTE_EXEC_DIR}'" 2>&1)"; then
         echo "ERROR: Failed to create directory on ${host}" >&2
         if [[ -n "${err}" ]]; then
             echo "  ssh: ${err}" >&2
@@ -180,9 +194,10 @@ for host in "${HOSTS[@]}"; do
     # Copy exec scripts
     if ! err="$(scp \
         "${LOCAL_EXEC_DIR}/${host_launch}" \
-        "${LOCAL_EXEC_DIR}/${host_exec}" \
+        "${LOCAL_EXEC_DIR}/${host_exec_docker}" \
+        "${LOCAL_EXEC_DIR}/${host_exec_native}" \
         "${LOCAL_EXEC_DIR}/${host_compose}" \
-        "${host}:${REMOTE_EXEC_DIR}/" 2>&1)"; then
+        "${SSH_USER}@${host}:${REMOTE_EXEC_DIR}/" 2>&1)"; then
         echo "ERROR: Failed to copy scripts to ${host}" >&2
         if [[ -n "${err}" ]]; then
             echo "  scp: ${err}" >&2
@@ -192,7 +207,7 @@ for host in "${HOSTS[@]}"; do
     fi
 
     # Copy metadata
-    if ! err="$(scp "${LOCAL_RUN_DIR}/metadata.txt" "${host}:${REMOTE_RUN_DIR}/metadata.txt" 2>&1)"; then
+    if ! err="$(scp "${LOCAL_RUN_DIR}/metadata.txt" "${SSH_USER}@${host}:${REMOTE_RUN_DIR}/metadata.txt" 2>&1)"; then
         echo "ERROR: Failed to copy metadata to ${host}" >&2
         if [[ -n "${err}" ]]; then
             echo "  scp: ${err}" >&2
@@ -202,7 +217,7 @@ for host in "${HOSTS[@]}"; do
     fi
 
     # Set execute permissions
-    if ! err="$(ssh "${host}" "chmod +x '${REMOTE_EXEC_DIR}/${host_exec}'" 2>&1)"; then
+    if ! err="$(ssh "${SSH_USER}@${host}" "chmod +x '${REMOTE_EXEC_DIR}/${host_exec_docker}' '${REMOTE_EXEC_DIR}/${host_exec_native}'" 2>&1)"; then
         echo "ERROR: Failed to set permissions on ${host}" >&2
         if [[ -n "${err}" ]]; then
             echo "  ssh: ${err}" >&2

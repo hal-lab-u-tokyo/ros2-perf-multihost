@@ -381,88 +381,6 @@ def prepare_run():
         return jsonify({"error": str(exc)}), 500
 
 
-@app.route("/start", methods=["POST"])
-def start_script():
-    body = request.get_json(silent=True) or {}
-    trial_idx = body.get("trial_idx", 1)
-    eval_time = body.get("eval_time")
-    rmw = body.get("rmw")
-
-    try:
-        trial_idx = _to_int(trial_idx, "trial_idx")
-        if eval_time is not None:
-            eval_time = _to_int(eval_time, "eval_time")
-        if rmw not in ("fastdds", "cyclonedds", "zenoh"):
-            raise ValueError("rmw must be one of: fastdds, cyclonedds, zenoh")
-
-        ctx = _resolve_exec_context(body)
-        resolved_host, script_path = _resolve_host_script(
-            ctx["exec_dir"], ctx["hosts"], "launch.py", joiner=".")
-        run_timestamp = _resolve_active_timestamp(ctx, rmw)
-        log_dir = os.path.join(
-            REPO_ROOT,
-            ctx["ws_dir"],
-            ctx["topology_dir"],
-            "results",
-            run_timestamp,
-            "exec_logs",
-            f"trial{trial_idx}",
-        )
-        os.makedirs(log_dir, exist_ok=True)
-
-        launch_cmd = (
-            f'set +u; . /opt/ros/jazzy/setup.bash; '
-            ' . "${ROS2_NODE_IMPL_WS:-' + REPO_ROOT +
-            '/ros2_node_impl_ws}/install/setup.bash"; '
-            f' set -u; ros2 launch "{script_path}" '
-            'eval_time:="${EVAL_TIME:-60}" log_dir:="${LOG_DIR}"'
-        )
-        cmd = ["bash", "-lc", launch_cmd]
-
-        env = os.environ.copy()
-        env["LOG_DIR"] = log_dir
-        env.setdefault("ROS2_PERF_REPO_ROOT", REPO_ROOT)
-        env.setdefault("ROS2_PERF_WS", REPO_ROOT)
-        env["RMW_CHOICE"] = rmw
-        if rmw == "fastdds":
-            env["RMW_IMPLEMENTATION"] = "rmw_fastrtps_cpp"
-            env.pop("ZENOH_ROUTER_CHECK_ATTEMPTS", None)
-            env.pop("ZENOH_SESSION_CONFIG_URI", None)
-        elif rmw == "zenoh":
-            env["RMW_IMPLEMENTATION"] = "rmw_zenoh_cpp"
-            env["ZENOH_ROUTER_CHECK_ATTEMPTS"] = "5"
-            env["ZENOH_SESSION_CONFIG_URI"] = (
-                f"{REPO_ROOT}/ros2_node_impl_ws/zenoh_config/DEFAULT_RMW_ZENOH_SESSION_CONFIG.json5"
-            )
-            env.setdefault("RUST_LOG", "zenoh=warn,zenoh_transport=warn")
-        else:
-            env["RMW_IMPLEMENTATION"] = "rmw_cyclonedds_cpp"
-            env.pop("ZENOH_ROUTER_CHECK_ATTEMPTS", None)
-            env.pop("ZENOH_SESSION_CONFIG_URI", None)
-        if eval_time is not None:
-            env["EVAL_TIME"] = str(eval_time)
-
-        app.logger.info(
-            "[start] host=%s topology=%s rmw=%s trial=%s timestamp=%s script=%s",
-            resolved_host,
-            ctx["topology_dir"],
-            rmw,
-            trial_idx,
-            run_timestamp,
-            script_path,
-        )
-        return _run_script(cmd, env=env)
-    except ValueError as exc:
-        return jsonify({"error": str(exc)}), 400
-    except FileNotFoundError as exc:
-        return jsonify({"error": str(exc)}), 404
-    except subprocess.TimeoutExpired:
-        return jsonify({"error": f"script timeout after {RUN_SCRIPT_TIMEOUT_SEC}s"}), 504
-    except Exception as exc:
-        app.logger.exception("[start] exception")
-        return jsonify({"error": str(exc)}), 500
-
-
 @app.route("/start_docker", methods=["POST"])
 def start_docker():
     body = request.get_json(silent=True) or {}
@@ -479,7 +397,7 @@ def start_docker():
 
         ctx = _resolve_exec_context(body)
         resolved_host, script_path = _resolve_host_script(
-            ctx["exec_dir"], ctx["hosts"], "exec.sh")
+            ctx["exec_dir"], ctx["hosts"], "exec_docker.sh")
         run_timestamp = _resolve_active_timestamp(ctx, rmw)
 
         cmd = ["bash", script_path, "--rmw", rmw]
@@ -509,6 +427,57 @@ def start_docker():
         return jsonify({"error": f"script timeout after {RUN_SCRIPT_TIMEOUT_SEC}s"}), 504
     except Exception as exc:
         app.logger.exception("[start_docker] exception")
+        return jsonify({"error": str(exc)}), 500
+
+
+@app.route("/start_native", methods=["POST"])
+def start_native():
+    body = request.get_json(silent=True) or {}
+    trial_idx = body.get("trial_idx", 1)
+    eval_time = body.get("eval_time")
+    rmw = body.get("rmw")
+
+    try:
+        trial_idx = _to_int(trial_idx, "trial_idx")
+        if eval_time is not None:
+            eval_time = _to_int(eval_time, "eval_time")
+        if rmw not in ("fastdds", "cyclonedds", "zenoh"):
+            raise ValueError("rmw must be one of: fastdds, cyclonedds, zenoh")
+
+        ctx = _resolve_exec_context(body)
+        resolved_host, script_path = _resolve_host_script(
+            ctx["exec_dir"], ctx["hosts"], "exec_native.sh")
+        run_timestamp = _resolve_active_timestamp(ctx, rmw)
+
+        cmd = ["bash", script_path, "--rmw", rmw]
+        if eval_time is not None:
+            cmd.extend(["--eval-time", str(eval_time)])
+        cmd.extend(["--trial-idx", str(trial_idx)])
+
+        env = os.environ.copy()
+        env["RUN_TIMESTAMP"] = run_timestamp
+        env["RMW_CHOICE"] = rmw
+        env.setdefault("ROS2_PERF_REPO_ROOT", REPO_ROOT)
+        env.setdefault("ROS2_PERF_WS", REPO_ROOT)
+
+        app.logger.info(
+            "[start_native] host=%s topology=%s rmw=%s trial=%s timestamp=%s script=%s",
+            resolved_host,
+            ctx["topology_dir"],
+            rmw,
+            trial_idx,
+            run_timestamp,
+            script_path,
+        )
+        return _run_script(cmd, env=env)
+    except ValueError as exc:
+        return jsonify({"error": str(exc)}), 400
+    except FileNotFoundError as exc:
+        return jsonify({"error": str(exc)}), 404
+    except subprocess.TimeoutExpired:
+        return jsonify({"error": f"script timeout after {RUN_SCRIPT_TIMEOUT_SEC}s"}), 504
+    except Exception as exc:
+        app.logger.exception("[start_native] exception")
         return jsonify({"error": str(exc)}), 500
 
 

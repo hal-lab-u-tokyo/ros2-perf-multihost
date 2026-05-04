@@ -111,7 +111,7 @@ def append_intermediate_block(lines, node_name, pub_defs, sub_topics, qos_opts):
 
 
 def append_host_script_epilogue(lines, host_name):
-    """Append the shared epilogue used by host*_exec.sh."""
+    """Append the shared epilogue used by host*_exec_docker.sh."""
     lines.extend(
         [
             "",
@@ -568,12 +568,12 @@ def run_script_common_prefix(lines, rel_root, eval_time_default, settings):
 
 
 def generate_host_exec_scripts(json_content, output_dir, project_root, settings):
-    """Generate host*_exec.sh wrapper scripts for host-specific Compose files."""
+    """Generate host*_exec_docker.sh wrapper scripts for host-specific Compose files."""
     rel_root = os.path.relpath(project_root, output_dir)
     eval_time_default = settings.default_eval_time
     for host_dict in json_content["hosts"]:
         host_name = host_dict["host_name"]
-        script_path = os.path.join(output_dir, f"{host_name}_exec.sh")
+        script_path = os.path.join(output_dir, f"{host_name}_exec_docker.sh")
         compose_file = f"$SCRIPT_DIR/{host_name}_compose.yaml"
         lines = []
         run_script_common_prefix(lines, rel_root, eval_time_default, settings)
@@ -604,6 +604,43 @@ def generate_host_exec_scripts(json_content, output_dir, project_root, settings)
                     'LOG_DIR="$LOG_DIR" '
                     f'docker compose -f "$COMPOSE_FILE" up service_{host_name}'
                 ),
+            ]
+        )
+
+        with open(script_path, "w") as f:
+            f.write("\n".join(lines) + "\n")
+
+        os.chmod(script_path, 0o755)
+
+
+def generate_host_exec_native_scripts(json_content, output_dir, project_root, settings):
+    """Generate host*_exec_native.sh wrapper scripts for native ROS 2 execution."""
+    rel_root = os.path.relpath(project_root, output_dir)
+    eval_time_default = settings.default_eval_time
+    for host_dict in json_content["hosts"]:
+        host_name = host_dict["host_name"]
+        script_path = os.path.join(output_dir, f"{host_name}_exec_native.sh")
+        launch_file = f"$SCRIPT_DIR/{host_name}.launch.py"
+        lines = []
+        run_script_common_prefix(lines, rel_root, eval_time_default, settings)
+        lines.extend(
+            [
+                "# --- Native mode: LOG_DIR is the host filesystem path ---",
+                'LOG_DIR="$EXEC_LOGS_HOST_DIR"',
+                'echo "LOG_DIR (host): $LOG_DIR"',
+                "",
+                "# Override Zenoh config path with host filesystem path",
+                'if [[ "$RMW_CHOICE" == "zenoh" ]]; then',
+                '  export ZENOH_SESSION_CONFIG_URI="$PROJECT_ROOT/ros2_node_impl_ws/zenoh_config/DEFAULT_RMW_ZENOH_SESSION_CONFIG.json5"',
+                'fi',
+                "",
+                "# Source ROS 2 environment",
+                "set +u",
+                ". /opt/ros/jazzy/setup.bash",
+                f'. "${{ROS2_NODE_IMPL_WS:-$PROJECT_ROOT/ros2_node_impl_ws}}/install/setup.bash"',
+                "set -u",
+                "",
+                f'ros2 launch "{launch_file}" eval_time:="$EVAL_TIME" log_dir:="$LOG_DIR"',
             ]
         )
 

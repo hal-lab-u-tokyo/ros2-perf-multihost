@@ -9,7 +9,7 @@ Usage:
     python3 start_exec_scripts.py simple --exec-policy docker --trial-idx 1 --ws-dir performance_ws --hosts-list host1,host2,host3
     short: python3 start_exec_scripts.py simple -p docker -i 1 -w performance_ws -l host1,host2,host3
 
-    # Native mode with non-default RMW (sends /start requests)
+    # Native mode with non-default RMW (sends /start_native requests)
     python3 start_exec_scripts.py simple --rmw zenoh --exec-policy native --trial-idx 1 --ws-dir performance_ws --hosts-list host1,host2,host3
     short: python3 start_exec_scripts.py simple -m zenoh -p native -i 1 -w performance_ws -l host1,host2,host3
 """
@@ -96,7 +96,7 @@ Examples:
         "--exec-policy",
         choices=["docker", "native"],
         default="docker",
-        help="Execution mode. docker sends /start_docker, native sends /start (default: docker)",
+        help="Execution mode. docker sends /start_docker, native sends /start_native (default: docker)",
     )
     parser.add_argument("-i", "--trial-idx", type=int, default=1,
                         help="Trial index")
@@ -148,7 +148,7 @@ Examples:
         timeout = (5, 300)  # (connect, read) in seconds
         print(f"Using Docker mode: {endpoint} endpoint with timeout {timeout}")
     else:
-        endpoint = "/start"
+        endpoint = "/start_native"
         timeout = 100  # seconds
         print(
             f"Using native mode: {endpoint} endpoint with timeout {timeout}s")

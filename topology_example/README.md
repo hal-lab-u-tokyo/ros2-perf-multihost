@@ -25,7 +25,7 @@ JSON files in this directory are converted into execution scripts by the followi
 
 | Key | Required | Type | Description |
 |---|---|---|---|
-| host_name | Required | string | Host name used as the base name of generated files. |
+| host_name | Required | string | Hostname of each Host machine. Must match the DNS name (or `/etc/hosts` entry) used to reach that machine. Used as the base name of all generated files (`<host_name>.launch.py`, `<host_name>_exec_docker.sh`, `<host_name>_exec_native.sh`, `<host_name>_compose.yaml`). |
 | nodes | Required | array | Array of node definitions. |
 
 ### Node Entry

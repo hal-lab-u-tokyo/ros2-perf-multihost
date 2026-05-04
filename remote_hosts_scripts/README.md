@@ -18,6 +18,14 @@ For overall usage, see the [Usage in Details](../README.md#usage-in-details) sec
 
 ### Start the server
 
+Recommended (from the Manager, starts all Hosts):
+
+```bash
+./manager_scripts/manage_rest_servers.sh start <topology>
+```
+
+Manual (needed on each Host):
+
 ```bash
 # on the Manager
 ssh ubuntu@hostX
@@ -31,8 +39,8 @@ python3 remote_hosts_scripts/rest_server.py
 | Method | Path | Description |
 |---|---|---|
 | `POST` | `/prepare_run` | Synchronizes the clock (if needed) and creates the run timestamp directory |
-| `POST` | `/start` | Runs the host-specific ROS 2 launch file (native execution mode) |
-| `POST` | `/start_docker` | Runs the host-specific `exec.sh` script (Docker execution mode) |
+| `POST` | `/start_docker` | Runs the host-specific `<host_name>_exec_docker.sh` script (Docker execution mode) |
+| `POST` | `/start_native` | Runs the host-specific `<host_name>_exec_native.sh` script (native execution mode) |
 
 All endpoints accept a JSON body. Common request fields:
 
@@ -41,7 +49,7 @@ All endpoints accept a JSON body. Common request fields:
 | `topology` | string | Topology directory name under `ws_dir` (required) |
 | `rmw` | string | RMW implementation: `fastdds`, `cyclonedds`, or `zenoh` (required) |
 | `ws_dir` | string | Workspace directory (default: `performance_ws`) |
-| `trial_idx` | integer | Trial index, used by `/start` and `/start_docker` (default: `1`) |
+| `trial_idx` | integer | Trial index, used by `/start_native` and `/start_docker` (default: `1`) |
 | `eval_time` | integer | Override evaluation duration in seconds (optional) |
 
 ### Clock synchronization (chrony)
@@ -91,7 +99,7 @@ python3 remote_hosts_scripts/start_exec_scripts.py <topology> \
 |---|---|---|---|
 | `topology` | — | Topology directory name under `ws-dir` (required) | — |
 | `--rmw` | `-m` | RMW implementation | `fastdds` |
-| `--exec-policy` | `-p` | Execution mode: `docker` sends `/start_docker`, `native` sends `/start` | `docker` |
+| `--exec-policy` | `-p` | Execution mode: `docker` sends `/start_docker`, `native` sends `/start_native` | `docker` |
 | `--trial-idx` | `-i` | Trial index | `1` |
 | `--ws-dir` | `-w` | Workspace directory | `performance_ws` |
 | `--prepare-run` | — | Send `/prepare_run` instead of a start request | — |
