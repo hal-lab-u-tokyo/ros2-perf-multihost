@@ -44,8 +44,25 @@ def _resolve_zenoh_router_target(target, hosts):
     )
 
 
+def _hostname_to_ip(hostname):
+    """Resolve a hostname to an IPv4 address.
+
+    Docker containers do not inherit the host's /etc/hosts even with
+    network_mode: host, so ZENOH_CONFIG_OVERRIDE must use a routable IP
+    address rather than a hostname that may only appear in /etc/hosts.
+    Falls back to the original value if resolution fails.
+    """
+    if _looks_like_ipv4(hostname):
+        return hostname
+    try:
+        return socket.gethostbyname(hostname)
+    except socket.gaierror:
+        return hostname
+
+
 def _build_zenoh_config_override(connect_host):
-    return f'mode="client";connect/endpoints=["tcp/{connect_host}:7447"]'
+    ip = _hostname_to_ip(connect_host)
+    return f'mode="client";connect/endpoints=["tcp/{ip}:7447"]'
 
 
 _ROUTER_PORT = 7447

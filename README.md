@@ -449,7 +449,7 @@ Arguments:
 - `--zenoh-router`: Router target used only when `--rmw zenoh`.
   - (default): first host listed in the JSON topology file (e.g., `host1`)
   - `<host-name>` / `<ipv4>`: explicit host name or IPv4 address (e.g., `host2` / `192.168.1.10`)
-  - `Manager`: the manager machine running `performance_test.py` (IP address auto-detected)
+  - `Manager`: the manager machine running `performance_test.py`
 
 Example:
 
@@ -486,6 +486,8 @@ For `docker` and `native` modes, `--zenoh-router` selects the target:
 - (default): first host in the JSON topology (e.g., `host1`)
 - `<host-name>` / `<ipv4>`: explicit hostname or IPv4 address
 - `Manager`: the machine running `performance_test.py`
+
+The specified target (hostname or `Manager`) is automatically resolved to an IP address, which is then used as the `connect/endpoints` value in `ZENOH_CONFIG_OVERRIDE`.
 
 `performance_test.py` also sets `ZENOH_CONFIG_OVERRIDE` so that every bench node connects to the router as a client:
 
