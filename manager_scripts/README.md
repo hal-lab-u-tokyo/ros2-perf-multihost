@@ -137,7 +137,7 @@ Commands:
 
 | Argument | Short | Description | Default |
 |---|---|---|---|
-| `<command>` | — | One of `start`, `stop`, `status`, `wait` | required |
+| `<command>` | — | One of `start`, `stop`, `restart`, `status`, `wait`, `monitor`, `logs` | required |
 | `<topology>` | — | Topology directory under `ws-dir` | required |
 | `--ws-dir` | `-w` | Workspace directory that contains generated topologies | `performance_ws` |
 | `--remote-repo-base` | `-b` | Remote repository base directory on each Host | `/home/ubuntu/ros2-perf-multihost` |

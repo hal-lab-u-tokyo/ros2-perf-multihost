@@ -57,13 +57,13 @@ Options:
                               (default: ${DEFAULT_WAIT_RETRIES})
       --wait-interval SEC     Interval in seconds between readiness checks
                               (default: ${DEFAULT_WAIT_INTERVAL_SEC})
-    --monitor-interval SEC  Interval in seconds for monitor command
-                    (default: ${DEFAULT_MONITOR_INTERVAL_SEC})
-    --monitor-count N       Number of monitor samples; 0 means infinite
-                    (default: 0)
-    --log-lines N           Number of lines to show for logs command
-                    (default: ${DEFAULT_LOG_LINES})
-    --follow                Follow logs continuously (logs command only)
+      --monitor-interval SEC  Interval in seconds for monitor command
+                              (default: ${DEFAULT_MONITOR_INTERVAL_SEC})
+      --monitor-count N       Number of monitor samples; 0 means infinite
+                              (default: 0)
+      --log-lines N           Number of lines to show for logs command
+                              (default: ${DEFAULT_LOG_LINES})
+      --follow                Follow logs continuously (logs command only)
   -h, --help                  Show this help message and exit
 
 Examples:
@@ -218,6 +218,8 @@ if [[ -z "${HOSTS_LINE}" ]]; then
     exit 1
 fi
 
+REMOTE_RUNTIME_DIR="${REMOTE_REPO_BASE}/${WS_DIR}/${TOPOLOGY_DIR}/results/runtime"
+
 IFS=',' read -r -a HOSTS_RAW <<< "${HOSTS_LINE}"
 HOSTS=()
 for h in "${HOSTS_RAW[@]}"; do
@@ -238,8 +240,10 @@ else
     NC_TIMEOUT_OPT=(-w 1)
 fi
 
-REMOTE_LOG_PATH="${REMOTE_REPO_BASE}/remote_hosts_scripts/rest_server.log"
-REMOTE_PID_PATH="${REMOTE_REPO_BASE}/remote_hosts_scripts/rest_server.pid"
+REMOTE_LOG_PATH="${REMOTE_RUNTIME_DIR}/rest_server.log"
+REMOTE_PID_PATH="${REMOTE_RUNTIME_DIR}/rest_server.pid"
+LEGACY_REMOTE_LOG_PATH="${REMOTE_REPO_BASE}/remote_hosts_scripts/rest_server.log"
+LEGACY_REMOTE_PID_PATH="${REMOTE_REPO_BASE}/remote_hosts_scripts/rest_server.pid"
 
 echo "=== REST server command: ${SUBCOMMAND} ==="
 echo "metadata_path : ${METADATA_PATH}"
@@ -249,6 +253,9 @@ echo "topology_dir  : ${TOPOLOGY_DIR}"
 echo "hosts         : ${HOSTS[*]}"
 echo "ssh_user      : ${SSH_USER}"
 echo "remote_repo   : ${REMOTE_REPO_BASE}"
+echo "runtime_dir   : ${REMOTE_RUNTIME_DIR}"
+echo "pid_file      : ${REMOTE_PID_PATH}"
+echo "log_file      : ${REMOTE_LOG_PATH}"
 echo "port          : ${PORT}"
 echo "wait_retries  : ${WAIT_RETRIES}"
 echo "wait_interval : ${WAIT_INTERVAL_SEC}s"
@@ -292,12 +299,21 @@ start_host() {
     echo "[${host}] Starting REST server..."
     if ! ssh "${SSH_OPTS[@]}" "${SSH_USER}@${host}" \
         "bash -lc 'cd \"${REMOTE_REPO_BASE}\" || exit 1; \
+        mkdir -p \"${REMOTE_RUNTIME_DIR}\"; \
         if [[ -f \"${REMOTE_PID_PATH}\" ]]; then \
             old_pid=\$(cat \"${REMOTE_PID_PATH}\" 2>/dev/null || true); \
             if [[ -n \"\$old_pid\" ]] && kill -0 \"\$old_pid\" 2>/dev/null; then \
                 kill \"\$old_pid\" 2>/dev/null || true; \
                 sleep 1; \
             fi; \
+        fi; \
+        if [[ -f \"${LEGACY_REMOTE_PID_PATH}\" ]]; then \
+            legacy_pid=\$(cat \"${LEGACY_REMOTE_PID_PATH}\" 2>/dev/null || true); \
+            if [[ -n \"\$legacy_pid\" ]] && kill -0 \"\$legacy_pid\" 2>/dev/null; then \
+                kill \"\$legacy_pid\" 2>/dev/null || true; \
+                sleep 1; \
+            fi; \
+            rm -f \"${LEGACY_REMOTE_PID_PATH}\"; \
         fi; \
         : > \"${REMOTE_LOG_PATH}\"; \
         nohup python3 remote_hosts_scripts/rest_server.py >>\"${REMOTE_LOG_PATH}\" 2>&1 < /dev/null & \
@@ -313,10 +329,14 @@ stop_host() {
     local host="$1"
     echo "[${host}] Stopping REST server..."
     if ! ssh "${SSH_OPTS[@]}" "${SSH_USER}@${host}" \
-        "bash -lc 'pid_file=\"${REMOTE_PID_PATH}\"; \
+        "bash -lc 'pid_file=\"${REMOTE_PID_PATH}\"; legacy_pid_file=\"${LEGACY_REMOTE_PID_PATH}\"; \
         if [[ ! -f \"\$pid_file\" ]]; then \
-            echo STOPPED_NO_PID; \
-            exit 0; \
+            if [[ -f \"\$legacy_pid_file\" ]]; then \
+                pid_file=\"\$legacy_pid_file\"; \
+            else \
+                echo STOPPED_NO_PID; \
+                exit 0; \
+            fi; \
         fi; \
         pid=\$(cat \"\$pid_file\" 2>/dev/null || true); \
         if [[ -n \"\$pid\" ]] && kill -0 \"\$pid\" 2>/dev/null; then \
@@ -329,7 +349,7 @@ stop_host() {
         else \
             echo STOPPED_STALE_PID; \
         fi; \
-        rm -f \"\$pid_file\"'"; then
+        rm -f \"\$pid_file\" \"\$legacy_pid_file\"'"; then
         echo "[${host}] ERROR: failed to stop remote server." >&2
         return 1
     fi
@@ -347,7 +367,7 @@ status_host() {
     local host="$1"
     local remote_state=""
     if ! remote_state="$(ssh "${SSH_OPTS[@]}" "${SSH_USER}@${host}" \
-        "bash -lc 'pid_file=\"${REMOTE_PID_PATH}\"; \
+        "bash -lc 'pid_file=\"${REMOTE_PID_PATH}\"; legacy_pid_file=\"${LEGACY_REMOTE_PID_PATH}\"; \
         if [[ -f \"\$pid_file\" ]]; then \
             pid=\$(cat \"\$pid_file\" 2>/dev/null || true); \
             if [[ -n \"\$pid\" ]] && kill -0 \"\$pid\" 2>/dev/null; then \
@@ -355,6 +375,15 @@ status_host() {
                 exit 0; \
             fi; \
             echo PID_STALE; \
+            exit 1; \
+        fi; \
+        if [[ -f \"\$legacy_pid_file\" ]]; then \
+            pid=\$(cat \"\$legacy_pid_file\" 2>/dev/null || true); \
+            if [[ -n \"\$pid\" ]] && kill -0 \"\$pid\" 2>/dev/null; then \
+                echo PID_RUNNING_LEGACY:\$pid; \
+                exit 0; \
+            fi; \
+            echo PID_STALE_LEGACY; \
             exit 1; \
         fi; \
         echo PID_MISSING; \
