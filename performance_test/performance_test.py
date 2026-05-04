@@ -33,14 +33,14 @@ def _resolve_zenoh_router_target(target, hosts):
     if not target:
         return "host", hosts[0], hosts[0]
     normalized = target.strip()
-    if normalized == "manager":
+    if normalized == "Manager":
         return "manager", None, _detect_manager_ip(hosts[0])
 
     if normalized in hosts or _looks_like_ipv4(normalized):
         return "host", normalized, normalized
 
     raise ValueError(
-        "--zenoh-router must be one of: manager, <host-name>, <ipv4>"
+        "--zenoh-router must be one of: Manager, <host-name>, <ipv4>"
     )
 
 
@@ -71,6 +71,9 @@ def _start_zenoh_router(
         log_file = os.path.join(runtime_dir, "zenoh_router.out")
         pid_file = os.path.join(runtime_dir, "zenoh_router.pid")
         env = os.environ.copy()
+        # Bench clients use ZENOH_CONFIG_OVERRIDE, but the router itself must
+        # run with default router/server behavior to open port 7447.
+        env.pop("ZENOH_CONFIG_OVERRIDE", None)
         env.setdefault("RMW_IMPLEMENTATION", "rmw_zenoh_cpp")
         env.setdefault("RUST_LOG", "zenoh=warn,zenoh_transport=warn")
         subprocess.run(["pkill", "-x", "rmw_zenohd"], capture_output=True)
@@ -248,9 +251,9 @@ Examples:
         type=str,
         default=None,
         help=(
-            "Router target for --rmw zenoh: manager | <host-name> | <ipv4> "
+            "Router target for --rmw zenoh: Manager | <host-name> | <ipv4> "
             "(default: first host in topology). "
-            "Examples: --zenoh-router manager | --zenoh-router host2 | --zenoh-router 192.168.1.10"
+            "Examples: --zenoh-router Manager | --zenoh-router host2 | --zenoh-router 192.168.1.10"
         ),
     )
     args = parser.parse_args()
@@ -311,6 +314,22 @@ Examples:
     zenoh_router_started = False
     zenoh_router_kind = None
     zenoh_router_target_host = None
+    connect_host = None
+
+    if args.rmw == "zenoh":
+        try:
+            zenoh_router_kind, zenoh_router_target_host, connect_host = _resolve_zenoh_router_target(
+                args.zenoh_router,
+                hosts,
+            )
+        except (ValueError, RuntimeError) as exc:
+            print(f"ERROR: {exc}", file=sys.stderr)
+            sys.exit(1)
+
+        zenoh_config_override = _build_zenoh_config_override(connect_host)
+        os.environ["ZENOH_CONFIG_OVERRIDE"] = zenoh_config_override
+    else:
+        os.environ.pop("ZENOH_CONFIG_OVERRIDE", None)
 
     if args.exec_policy in ("docker", "native"):
         distribute_cmd = [
@@ -350,18 +369,6 @@ Examples:
         os.environ["ROS2_PERF_REPO_ROOT"] = args.remote_repo_base
 
     if args.rmw == "zenoh":
-        try:
-            zenoh_router_kind, zenoh_router_target_host, connect_host = _resolve_zenoh_router_target(
-                args.zenoh_router,
-                hosts,
-            )
-        except (ValueError, RuntimeError) as exc:
-            print(f"ERROR: {exc}", file=sys.stderr)
-            sys.exit(1)
-
-        zenoh_config_override = _build_zenoh_config_override(connect_host)
-        os.environ["ZENOH_CONFIG_OVERRIDE"] = zenoh_config_override
-
         target_label = "manager" if zenoh_router_kind == "manager" else zenoh_router_target_host
         print(f"Zenoh router target: {target_label}")
         print(f"ZENOH_CONFIG_OVERRIDE={zenoh_config_override}")
@@ -380,9 +387,6 @@ Examples:
         except RuntimeError as exc:
             print(f"ERROR: {exc}", file=sys.stderr)
             sys.exit(1)
-    else:
-        os.environ.pop("ZENOH_CONFIG_OVERRIDE", None)
-
     try:
         prepare_run(
             start_exec_scripts_py,

@@ -449,7 +449,7 @@ Arguments:
 - `--zenoh-router`: Router target used only when `--rmw zenoh`.
   - (default): first host listed in the JSON topology file (e.g., `host1`)
   - `<host-name>` / `<ipv4>`: explicit host name or IPv4 address (e.g., `host2` / `192.168.1.10`)
-  - `manager`: the manager machine running `performance_test.py` (IP address auto-detected)
+  - `Manager`: the manager machine running `performance_test.py` (IP address auto-detected)
 
 Example:
 
@@ -471,7 +471,7 @@ python3 performance_test/performance_test.py \
 python3 performance_test/performance_test.py \
   simple \
   --rmw zenoh \
-  --zenoh-router manager \
+  --zenoh-router Manager \
   --exec-policy native \
   --eval-time 10 --trials 3
 ```
