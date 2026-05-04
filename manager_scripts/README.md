@@ -9,7 +9,6 @@ This directory contains scripts for generating and distributing topology-specifi
 | `generate_exec_scripts.py` | Generates execution scripts and Compose files from a topology JSON file |
 | `distribute_exec_scripts.sh` | Distributes generated scripts to each host via SCP |
 | `manage_rest_servers.sh` | Manages `remote_hosts_scripts/rest_server.py` on all Hosts via SSH from the manager |
-| `operate_zenoh_router.sh` | Starts or stops the Zenoh router on the manager machine |
 
 For usage of each script, see the [Usage in Details](../README.md#usage-in-details) section in the top-level README.
 

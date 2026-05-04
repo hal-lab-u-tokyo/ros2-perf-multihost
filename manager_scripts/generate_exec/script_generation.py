@@ -403,7 +403,7 @@ def append_zenohd_service(lines, project_root, output_dir, settings):
     lines.append("      timeout: 1s")
     lines.append("      retries: 30")
     lines.append(
-        f"    command: [ \"/bin/bash\", \"{settings.project_root_in_container}/manager_scripts/operate_zenoh_router.sh\", \"foreground\" ]"
+        '    command: [ "/bin/bash", "-lc", "ros2 run rmw_zenoh_cpp rmw_zenohd" ]'
     )
 
 

@@ -487,16 +487,6 @@ It also sets `ZENOH_CONFIG_OVERRIDE` for each node run. By default this includes
 - `mode="client"`
 - `connect/endpoints=["tcp/<router-target>:7447"]`
 
-You can still operate the router manually when needed:
-
-Available subcommands:
-
-- `start`: start the router in the background with nohup, PID, and log management
-- `foreground`: start in the foreground (blocks the terminal; stop with `Ctrl-C`)
-- `stop`: stop the running router using the saved PID
-- `status`: show process and listening port status
-- `wait`: wait until the router port starts listening
-
 ### Step4: Results and Analysis
 
 `performance_test.py` launches node groups via REST for each trial, then collects logs from each Host with `scp`.

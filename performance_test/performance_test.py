@@ -47,61 +47,108 @@ def _build_zenoh_config_override(connect_host):
     return f'mode="client";connect/endpoints=["tcp/{connect_host}:7447"]'
 
 
-def _run_router_control(action, target_kind, target_host, repo_root, remote_repo_base, ssh_user):
-    if target_kind == "manager":
-        cmd = [
-            os.path.join(repo_root, "manager_scripts",
-                         "operate_zenoh_router.sh"),
-            action,
-        ]
-    else:
-        remote_script = f"{remote_repo_base}/manager_scripts/operate_zenoh_router.sh"
-        cmd = ["ssh", f"{ssh_user}@{target_host}",
-               "bash", remote_script, action]
-
-    try:
-        result = subprocess.run(
-            cmd, text=True, capture_output=True, check=True)
-        if result.stdout:
-            print(result.stdout.strip())
-    except subprocess.CalledProcessError as exc:
-        stderr = (exc.stderr or "").strip()
-        stdout = (exc.stdout or "").strip()
-        detail = stderr or stdout or f"return code {exc.returncode}"
-        raise RuntimeError(
-            f"Zenoh router action '{action}' failed on "
-            f"{'manager' if target_kind == 'manager' else target_host}: {detail}"
-        ) from exc
+_ROUTER_PORT = 7447
 
 
 def _start_zenoh_router(target_kind, target_host, repo_root, remote_repo_base, ssh_user):
-    _run_router_control(
-        "start",
-        target_kind,
-        target_host,
-        repo_root,
-        remote_repo_base,
-        ssh_user,
-    )
-    _run_router_control(
-        "wait",
-        target_kind,
-        target_host,
-        repo_root,
-        remote_repo_base,
-        ssh_user,
-    )
+    if target_kind == "manager":
+        log_dir = os.path.join(repo_root, "logs")
+        os.makedirs(log_dir, exist_ok=True)
+        log_file = os.path.join(log_dir, "zenoh_router.out")
+        pid_file = os.path.join(log_dir, "zenoh_router.pid")
+        env = os.environ.copy()
+        env.setdefault("RMW_IMPLEMENTATION", "rmw_zenoh_cpp")
+        env.setdefault("RUST_LOG", "zenoh=warn,zenoh_transport=warn")
+        subprocess.run(["pkill", "-x", "rmw_zenohd"], capture_output=True)
+        time.sleep(0.5)
+        with open(log_file, "w") as lf:
+            proc = subprocess.Popen(
+                ["bash", "-c",
+                 "source /opt/ros/jazzy/setup.bash && exec ros2 run rmw_zenoh_cpp rmw_zenohd"],
+                env=env, stdout=lf, stderr=lf, start_new_session=True,
+            )
+        with open(pid_file, "w") as pf:
+            pf.write(str(proc.pid))
+        print(f"rmw_zenohd started (PID {proc.pid}), log: {log_file}")
+        print(f"Waiting for Zenoh router on port {_ROUTER_PORT}...")
+        for _ in range(30):
+            try:
+                with socket.create_connection(("localhost", _ROUTER_PORT), timeout=1):
+                    print(f"Zenoh router is up on port {_ROUTER_PORT}.")
+                    return
+            except OSError:
+                time.sleep(1)
+        raise RuntimeError(
+            f"Timeout waiting for Zenoh router on port {_ROUTER_PORT}")
+    else:
+        log_dir = f"{remote_repo_base}/logs"
+        start_cmd = (
+            f"mkdir -p {log_dir}; "
+            "source /opt/ros/jazzy/setup.bash 2>/dev/null || true; "
+            "pkill -x rmw_zenohd 2>/dev/null || true; sleep 0.5; "
+            f"RMW_IMPLEMENTATION=rmw_zenoh_cpp "
+            f"RUST_LOG=${{RUST_LOG:-zenoh=warn,zenoh_transport=warn}} "
+            f"nohup ros2 run rmw_zenoh_cpp rmw_zenohd >{log_dir}/zenoh_router.out 2>&1 & "
+            f"echo $! >{log_dir}/zenoh_router.pid && echo 'rmw_zenohd started'"
+        )
+        try:
+            result = subprocess.run(
+                ["ssh", f"{ssh_user}@{target_host}", "bash", "-c", start_cmd],
+                text=True, capture_output=True, check=True,
+            )
+        except subprocess.CalledProcessError as exc:
+            detail = ((exc.stderr or exc.stdout)
+                      or f"return code {exc.returncode}").strip()
+            raise RuntimeError(
+                f"Zenoh router start failed on {target_host}: {detail}") from exc
+        if result.stdout:
+            print(result.stdout.strip())
+        wait_cmd = (
+            f"for i in $(seq 1 30); do "
+            f"nc -z localhost {_ROUTER_PORT} 2>/dev/null && echo 'Zenoh router is up.' && exit 0; "
+            f"sleep 1; done; exit 1"
+        )
+        try:
+            result = subprocess.run(
+                ["ssh", f"{ssh_user}@{target_host}", "bash", "-c", wait_cmd],
+                text=True, capture_output=True, check=True,
+            )
+        except subprocess.CalledProcessError:
+            raise RuntimeError(
+                f"Timeout waiting for Zenoh router on {target_host}:{_ROUTER_PORT}"
+            )
+        if result.stdout:
+            print(result.stdout.strip())
 
 
 def _stop_zenoh_router(target_kind, target_host, repo_root, remote_repo_base, ssh_user):
-    _run_router_control(
-        "stop",
-        target_kind,
-        target_host,
-        repo_root,
-        remote_repo_base,
-        ssh_user,
-    )
+    if target_kind == "manager":
+        pid_file = os.path.join(repo_root, "logs", "zenoh_router.pid")
+        if os.path.exists(pid_file):
+            with open(pid_file) as pf:
+                pid = pf.read().strip()
+            subprocess.run(["kill", pid], capture_output=True)
+            os.remove(pid_file)
+            print(f"Stopped rmw_zenohd (PID {pid})")
+        else:
+            subprocess.run(["pkill", "-x", "rmw_zenohd"], capture_output=True)
+            print("Stopped rmw_zenohd (no PID file)")
+    else:
+        log_dir = f"{remote_repo_base}/logs"
+        pid_file = f"{log_dir}/zenoh_router.pid"
+        stop_cmd = (
+            f"if [ -f {pid_file} ]; then "
+            f"kill $(cat {pid_file}) 2>/dev/null || true; rm -f {pid_file}; "
+            f"echo 'Stopped rmw_zenohd'; "
+            f"else pkill -x rmw_zenohd 2>/dev/null || true; "
+            f"echo 'Stopped rmw_zenohd (no PID file)'; fi"
+        )
+        result = subprocess.run(
+            ["ssh", f"{ssh_user}@{target_host}", "bash", "-c", stop_cmd],
+            text=True, capture_output=True,
+        )
+        if result.stdout:
+            print(result.stdout.strip())
 
 
 if __name__ == "__main__":
