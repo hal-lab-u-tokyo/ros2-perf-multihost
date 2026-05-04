@@ -28,6 +28,9 @@ CHRONY_SYNC_ON_STARTUP = os.environ.get(
 CHRONY_CHECK_ON_PREPARE = os.environ.get(
     "ROS2_PERF_CHRONY_CHECK_ON_PREPARE", "1"
 ).strip().lower() in ("1", "true", "yes", "on")
+CHRONY_FAIL_FAST_ON_STARTUP = os.environ.get(
+    "ROS2_PERF_CHRONY_FAIL_FAST_ON_STARTUP", "0"
+).strip().lower() in ("1", "true", "yes", "on")
 CHRONYC_CMD_PREFIX = os.environ.get(
     "ROS2_PERF_CHRONYC_CMD_PREFIX", "sudo -n chronyc"
 ).strip()
@@ -509,7 +512,17 @@ if __name__ == "__main__":
             startup_sync.get("corrected", False),
             startup_sync.get("offset_seconds", "N/A"),
         )
-    except Exception:
+    except Exception as exc:
         app.logger.exception("[startup] chrony sync failed")
-        raise
+        if CHRONY_FAIL_FAST_ON_STARTUP:
+            raise
+        if isinstance(exc, RuntimeError) and "a password is required" in str(exc):
+            app.logger.warning(
+                "[startup] continuing without startup sync because sudo for chronyc requires a password; "
+                "configure passwordless sudo for /usr/bin/chronyc or set ROS2_PERF_CHRONY_SYNC_ON_STARTUP=0"
+            )
+        else:
+            app.logger.warning(
+                "[startup] continuing without startup sync; /prepare_run may fail until chrony is reachable and chronyc permissions are configured"
+            )
     app.run(host="0.0.0.0", port=5000)

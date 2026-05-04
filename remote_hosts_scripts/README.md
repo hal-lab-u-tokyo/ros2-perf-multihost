@@ -53,6 +53,7 @@ All endpoints accept a JSON body. Common request fields:
 
 Because these operations use `sudo -n chronyc` internally, the Host user must be able to run `chronyc` via `sudo` without a password.
 See [Clock synchronization for REST benchmark (chrony)](../README.md#clock-synchronization-for-rest-benchmark-chrony) in the top-level README for setup steps.
+By default, if startup sync fails, the server keeps running and reports the issue; set `ROS2_PERF_CHRONY_FAIL_FAST_ON_STARTUP=1` to exit immediately on startup sync failure.
 
 ### Environment variables
 
@@ -63,6 +64,7 @@ See [Clock synchronization for REST benchmark (chrony)](../README.md#clock-synch
 | `RUN_SCRIPT_TIMEOUT_SEC` | `900` | Timeout in seconds for script execution |
 | `ROS2_PERF_CHRONY_SYNC_ON_STARTUP` | `1` | Set `0` to disable the startup clock sync |
 | `ROS2_PERF_CHRONY_CHECK_ON_PREPARE` | `1` | Set `0` to disable the prepare-time offset guard |
+| `ROS2_PERF_CHRONY_FAIL_FAST_ON_STARTUP` | `0` | Set `1` to exit the server if startup chrony sync fails |
 | `ROS2_PERF_CHRONYC_CMD_PREFIX` | `sudo -n chronyc` | Command prefix used to invoke `chronyc` |
 | `ROS2_PERF_CHRONY_WAITSYNC_TRIES` | `20` | Maximum number of `waitsync` polling attempts |
 | `ROS2_PERF_CHRONY_WAITSYNC_MAX_CORRECTION_SEC` | `0.001` | Residual correction threshold passed to `chronyc waitsync` |
