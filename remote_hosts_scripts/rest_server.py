@@ -3,6 +3,7 @@ from datetime import datetime
 import logging
 import os
 import re
+import shlex
 import shutil
 import socket
 import subprocess
@@ -28,7 +29,7 @@ CHRONY_CHECK_ON_PREPARE = os.environ.get(
     "ROS2_PERF_CHRONY_CHECK_ON_PREPARE", "1"
 ).strip().lower() in ("1", "true", "yes", "on")
 CHRONYC_CMD_PREFIX = os.environ.get(
-    "ROS2_PERF_CHRONYC_CMD_PREFIX", "sudo chronyc"
+    "ROS2_PERF_CHRONYC_CMD_PREFIX", "sudo -n chronyc"
 ).strip()
 CHRONY_WAITSYNC_TRIES = int(os.environ.get(
     "ROS2_PERF_CHRONY_WAITSYNC_TRIES", "20"))
@@ -49,9 +50,13 @@ def _to_int(value, name):
         raise ValueError(f"{name} must be an integer") from exc
 
 
-def _run_shell_command(command, timeout_sec):
+def _format_command(argv):
+    return " ".join(shlex.quote(part) for part in argv)
+
+
+def _run_command(argv, timeout_sec):
     result = subprocess.run(
-        ["bash", "-lc", command],
+        argv,
         text=True,
         capture_output=True,
         timeout=timeout_sec,
@@ -61,22 +66,28 @@ def _run_shell_command(command, timeout_sec):
         stdout = (result.stdout or "").strip()
         detail = stderr if stderr else stdout
         raise RuntimeError(
-            f"command failed (rc={result.returncode}): {command}; detail={detail}"
+            f"command failed (rc={result.returncode}): {_format_command(argv)}; detail={detail}"
         )
     return (result.stdout or "").strip()
 
 
-def _chrony_makestep_and_waitsync():
-    makestep_cmd = f"{CHRONYC_CMD_PREFIX} -a makestep"
-    waitsync_cmd = (
-        f"{CHRONYC_CMD_PREFIX} waitsync {CHRONY_WAITSYNC_TRIES} "
-        f"{CHRONY_WAITSYNC_MAX_CORRECTION_SEC}"
-    )
-    tracking_cmd = f"{CHRONYC_CMD_PREFIX} tracking"
+def _chronyc_command(*args):
+    prefix_parts = shlex.split(CHRONYC_CMD_PREFIX)
+    if not prefix_parts:
+        raise RuntimeError("ROS2_PERF_CHRONYC_CMD_PREFIX must not be empty")
+    return prefix_parts + [str(arg) for arg in args]
 
-    makestep_stdout = _run_shell_command(makestep_cmd, CHRONY_CMD_TIMEOUT_SEC)
-    waitsync_stdout = _run_shell_command(waitsync_cmd, CHRONY_CMD_TIMEOUT_SEC)
-    tracking_stdout = _run_shell_command(tracking_cmd, CHRONY_CMD_TIMEOUT_SEC)
+
+def _chrony_makestep_and_waitsync():
+    makestep_cmd = _chronyc_command("-a", "makestep")
+    waitsync_cmd = _chronyc_command(
+        "waitsync", CHRONY_WAITSYNC_TRIES, CHRONY_WAITSYNC_MAX_CORRECTION_SEC
+    )
+    tracking_cmd = _chronyc_command("tracking")
+
+    makestep_stdout = _run_command(makestep_cmd, CHRONY_CMD_TIMEOUT_SEC)
+    waitsync_stdout = _run_command(waitsync_cmd, CHRONY_CMD_TIMEOUT_SEC)
+    tracking_stdout = _run_command(tracking_cmd, CHRONY_CMD_TIMEOUT_SEC)
 
     return {
         "makestep": makestep_stdout,
@@ -101,8 +112,8 @@ def _parse_tracking_offset_seconds(tracking_output):
 
 
 def _collect_chrony_tracking():
-    tracking_cmd = f"{CHRONYC_CMD_PREFIX} tracking"
-    tracking_stdout = _run_shell_command(tracking_cmd, CHRONY_CMD_TIMEOUT_SEC)
+    tracking_cmd = _chronyc_command("tracking")
+    tracking_stdout = _run_command(tracking_cmd, CHRONY_CMD_TIMEOUT_SEC)
     offset_sec = _parse_tracking_offset_seconds(tracking_stdout)
     return {
         "tracking": tracking_stdout,
@@ -324,8 +335,8 @@ def prepare_run():
         rmw = body.get("rmw")
         if rmw not in ("fastdds", "cyclonedds", "zenoh"):
             raise ValueError("rmw must be one of: fastdds, cyclonedds, zenoh")
-        chrony_sync = _guard_clock_on_prepare()
         ctx = _resolve_exec_context(body)
+        chrony_sync = _guard_clock_on_prepare()
         run_timestamp = _prepare_results_timestamp(ctx, rmw)
         app.logger.info(
             "[prepare_run] topology=%s rmw=%s timestamp=%s chrony_enabled=%s chrony_corrected=%s",

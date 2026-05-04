@@ -193,11 +193,11 @@ Therefore, configure the following settings on the Manager machine to meet this 
 - Recommended Manager-side configuration examples:
   - `/etc/hosts`:
     ```text
-    <sniped.>
+    <snipped.>
     192.168.10.11 host1
     192.168.10.12 host2
     192.168.10.13 host3
-    <sniped.>
+    <snipped.>
     ```
   - `~/.ssh/config`:
     ```text
@@ -299,7 +299,7 @@ sudo apt install -y chrony
 sudo systemctl enable --now chrony
 ```
 
-Because the REST server invokes `sudo chronyc`, the `ubuntu` user must be allowed to run `chronyc` via `sudo` without a password.
+Because the REST server invokes `sudo -n chronyc` (non-interactive), the `ubuntu` user must be allowed to run `chronyc` via `sudo` without a password.
 The sudoers entry below grants passwordless `sudo` only for `/usr/bin/chronyc`, so no other commands are affected.
 
 Check the permission, and if needed, configure the sudoers entry on each Host as follows:
@@ -491,7 +491,7 @@ Common issues and fixes:
 - Expected CSV outputs are missing: check `<ws-dir>/<topology>/results/latest-<rmw>/logs/trial<N>/` for trial logs and inspect script stderr for analyzer failures.
 - REST server fails to start with a chrony error: confirm `chronyd` is running (`systemctl status chrony`) and that the sudoers entry for `chronyc` is in place (see [Clock synchronization for REST benchmark (chrony)](#clock-synchronization-for-rest-benchmark-chrony)).
 - `python3 remote_hosts_scripts/rest_server.py` asks for a sudo password: clear cached credentials with `sudo -k` and verify with `sudo -n chronyc -a makestep`; if it fails, configure the `chronyc` sudoers entry as described in [Clock synchronization for REST benchmark (chrony)](#clock-synchronization-for-rest-benchmark-chrony).
-- `prepare_run` returns `chrony check/sync failed` or `timed out`: check that `sudo chronyc tracking` runs without a password as the REST server user; if the NTP source is unreachable, verify network connectivity or adjust `ROS2_PERF_CHRONY_WAITSYNC_TRIES` and `ROS2_PERF_CHRONY_CMD_TIMEOUT_SEC`.
+- `prepare_run` returns `chrony check/sync failed` or `timed out`: check that `sudo -n chronyc -a makestep` runs without a password as the REST server user; if the NTP source is unreachable, verify network connectivity or adjust `ROS2_PERF_CHRONY_WAITSYNC_TRIES` and `ROS2_PERF_CHRONY_CMD_TIMEOUT_SEC`.
 - Clock offset between hosts causes unexpectedly large or negative latency values: re-run `chronyc tracking` on each Host to verify synchronization, and restart the REST server to trigger a fresh startup sync.
 
 ## Contributing and License
