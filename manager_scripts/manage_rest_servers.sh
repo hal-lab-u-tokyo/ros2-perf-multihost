@@ -10,7 +10,7 @@ REPO_DIR="$(cd "${SCRIPT_DIR}/.." && pwd)"
 DEFAULT_WS_DIR="performance_ws"
 DEFAULT_REMOTE_REPO_BASE="/home/ubuntu/ros2-perf-multihost"
 DEFAULT_SSH_USER="ubuntu"
-DEFAULT_PORT="5000"
+PORT="5000"
 DEFAULT_WAIT_RETRIES="30"
 DEFAULT_WAIT_INTERVAL_SEC="2"
 DEFAULT_MONITOR_INTERVAL_SEC="5"
@@ -20,13 +20,13 @@ WS_DIR_INPUT="${DEFAULT_WS_DIR}"
 TOPOLOGY_INPUT=""
 REMOTE_REPO_BASE="${DEFAULT_REMOTE_REPO_BASE}"
 SSH_USER="${DEFAULT_SSH_USER}"
-PORT="${DEFAULT_PORT}"
 WAIT_RETRIES="${DEFAULT_WAIT_RETRIES}"
 WAIT_INTERVAL_SEC="${DEFAULT_WAIT_INTERVAL_SEC}"
 MONITOR_INTERVAL_SEC="${DEFAULT_MONITOR_INTERVAL_SEC}"
 MONITOR_COUNT="0"
 LOG_LINES="${DEFAULT_LOG_LINES}"
 FOLLOW_LOGS="0"
+FORCE="0"
 SUBCOMMAND=""
 
 print_help() {
@@ -51,8 +51,6 @@ Options:
                               (default: ${DEFAULT_REMOTE_REPO_BASE})
   -u, --ssh-user USER         SSH username for each Host
                               (default: ${DEFAULT_SSH_USER})
-  -p, --port PORT             REST server port to wait for
-                              (default: ${DEFAULT_PORT})
       --wait-retries N        Number of readiness checks per host
                               (default: ${DEFAULT_WAIT_RETRIES})
       --wait-interval SEC     Interval in seconds between readiness checks
@@ -64,6 +62,7 @@ Options:
       --log-lines N           Number of lines to show for logs command
                               (default: ${DEFAULT_LOG_LINES})
       --follow                Follow logs continuously (logs command only)
+  -f, --force                 Skip confirmation prompts (start/stop/restart)
   -h, --help                  Show this help message and exit
 
 Examples:
@@ -115,9 +114,8 @@ while [[ $# -gt 0 ]]; do
             shift 2
             ;;
         -p|--port)
-            [[ $# -ge 2 ]] || { echo "ERROR: $1 requires a value" >&2; exit 2; }
-            PORT="$2"
-            shift 2
+            echo "ERROR: --port is not supported; port is fixed at ${PORT}." >&2
+            exit 2
             ;;
         --wait-retries)
             [[ $# -ge 2 ]] || { echo "ERROR: $1 requires a value" >&2; exit 2; }
@@ -146,6 +144,10 @@ while [[ $# -gt 0 ]]; do
             ;;
         --follow)
             FOLLOW_LOGS="1"
+            shift
+            ;;
+        -f|--force)
+            FORCE="1"
             shift
             ;;
         -h|--help)
@@ -238,8 +240,6 @@ fi
 NC_TIMEOUT_OPT=(-w 1)
 
 REMOTE_LOG_PATH="${REMOTE_RUNTIME_DIR}/rest_server.log"
-REMOTE_PID_PATH="${REMOTE_RUNTIME_DIR}/rest_server.pid"
-LEGACY_REMOTE_PID_PATH="${REMOTE_REPO_BASE}/remote_hosts_scripts/rest_server.pid"
 
 echo "=== REST server command: ${SUBCOMMAND} ==="
 echo "metadata_path : ${METADATA_PATH}"
@@ -250,9 +250,9 @@ echo "hosts         : ${HOSTS[*]}"
 echo "ssh_user      : ${SSH_USER}"
 echo "remote_repo   : ${REMOTE_REPO_BASE}"
 echo "runtime_dir   : ${REMOTE_RUNTIME_DIR}"
-echo "pid_file      : ${REMOTE_PID_PATH}"
 echo "log_file      : ${REMOTE_LOG_PATH}"
-echo "port          : ${PORT}"
+echo "force         : ${FORCE}"
+echo "port          : ${PORT} (fixed)"
 echo "wait_retries  : ${WAIT_RETRIES}"
 echo "wait_interval : ${WAIT_INTERVAL_SEC}s"
 echo "monitor_interval : ${MONITOR_INTERVAL_SEC}s"
@@ -266,6 +266,54 @@ SSH_OPTS=(
     -o StrictHostKeyChecking=accept-new
     -o ConnectTimeout=5
 )
+
+CONFIRMED_KILL="0"
+
+find_remote_port_pid() {
+    local host="$1"
+    ssh "${SSH_OPTS[@]}" "${SSH_USER}@${host}" \
+        "ss -tlnp | grep \":${PORT} \" | grep -oP \"pid=\\K[0-9]+\" | head -1" \
+        2>/dev/null || true
+}
+
+check_and_confirm_kill() {
+    local -a ports_in_use=()
+    local host pid
+    echo "Checking port ${PORT} on all hosts..."
+    for host in "${HOSTS[@]}"; do
+        pid=$(find_remote_port_pid "${host}")
+        if [[ -n "${pid}" ]]; then
+            ports_in_use+=("${host} (pid=${pid})")
+        fi
+    done
+
+    if [[ "${#ports_in_use[@]}" -eq 0 ]]; then
+        CONFIRMED_KILL="0"
+        return 0
+    fi
+
+    echo "The following hosts have a process on port ${PORT}:"
+    for entry in "${ports_in_use[@]}"; do
+        echo "  ${entry}"
+    done
+
+    if [[ "${FORCE}" == "1" ]]; then
+        echo "Killing all (--force)."
+        CONFIRMED_KILL="1"
+        return 0
+    fi
+
+    read -r -p "Kill these processes? [y/N] " ans
+    case "${ans}" in
+        [yY]*)
+            CONFIRMED_KILL="1"
+            ;;
+        *)
+            echo "Aborted."
+            exit 1
+            ;;
+    esac
+}
 
 wait_host_ready() {
     local host="$1"
@@ -296,26 +344,18 @@ start_host() {
     if ! ssh "${SSH_OPTS[@]}" "${SSH_USER}@${host}" \
         "bash -lc 'cd \"${REMOTE_REPO_BASE}\" || exit 1; \
         mkdir -p \"${REMOTE_RUNTIME_DIR}\"; \
-        if [[ -f \"${REMOTE_PID_PATH}\" ]]; then \
-            old_pid=\$(cat \"${REMOTE_PID_PATH}\" 2>/dev/null || true); \
-            if [[ -n \"\$old_pid\" ]] && kill -0 \"\$old_pid\" 2>/dev/null; then \
-                kill \"\$old_pid\" 2>/dev/null || true; \
+        if [[ \"${CONFIRMED_KILL}\" == \"1\" ]]; then \
+            pid=\$(ss -tlnp | grep \":${PORT} \" | grep -oP \"pid=\\K[0-9]+\" | head -1); \
+            if [[ -n \"\$pid\" ]]; then \
+                kill \"\$pid\" 2>/dev/null || true; \
                 sleep 1; \
+                kill -0 \"\$pid\" 2>/dev/null && kill -9 \"\$pid\" 2>/dev/null || true; \
             fi; \
-        fi; \
-        if [[ -f \"${LEGACY_REMOTE_PID_PATH}\" ]]; then \
-            legacy_pid=\$(cat \"${LEGACY_REMOTE_PID_PATH}\" 2>/dev/null || true); \
-            if [[ -n \"\$legacy_pid\" ]] && kill -0 \"\$legacy_pid\" 2>/dev/null; then \
-                kill \"\$legacy_pid\" 2>/dev/null || true; \
-                sleep 1; \
-            fi; \
-            rm -f \"${LEGACY_REMOTE_PID_PATH}\"; \
         fi; \
         : > \"${REMOTE_LOG_PATH}\"; \
         export ROS2_PERF_REPO_ROOT=\"${REMOTE_REPO_BASE}\"; \
         export ROS2_PERF_WS_DIR=\"${WS_DIR}\"; \
-        nohup python3 remote_hosts_scripts/rest_server.py >>\"${REMOTE_LOG_PATH}\" 2>&1 < /dev/null & \
-        echo \$! > \"${REMOTE_PID_PATH}\"'"; then
+        nohup python3 remote_hosts_scripts/rest_server.py >>\"${REMOTE_LOG_PATH}\" 2>&1 < /dev/null &'"; then
         echo "[${host}] ERROR: failed to execute remote start command." >&2
         return 1
     fi
@@ -326,80 +366,38 @@ start_host() {
 stop_host() {
     local host="$1"
     echo "[${host}] Stopping REST server..."
-    if ! ssh "${SSH_OPTS[@]}" "${SSH_USER}@${host}" \
-        "bash -lc 'pid_file=\"${REMOTE_PID_PATH}\"; legacy_pid_file=\"${LEGACY_REMOTE_PID_PATH}\"; \
-        if [[ ! -f \"\$pid_file\" ]]; then \
-            if [[ -f \"\$legacy_pid_file\" ]]; then \
-                pid_file=\"\$legacy_pid_file\"; \
-            else \
-                echo STOPPED_NO_PID; \
-                exit 0; \
-            fi; \
-        fi; \
-        pid=\$(cat \"\$pid_file\" 2>/dev/null || true); \
-        if [[ -n \"\$pid\" ]] && kill -0 \"\$pid\" 2>/dev/null; then \
+    local result
+    result=$(ssh "${SSH_OPTS[@]}" "${SSH_USER}@${host}" \
+        "bash -lc 'pid=\$(ss -tlnp | grep \":${PORT} \" | grep -oP \"pid=\\K[0-9]+\" | head -1); \
+        if [[ -n \"\$pid\" ]]; then \
             kill \"\$pid\" 2>/dev/null || true; \
             sleep 1; \
-            if kill -0 \"\$pid\" 2>/dev/null; then \
-                kill -9 \"\$pid\" 2>/dev/null || true; \
-            fi; \
-            echo STOPPED_PID=\$pid; \
+            kill -0 \"\$pid\" 2>/dev/null && kill -9 \"\$pid\" 2>/dev/null || true; \
+            echo STOPPED=\$pid; \
         else \
-            echo STOPPED_STALE_PID; \
-        fi; \
-        rm -f \"\$pid_file\" \"\$legacy_pid_file\"'"; then
-        echo "[${host}] ERROR: failed to stop remote server." >&2
-        return 1
-    fi
-
+            echo NOT_RUNNING; \
+        fi'" 2>/dev/null) || true
+    echo "[${host}] ${result}"
+    sleep 1
     if nc -z "${NC_TIMEOUT_OPT[@]}" "${host}" "${PORT}" >/dev/null 2>&1; then
         echo "[${host}] WARN: ${host}:${PORT} is still reachable after stop." >&2
-    else
-        echo "[${host}] STOPPED"
+        return 1
     fi
-
     return 0
 }
 
 status_host() {
     local host="$1"
-    local remote_state=""
-    if ! remote_state="$(ssh "${SSH_OPTS[@]}" "${SSH_USER}@${host}" \
-        "bash -lc 'pid_file=\"${REMOTE_PID_PATH}\"; legacy_pid_file=\"${LEGACY_REMOTE_PID_PATH}\"; \
-        if [[ -f \"\$pid_file\" ]]; then \
-            pid=\$(cat \"\$pid_file\" 2>/dev/null || true); \
-            if [[ -n \"\$pid\" ]] && kill -0 \"\$pid\" 2>/dev/null; then \
-                echo PID_RUNNING:\$pid; \
-                exit 0; \
-            fi; \
-            echo PID_STALE; \
-            exit 1; \
-        fi; \
-        if [[ -f \"\$legacy_pid_file\" ]]; then \
-            pid=\$(cat \"\$legacy_pid_file\" 2>/dev/null || true); \
-            if [[ -n \"\$pid\" ]] && kill -0 \"\$pid\" 2>/dev/null; then \
-                echo PID_RUNNING_LEGACY:\$pid; \
-                exit 0; \
-            fi; \
-            echo PID_STALE_LEGACY; \
-            exit 1; \
-        fi; \
-        echo PID_MISSING; \
-        exit 1'" 2>/dev/null)"; then
-        remote_state="SSH_ERROR"
-    fi
-
-    local port_state="DOWN"
-    if nc -z "${NC_TIMEOUT_OPT[@]}" "${host}" "${PORT}" >/dev/null 2>&1; then
-        port_state="UP"
-    fi
-
-    echo "[${host}] ${remote_state} PORT_${port_state}"
-
-    if [[ "${remote_state}" == PID_RUNNING:* && "${port_state}" == "UP" ]]; then
-        return 0
-    fi
-    return 1
+    local result
+    result=$(ssh "${SSH_OPTS[@]}" "${SSH_USER}@${host}" \
+        "bash -lc 'pid=\$(ss -tlnp | grep \":${PORT} \" | grep -oP \"pid=\\K[0-9]+\" | head -1); \
+        if [[ -n \"\$pid\" ]]; then \
+            echo \"RUNNING pid=\$pid\"; \
+        else \
+            echo NOT_RUNNING; \
+        fi'" 2>/dev/null) || result="SSH_ERROR"
+    echo "[${host}] ${result}"
+    [[ "${result}" == RUNNING* ]]
 }
 
 logs_host() {
@@ -464,6 +462,7 @@ run_in_parallel() {
 
 case "${SUBCOMMAND}" in
     start)
+        check_and_confirm_kill
         if run_in_parallel start_host; then
             echo "=== All REST servers are ready ==="
             exit 0
@@ -472,6 +471,11 @@ case "${SUBCOMMAND}" in
         exit 1
         ;;
     stop)
+        check_and_confirm_kill
+        if [[ "${CONFIRMED_KILL}" == "0" ]]; then
+            echo "No processes found on port ${PORT} on any host. Nothing to stop."
+            exit 0
+        fi
         if run_in_parallel stop_host; then
             echo "=== Stop command completed on all hosts ==="
             exit 0
@@ -480,10 +484,14 @@ case "${SUBCOMMAND}" in
         exit 1
         ;;
     restart)
-        if ! run_in_parallel stop_host; then
-            echo "ERROR: Failed to stop REST server on one or more hosts." >&2
-            exit 1
+        check_and_confirm_kill
+        if [[ "${CONFIRMED_KILL}" == "1" ]]; then
+            if ! run_in_parallel stop_host; then
+                echo "ERROR: Failed to stop REST server on one or more hosts." >&2
+                exit 1
+            fi
         fi
+        CONFIRMED_KILL="0"
         if run_in_parallel start_host; then
             echo "=== All REST servers are restarted and ready ==="
             exit 0
