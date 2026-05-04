@@ -441,7 +441,7 @@ Arguments:
 - `<topology>`: Topology directory to use (required)
 - `--rmw` (`-m`): RMW implementation (`fastdds`, `cyclonedds`, or `zenoh`) (default: `fastdds`)
 - `--exec-policy` (`-p`): Execution mode, one of `docker`, `native`, or `local` (default: `docker`)
-- `--eval-time` (`-e`): Override evaluation time; if omitted, the default from generated `*_exec_docker.sh` / `*_exec_native.sh` scripts is used
+- `--eval-time` (`-e`): Override evaluation time; if omitted, the default from generated `*_exec_docker.sh` / `*_exec_native.sh` / `local_exec.sh` scripts is used
 - `--trials` (`-t`): Number of trials (default: `3`)
 - `--ws-dir` (`-w`): Base directory that contains generated execution scripts (default: `performance_ws`)
 - `--remote-repo-base` (`-b`): Remote repository base directory used for automatic distribution and log collection in `docker`/`native` modes (default: `/home/ubuntu/ros2-perf-multihost`)
@@ -478,14 +478,27 @@ python3 performance_test/performance_test.py \
 
 If you want to distribute the generated host-specific execution files to each Host manually in advance, use `manager_scripts/distribute_exec_scripts.sh` as documented in [manager_scripts/README.md](./manager_scripts/README.md), then run `performance_test.py` normally.
 
-#### Zenoh Router Lifecycle [Zenoh only]
+#### Note: Zenoh Router Setting [Zenoh only]
 
-When using Zenoh as the RMW, `performance_test.py` automatically operates `rmw_zenohd` on the target specified by `--zenoh-router`.
+When using Zenoh as the RMW, `performance_test.py` automatically manages `rmw_zenohd` according to `--exec-policy` and `--zenoh-router`.
 
-It also sets `ZENOH_CONFIG_OVERRIDE` for each node run. By default this includes:
+For `docker` and `native` modes, `--zenoh-router` selects the target:
+- (default): first host in the JSON topology (e.g., `host1`)
+- `<host-name>` / `<ipv4>`: explicit hostname or IPv4 address
+- `Manager`: the machine running `performance_test.py`
+
+`performance_test.py` also sets `ZENOH_CONFIG_OVERRIDE` so that every bench node connects to the router as a client:
 
 - `mode="client"`
 - `connect/endpoints=["tcp/<router-target>:7447"]`
+
+The table below summarizes how zenohd is placed and managed for each exec-policy:
+
+| exec-policy | zenohd placement | How it is managed |
+|---|---|---|
+| `local` | Manager (Docker container) | Managed internally by `local_exec.sh` via the `service_zenohd` service in `local_compose.yaml`; `performance_test.py` does not start or stop it separately |
+| `docker` | Router target host (Docker container) | `performance_test.py` runs `docker compose -f zenohd_compose.yaml up/down service_zenohd` on the target. No native ROS 2 installation required on the target host |
+| `native` | Router target host (native process) | `performance_test.py` SSHes to the target and starts/stops `rmw_zenohd` directly; requires ROS 2 and `rmw_zenoh_cpp` to be installed natively on the target host |
 
 ### Step4: Results and Analysis
 

@@ -18,6 +18,7 @@ from generate_exec.script_generation import (
     generate_host_exec_native_scripts,
     generate_host_exec_scripts,
     generate_local_run_script,
+    generate_zenohd_compose,
 )
 from generate_exec.validation import normalize_ws_dir, validate_topology_json_schema
 
@@ -93,6 +94,7 @@ Examples:
             json_content, tmp_dir, project_root, settings)
         generate_local_run_script(
             json_content, tmp_dir, project_root, settings)
+        generate_zenohd_compose(tmp_dir, settings)
 
         # Generation succeeded; replace the existing directory atomically.
         if overwrite:
@@ -112,7 +114,8 @@ Examples:
     )
 
     print(
-        f"Generated host*.launch.py, host*_exec_docker.sh, host*_exec_native.sh, host*_compose.yaml, local_exec.sh, local_compose.yaml "
+        f"Generated host*.launch.py, host*_exec_docker.sh, host*_exec_native.sh, host*_compose.yaml, "
+        f"local_exec.sh, local_compose.yaml, zenohd_compose.yaml "
         f"in {settings.perf_ws_dir}/{topology_dir}/exec_scripts "
         f"for {len(json_content['hosts'])} host(s)"
     )

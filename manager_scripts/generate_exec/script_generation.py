@@ -406,6 +406,23 @@ def append_zenohd_service(lines, project_root, output_dir, settings):
     )
 
 
+def generate_zenohd_compose(output_dir, settings):
+    """Generate standalone zenohd_compose.yaml for use with --exec-policy docker."""
+    lines = [
+        "services:",
+        "  service_zenohd:",
+        f"    image: {settings.image_name}",
+        "    network_mode: host",
+        "    environment:",
+        "      - RMW_IMPLEMENTATION=rmw_zenoh_cpp",
+        "      - RUST_LOG=${RUST_LOG:-zenoh=warn,zenoh_transport=warn}",
+        '    command: ["ros2", "run", "rmw_zenoh_cpp", "rmw_zenohd"]',
+    ]
+    compose_path = os.path.join(output_dir, "zenohd_compose.yaml")
+    with open(compose_path, "w") as f:
+        f.write("\n".join(lines) + "\n")
+
+
 def generate_compose(json_content, output_dir, project_root, settings):
     """Generate local_compose.yaml for validation on a development machine."""
     eval_time_default = settings.default_eval_time
