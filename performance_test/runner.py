@@ -54,6 +54,7 @@ def run_test(
     eval_time=None,
     run_timestamp=None,
     log_dir=None,
+    zenoh_config_override=None,
 ):
     print(f"=== Run trial={trial_idx + 1} ===")
 
@@ -78,6 +79,8 @@ def run_test(
         env = os.environ.copy()
         if run_timestamp:
             env["RUN_TIMESTAMP"] = str(run_timestamp)
+        if zenoh_config_override is not None:
+            env["ZENOH_CONFIG_OVERRIDE"] = str(zenoh_config_override)
 
         result = subprocess.run(cmd, text=True, env=env)
         print(result)
@@ -107,16 +110,24 @@ def run_test(
     env = os.environ.copy()
     if eval_time is not None:
         env["EVAL_TIME"] = str(eval_time)
+    if zenoh_config_override is not None:
+        env["ZENOH_CONFIG_OVERRIDE"] = str(zenoh_config_override)
 
+    if log_dir is not None:
+        log_path = os.path.join(log_dir, f"exec_trial{trial_idx + 1}.log")
+        os.makedirs(log_dir, exist_ok=True)
+    else:
+        log_path = None
+
+    print(
+        f"  Waiting for all hosts to complete trial {trial_idx + 1}...", flush=True)
     result = subprocess.run(
         cmd,
         text=True,
         capture_output=True,
         env=env,
     )
-    if log_dir is not None:
-        log_path = os.path.join(log_dir, f"exec_trial{trial_idx + 1}.log")
-        os.makedirs(log_dir, exist_ok=True)
+    if log_path:
         with open(log_path, "w", encoding="utf-8") as f:
             f.write(result.stdout or "")
             if result.stderr:

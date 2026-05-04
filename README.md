@@ -329,7 +329,7 @@ This section walks you through the full usage of the framework in detail, from g
 
 ### Step1: Define Topology
 
-Define node placement, topic relationships, and QoS configuration in a topology JSON file.
+Define node placement, topic relationships, and QoS configuration in a JSON topology file.
 See [topology_example/README.md](./topology_example/README.md) for the JSON schema and definition guidance.
 
 ### Step2: Generate Execution Scripts
@@ -398,7 +398,7 @@ Example:
 ```
 
 If SSH startup or readiness check fails on any Host, this command exits with a non-zero status.
-The REST server log and PID file are stored on each Host under `<remote-repo-base>/<ws-dir>/<topology>/results/runtime/`.
+The REST server log is stored on each Host under `<remote-repo-base>/<ws-dir>/<topology>/results/runtime/rest_server.log`.
 For full subcommand and option details (including `wait`, `monitor`, `logs`, and related options), see [manager_scripts/README.md](./manager_scripts/README.md#manage_rest_serverssh).
 
 If the server exits at startup with a chrony sudo permission error, check the chrony sudo setup in [Clock synchronization for REST benchmark (chrony)](#clock-synchronization-for-rest-benchmark-chrony).
@@ -432,7 +432,8 @@ python3 performance_test/performance_test.py \
   [--trials|-t <n>] \
   [--ws-dir|-w <dir>] \
   [--remote-repo-base|-b <dir>] \
-  [--ssh-user|-u <user>]
+  [--ssh-user|-u <user>] \
+  [--zenoh-router <target>]
 ```
 
 Arguments:
@@ -440,11 +441,15 @@ Arguments:
 - `<topology>`: Topology directory to use (required)
 - `--rmw` (`-m`): RMW implementation (`fastdds`, `cyclonedds`, or `zenoh`) (default: `fastdds`)
 - `--exec-policy` (`-p`): Execution mode, one of `docker`, `native`, or `local` (default: `docker`)
-- `--eval-time` (`-e`): Override evaluation time; if omitted, the default from generated `*_exec_docker.sh` / `*_exec_native.sh` scripts is used
+- `--eval-time` (`-e`): Override evaluation time; if omitted, the default from generated `*_exec_docker.sh` / `*_exec_native.sh` / `local_exec.sh` scripts is used
 - `--trials` (`-t`): Number of trials (default: `3`)
 - `--ws-dir` (`-w`): Base directory that contains generated execution scripts (default: `performance_ws`)
 - `--remote-repo-base` (`-b`): Remote repository base directory used for automatic distribution and log collection in `docker`/`native` modes (default: `/home/ubuntu/ros2-perf-multihost`)
 - `--ssh-user` (`-u`): SSH username used for distribution and log collection in `docker`/`native` modes (default: `ubuntu`)
+- `--zenoh-router`: Router target used only when `--rmw zenoh`.
+  - (default): first host listed in the JSON topology file (e.g., `host1`)
+  - `<host-name>` / `<ipv4>`: explicit host name or IPv4 address (e.g., `host2` / `192.168.1.10`)
+  - `Manager`: the manager machine running `performance_test.py`
 
 Example:
 
@@ -455,31 +460,47 @@ python3 performance_test/performance_test.py \
   --exec-policy docker \
   --eval-time 10 --trials 3
 
-# Native execution on remote Hosts with Zenoh
+# Docker execution on remote Hosts with Zenoh Router on the default location
 python3 performance_test/performance_test.py \
   simple \
   --rmw zenoh \
+  --exec-policy docker \
+  --eval-time 10 --trials 3
+
+# Native execution on remote Hosts with Zenoh Router on the Manager
+python3 performance_test/performance_test.py \
+  simple \
+  --rmw zenoh \
+  --zenoh-router Manager \
   --exec-policy native \
   --eval-time 10 --trials 3
 ```
 
 If you want to distribute the generated host-specific execution files to each Host manually in advance, use `manager_scripts/distribute_exec_scripts.sh` as documented in [manager_scripts/README.md](./manager_scripts/README.md), then run `performance_test.py` normally.
 
-#### Zenoh Router (on the Manager) [Zenoh only]
+#### Note: Zenoh Router Setting [Zenoh only]
 
-When using Zenoh as the RMW, start the router on the Manager before running the benchmark.
+When using Zenoh as the RMW, `performance_test.py` automatically manages `rmw_zenohd` according to `--exec-policy` and `--zenoh-router`.
 
-```bash
-./manager_scripts/operate_zenoh_router.sh start
-```
+For `docker` and `native` modes, `--zenoh-router` selects the target:
+- (default): first host in the JSON topology (e.g., `host1`)
+- `<host-name>` / `<ipv4>`: explicit hostname or IPv4 address
+- `Manager`: the machine running `performance_test.py`
 
-Available subcommands:
+The specified target (hostname or `Manager`) is automatically resolved to an IP address, which is then used as the `connect/endpoints` value in `ZENOH_CONFIG_OVERRIDE`.
 
-- `start`: start the router in the background with nohup, PID, and log management
-- `foreground`: start in the foreground (blocks the terminal; stop with `Ctrl-C`)
-- `stop`: stop the running router using the saved PID
-- `status`: show process and listening port status
-- `wait`: wait until the router port starts listening
+`performance_test.py` also sets `ZENOH_CONFIG_OVERRIDE` so that every bench node connects to the router as a client:
+
+- `mode="client"`
+- `connect/endpoints=["tcp/<router-target>:7447"]`
+
+The table below summarizes how zenohd is placed and managed for each exec-policy:
+
+| exec-policy | zenohd placement | How it is managed |
+|---|---|---|
+| `local` | Manager (Docker container) | Managed internally by `local_exec.sh` via the `service_zenohd` service in `local_compose.yaml`; `performance_test.py` does not start or stop it separately |
+| `docker` | Router target host (Docker container) | `performance_test.py` runs `docker compose -f zenohd_compose.yaml up/down service_zenohd` on the target. No native ROS 2 installation required on the target host |
+| `native` | Router target host (native process) | `performance_test.py` SSHes to the target and starts/stops `rmw_zenohd` directly; requires ROS 2 and `rmw_zenoh_cpp` to be installed natively on the target host |
 
 ### Step4: Results and Analysis
 

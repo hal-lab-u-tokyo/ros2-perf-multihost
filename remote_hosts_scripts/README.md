@@ -51,6 +51,7 @@ All endpoints accept a JSON body. Common request fields:
 | `ws_dir` | string | Workspace directory (default: `performance_ws`) |
 | `trial_idx` | integer | Trial index, used by `/start_native` and `/start_docker` (default: `1`) |
 | `eval_time` | integer | Override evaluation duration in seconds (optional) |
+| `zenoh_config_override` | string | Optional `ZENOH_CONFIG_OVERRIDE` value forwarded to the execution script environment |
 
 ### Clock synchronization (chrony)
 
