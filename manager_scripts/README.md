@@ -66,9 +66,9 @@ For the JSON schema, see [topology_example/README.md](../topology_example/README
 | `--eval-time` | `-t` | Evaluation time in seconds | 60 |
 | `--trial-idx` | `-i` | Trial index for local execution | 1 |
 
-Each node launched from `<host_name>_exec_docker.sh`, `<host_name>_exec_native.sh`, or `local_exec.sh` receives a `--log-dir` under `results/YYYY-MM-DD_hh-mm-ss-<rmw>/exec_logs/trial<trial_idx>/` inside the generated topology directory. `results/latest-<rmw>` is updated as a symbolic link to the active run directory.
+Each node launched from `<host_name>_exec_docker.sh`, `<host_name>_exec_native.sh`, or `local_exec.sh` receives a `--log-dir` under `results/YYYY-MM-DD_hh-mm-ss-<rmw>/raw_logs/trial<trial_idx>/` inside the generated topology directory. `results/latest-<rmw>` is updated as a symbolic link to the active run directory.
 
-Example: `performance_ws/simple/results/latest-fastdds/exec_logs/trial1/`
+Example: `performance_ws/simple/results/latest-fastdds/raw_logs/trial1/`
 
 ## distribute_exec_scripts.sh
 

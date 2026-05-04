@@ -318,7 +318,7 @@ def _prepare_results_timestamp(ctx, rmw):
 
     run_timestamp = f"{datetime.now().strftime('%Y-%m-%d_%H-%M-%S')}-{rmw}"
     run_dir = os.path.join(results_dir, run_timestamp)
-    os.makedirs(os.path.join(run_dir, "exec_logs"), exist_ok=True)
+    os.makedirs(os.path.join(run_dir, "raw_logs"), exist_ok=True)
 
     latest_link = os.path.join(results_dir, f"latest-{rmw}")
     if os.path.lexists(latest_link):

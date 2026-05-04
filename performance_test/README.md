@@ -19,30 +19,44 @@ For usage of `performance_test.py`, see the [Usage in Details](../README.md#usag
 
 ## Output Structure
 
-`performance_test.py` creates the following directory structure under `<ws-dir>/<topology>/results/`:
+`performance_test.py` creates run-scoped outputs under `<ws-dir>/<topology>/results/<timestamp>-<rmw>/`, and related tools may also manage shared runtime logs under `<ws-dir>/<topology>/results/runtime/`:
 
 ```
 results/
 ├── latest-fastdds -> 2026-04-26_13-21-45-fastdds/   # symlink per RMW
 ├── latest-zenoh   -> 2026-04-26_14-02-10-zenoh/
+├── runtime/
+│   ├── rest_server.log              # managed by manage_rest_servers.sh
+│   └── zenohd_router.log            # created when rmw_zenohd is started natively
 └── 2026-04-26_13-21-45-fastdds/
-    ├── logs/
-    │   ├── prepare_run.log             # stdout/stderr of the prepare_run REST phase (docker/native mode)
-    │   ├── trial1/
-    │   │   ├── <node>_log/              # per-node log directory
-    │   │   │   └── <topic>_log.txt      # raw latency log per topic
-    │   │   ├── <host>_monitor_host.csv  # per-Host resource usage time series
-    │   │   └── ...
-    │   ├── exec_trial1.log              # stdout/stderr of the REST call for trial 1 (docker/native mode)
-    │   ├── trial2/
+    ├── coordination_logs/           # created in docker/native mode
+    │   ├── prepare_run.log          # stdout/stderr of the prepare_run REST phase
+    │   ├── exec_trial1.log          # stdout/stderr of the REST call for trial 1
     │   ├── exec_trial2.log
     │   └── ...
-    └── csv/
-        ├── total_latency.csv
-        ├── throughput.csv
-        ├── host_trials_usage.csv
-        └── host_usage_summary.csv
+    ├── raw_logs/
+    │   ├── trial1/
+    │   │   ├── <node>_log/          # per-node log directory
+    │   │   │   └── <topic>_log.txt  # raw latency log per topic
+    │   │   ├── <host>_monitor_host.csv # per-Host resource usage time series
+    │   │   └── ...
+    │   ├── trial2/
+    │   └── ...
+    ├── analysis/
+    │   ├── total_latency.csv
+    │   ├── throughput.csv
+    │   ├── host_trials_usage.csv
+    │   └── host_usage_summary.csv
+    └── runtime_logs/                # created in docker/native mode
+        ├── host1_rest_server.log
+        ├── host2_rest_server.log
+        ├── ...
+        └── zenohd_router.log        # when zenoh router logs are collectable
 ```
+
+`runtime_logs/<host>_rest_server.log` is a snapshot copy of each Host's long-lived
+`results/runtime/rest_server.log`, so it may include entries from previous runs
+unless the REST server was restarted before benchmarking.
 
 ## CSV Formats
 
