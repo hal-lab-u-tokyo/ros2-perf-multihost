@@ -371,14 +371,14 @@ Distribute the generated `exec_scripts/` directory to each Host.
 ./manager_scripts/distribute_exec_scripts.sh \
   <topology> \
   [--ws-dir|-w <dir>] \
-  [--remote-repo-base|-r <dir>]
+  [--remote-repo-base|-b <dir>]
 ```
 
 Arguments:
 
 - `<topology>`: Topology directory under `ws-dir` (required)
 - `--ws-dir` (`-w`): Workspace directory that contains topologies (default: `performance_ws`)
-- `--remote-repo-base` (`-r`): Remote repository base directory (default: `/home/ubuntu/ros2-perf-multihost`)
+- `--remote-repo-base` (`-b`): Remote repository base directory (default: `/home/ubuntu/ros2-perf-multihost`)
 
 Example:
 

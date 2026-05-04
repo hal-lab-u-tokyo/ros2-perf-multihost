@@ -25,13 +25,13 @@ Distribute host-specific exec scripts using values from metadata.txt.
 Options:
     -w, --ws-dir DIR           Workspace directory that contains topologies
                              (default: ${DEFAULT_WS_DIR})
-  -r, --remote-repo-base DIR Remote repository base directory
+    -b, --remote-repo-base DIR Remote repository base directory
                              (default: ${DEFAULT_REMOTE_REPO_BASE})
   -h, --help                 Show this help message and exit
 
 Examples:
     $(basename "$0") simple
-    $(basename "$0") simple -w performance_ws -r /home/ubuntu/ros2-perf-multihost
+    $(basename "$0") simple -w performance_ws -b /home/ubuntu/ros2-perf-multihost
 EOF
 }
 
@@ -45,7 +45,7 @@ while [[ $# -gt 0 ]]; do
             WS_DIR_INPUT="$2"
             shift 2
             ;;
-        -r|--remote-repo-base)
+        -b|--remote-repo-base)
             if [[ $# -lt 2 ]]; then
                 echo "ERROR: $1 requires a value" >&2
                 exit 2
