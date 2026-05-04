@@ -234,11 +234,8 @@ if [[ "${#HOSTS[@]}" -eq 0 ]]; then
     exit 1
 fi
 
-if nc -h 2>&1 | grep -qi 'OpenBSD'; then
-    NC_TIMEOUT_OPT=(-G 1)
-else
-    NC_TIMEOUT_OPT=(-w 1)
-fi
+# Ubuntu target: use -w timeout option (netcat-openbsd).
+NC_TIMEOUT_OPT=(-w 1)
 
 REMOTE_LOG_PATH="${REMOTE_RUNTIME_DIR}/rest_server.log"
 REMOTE_PID_PATH="${REMOTE_RUNTIME_DIR}/rest_server.pid"
