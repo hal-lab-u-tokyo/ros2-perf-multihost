@@ -150,9 +150,11 @@ Examples:
         print(f"Using Docker mode: {endpoint} endpoint with timeout {timeout}")
     else:
         endpoint = "/start_native"
-        timeout = 100  # seconds
+        _read_timeout = max(100, int(eval_time) +
+                            30) if eval_time is not None else 100
+        timeout = (5, _read_timeout)  # (connect, read) in seconds
         print(
-            f"Using native mode: {endpoint} endpoint with timeout {timeout}s")
+            f"Using native mode: {endpoint} endpoint with timeout {timeout}")
 
     failed_hosts = []
     lock = threading.Lock()

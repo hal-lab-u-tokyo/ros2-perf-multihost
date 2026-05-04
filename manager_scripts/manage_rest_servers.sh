@@ -11,7 +11,7 @@ DEFAULT_WS_DIR="performance_ws"
 DEFAULT_REMOTE_REPO_BASE="/home/ubuntu/ros2-perf-multihost"
 DEFAULT_SSH_USER="ubuntu"
 PORT="5000"
-DEFAULT_WAIT_RETRIES="30"
+DEFAULT_WAIT_RETRIES="60"
 DEFAULT_WAIT_INTERVAL_SEC="2"
 DEFAULT_MONITOR_INTERVAL_SEC="5"
 DEFAULT_LOG_LINES="100"
@@ -124,6 +124,7 @@ while [[ $# -gt 0 ]]; do
             ;;
         --wait-interval)
             [[ $# -ge 2 ]] || { echo "ERROR: $1 requires a value" >&2; exit 2; }
+            [[ "$2" =~ ^[1-9][0-9]*$ ]] || { echo "ERROR: --wait-interval must be a positive integer." >&2; exit 2; }
             WAIT_INTERVAL_SEC="$2"
             shift 2
             ;;
