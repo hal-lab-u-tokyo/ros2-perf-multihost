@@ -409,6 +409,9 @@ def append_zenohd_service(lines, project_root, output_dir, settings):
 def generate_zenohd_compose(output_dir, settings):
     """Generate standalone zenohd_compose.yaml for use with --exec-policy docker."""
     lines = [
+        # Use a dedicated project name so that 'docker compose down --remove-orphans'
+        # in host exec scripts does not treat service_zenohd as an orphan.
+        "name: zenohd",
         "services:",
         "  service_zenohd:",
         f"    image: {settings.image_name}",
