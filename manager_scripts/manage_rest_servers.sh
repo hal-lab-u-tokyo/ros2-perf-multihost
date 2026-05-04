@@ -367,7 +367,7 @@ stop_host() {
     local host="$1"
     echo "[${host}] Stopping REST server..."
     local result
-    result=$(ssh "${SSH_OPTS[@]}" "${SSH_USER}@${host}" \
+    if ! result=$(ssh "${SSH_OPTS[@]}" "${SSH_USER}@${host}" \
         "bash -lc 'pid=\$(ss -tlnp | grep \":${PORT} \" | grep -oP \"pid=\\K[0-9]+\" | head -1); \
         if [[ -n \"\$pid\" ]]; then \
             kill \"\$pid\" 2>/dev/null || true; \
@@ -376,7 +376,13 @@ stop_host() {
             echo STOPPED=\$pid; \
         else \
             echo NOT_RUNNING; \
-        fi'" 2>/dev/null) || true
+        fi'" 2>&1); then
+        echo "[${host}] ERROR: failed to execute remote stop command." >&2
+        if [[ -n "${result}" ]]; then
+            echo "[${host}] ssh: ${result}" >&2
+        fi
+        return 1
+    fi
     echo "[${host}] ${result}"
     sleep 1
     if nc -z "${NC_TIMEOUT_OPT[@]}" "${host}" "${PORT}" >/dev/null 2>&1; then
@@ -460,8 +466,29 @@ run_in_parallel() {
     return "${overall_fail}"
 }
 
+check_ssh_host() {
+    local host="$1"
+    if ssh "${SSH_OPTS[@]}" "${SSH_USER}@${host}" "true" >/dev/null 2>&1; then
+        echo "[${host}] SSH_OK"
+        return 0
+    fi
+    echo "[${host}] SSH_UNREACHABLE" >&2
+    return 1
+}
+
+preflight_check_ssh_all_hosts() {
+    echo "Preflight: checking SSH reachability on all hosts..."
+    if run_in_parallel check_ssh_host; then
+        echo "Preflight OK: all hosts are reachable via SSH."
+        return 0
+    fi
+    echo "ERROR: one or more hosts are unreachable via SSH. Aborting before making changes." >&2
+    return 1
+}
+
 case "${SUBCOMMAND}" in
     start)
+        preflight_check_ssh_all_hosts
         check_and_confirm_kill
         if run_in_parallel start_host; then
             echo "=== All REST servers are ready ==="
@@ -471,6 +498,7 @@ case "${SUBCOMMAND}" in
         exit 1
         ;;
     stop)
+        preflight_check_ssh_all_hosts
         check_and_confirm_kill
         if [[ "${CONFIRMED_KILL}" == "0" ]]; then
             echo "No processes found on port ${PORT} on any host. Nothing to stop."
@@ -484,6 +512,7 @@ case "${SUBCOMMAND}" in
         exit 1
         ;;
     restart)
+        preflight_check_ssh_all_hosts
         check_and_confirm_kill
         if [[ "${CONFIRMED_KILL}" == "1" ]]; then
             if ! run_in_parallel stop_host; then

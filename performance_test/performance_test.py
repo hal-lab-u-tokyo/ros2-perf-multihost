@@ -21,9 +21,14 @@ def _looks_like_ipv4(value):
 
 def _detect_manager_ip(host_hint):
     # Determine the local source IP used to reach one of the test hosts.
-    with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as sock:
-        sock.connect((host_hint, 9))
-        local_ip = sock.getsockname()[0]
+    try:
+        with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as sock:
+            sock.connect((host_hint, 9))
+            local_ip = sock.getsockname()[0]
+    except OSError as exc:
+        raise RuntimeError(
+            f"Failed to detect manager IPv4 address using host hint '{host_hint}': {exc}"
+        ) from exc
     if not local_ip:
         raise RuntimeError("Failed to detect manager IPv4 address")
     return local_ip
@@ -50,14 +55,16 @@ def _hostname_to_ip(hostname):
     Docker containers do not inherit the host's /etc/hosts even with
     network_mode: host, so ZENOH_CONFIG_OVERRIDE must use a routable IP
     address rather than a hostname that may only appear in /etc/hosts.
-    Falls back to the original value if resolution fails.
     """
     if _looks_like_ipv4(hostname):
         return hostname
     try:
         return socket.gethostbyname(hostname)
-    except socket.gaierror:
-        return hostname
+    except socket.gaierror as exc:
+        raise RuntimeError(
+            "Failed to resolve zenoh router hostname to IPv4 address: "
+            f"'{hostname}'. Use a resolvable hostname or an explicit IPv4."
+        ) from exc
 
 
 def _build_zenoh_config_override(connect_host):
@@ -72,6 +79,51 @@ def _zenoh_router_runtime_dir(base_dir, ws_dir, topology_name):
     return os.path.join(base_dir, ws_dir, topology_name, "results", "runtime")
 
 
+def _preflight_check_ssh_all_hosts(hosts, ssh_user):
+    failures = []
+    for host in hosts:
+        result = subprocess.run(
+            [
+                "ssh",
+                "-o",
+                "BatchMode=yes",
+                "-o",
+                "StrictHostKeyChecking=accept-new",
+                "-o",
+                "ConnectTimeout=5",
+                f"{ssh_user}@{host}",
+                "true",
+            ],
+            text=True,
+            capture_output=True,
+        )
+        if result.returncode != 0:
+            detail = ((result.stderr or result.stdout)
+                      or f"return code {result.returncode}").strip()
+            failures.append(f"- {host}: {detail}")
+    if failures:
+        raise RuntimeError(
+            "SSH preflight failed for one or more hosts:\n" +
+            "\n".join(failures)
+        )
+
+
+def _preflight_check_rest_port_all_hosts(hosts, port=5000):
+    failures = []
+    for host in hosts:
+        try:
+            with socket.create_connection((host, port), timeout=1.5):
+                pass
+        except OSError as exc:
+            failures.append(f"- {host}:{port}: {exc}")
+    if failures:
+        raise RuntimeError(
+            "REST preflight failed for one or more hosts:\n"
+            + "\n".join(failures)
+            + "\nEnsure REST servers are running on all hosts before benchmark execution."
+        )
+
+
 def _find_local_pid_by_port(port):
     cmd = (
         f"ss -tlnp | grep ':{port} ' | "
@@ -83,7 +135,25 @@ def _find_local_pid_by_port(port):
     return pid if pid else None
 
 
+def _is_local_zenoh_router_pid(pid):
+    result = subprocess.run(
+        ["ps", "-p", pid, "-o", "args="],
+        text=True,
+        capture_output=True,
+    )
+    if result.returncode != 0:
+        return False
+    cmdline = (result.stdout or "").strip()
+    return "rmw_zenoh_cpp" in cmdline and "rmw_zenohd" in cmdline
+
+
 def _terminate_pid(pid):
+    if not _is_local_zenoh_router_pid(pid):
+        print(
+            f"WARNING: Refusing to terminate PID {pid} because it does not look like rmw_zenohd.",
+            file=sys.stderr,
+        )
+        return
     subprocess.run(["kill", pid], capture_output=True)
     time.sleep(0.5)
     if subprocess.run(["kill", "-0", pid], capture_output=True).returncode == 0:
@@ -170,10 +240,11 @@ def _start_zenoh_router(
             rust_log = os.environ.get(
                 "RUST_LOG", "zenoh=warn,zenoh_transport=warn")
             start_cmd = (
+                "set -e; "
                 f"RUST_LOG={shlex.quote(rust_log)} "
                 f"docker compose -f {shlex.quote(compose_file)} down --remove-orphans 2>/dev/null || true; "
                 f"RUST_LOG={shlex.quote(rust_log)} "
-                f"docker compose -f {shlex.quote(compose_file)} up -d service_zenohd; "
+                f"docker compose -f {shlex.quote(compose_file)} up -d service_zenohd && "
                 "echo 'zenohd container started via compose'"
             )
         else:
@@ -186,8 +257,10 @@ def _start_zenoh_router(
                 "source /opt/ros/jazzy/setup.bash 2>/dev/null || true; "
                 f"old_pid=$(ss -tlnp | grep ':{_ROUTER_PORT} ' | grep -oP 'pid=\\K[0-9]+' | head -1 || true); "
                 "if [ -n \"$old_pid\" ]; then "
+                "if ps -p \"$old_pid\" -o args= | grep -q \"rmw_zenoh_cpp.*rmw_zenohd\"; then "
                 "kill \"$old_pid\" 2>/dev/null || true; sleep 0.5; "
                 "kill -0 \"$old_pid\" 2>/dev/null && kill -9 \"$old_pid\" 2>/dev/null || true; "
+                "else echo \"Skip stopping PID $old_pid (not rmw_zenohd)\"; fi; "
                 "fi; "
                 f"rm -f {shlex.quote(legacy_pid_file)}; "
                 f"RMW_IMPLEMENTATION=rmw_zenoh_cpp "
@@ -279,9 +352,13 @@ def _stop_zenoh_router(
             stop_cmd = (
                 f"pid=$(ss -tlnp | grep ':{_ROUTER_PORT} ' | grep -oP 'pid=\\K[0-9]+' | head -1 || true); "
                 "if [ -n \"$pid\" ]; then "
+                "if ps -p \"$pid\" -o args= | grep -q \"rmw_zenoh_cpp.*rmw_zenohd\"; then "
                 "kill \"$pid\" 2>/dev/null || true; sleep 0.5; "
                 "kill -0 \"$pid\" 2>/dev/null && kill -9 \"$pid\" 2>/dev/null || true; "
                 f"echo \"Stopped rmw_zenohd on port {_ROUTER_PORT} (PID $pid)\"; "
+                "else "
+                f"echo \"Skip stopping PID $pid on port {_ROUTER_PORT} (not rmw_zenohd)\"; "
+                "fi; "
                 "else "
                 f"echo 'Stopped rmw_zenohd (nothing listening on port {_ROUTER_PORT})'; "
                 "fi; "
@@ -418,6 +495,21 @@ Examples:
     print(f"Local csv dir: {local_csv_dir}")
     print(f"Local latest alias: {local_latest_link} -> {run_timestamp}")
     print(f"SSH user for remote ops: {args.ssh_user}")
+
+    if args.exec_policy in ("docker", "native"):
+        print("Preflight: checking SSH reachability on all hosts...")
+        try:
+            _preflight_check_ssh_all_hosts(hosts, args.ssh_user)
+        except RuntimeError as exc:
+            print(f"ERROR: {exc}", file=sys.stderr)
+            sys.exit(1)
+
+        print("Preflight: checking REST server reachability on port 5000...")
+        try:
+            _preflight_check_rest_port_all_hosts(hosts, port=5000)
+        except RuntimeError as exc:
+            print(f"ERROR: {exc}", file=sys.stderr)
+            sys.exit(1)
 
     zenoh_config_override = None
     zenoh_router_started = False
