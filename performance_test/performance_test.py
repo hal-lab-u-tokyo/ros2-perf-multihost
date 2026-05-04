@@ -11,6 +11,15 @@ from analyzer import aggregate_total_latency
 from runner import collect_logs, prepare_run, resolve_host_list, run_test
 
 
+def _safe_replace_symlink(target, link_path):
+    """Create or replace a symlink at link_path pointing to target."""
+    if os.path.lexists(link_path):
+        if os.path.isdir(link_path) and not os.path.islink(link_path):
+            return  # real directory exists, leave it alone
+        os.remove(link_path)
+    os.symlink(target, link_path)
+
+
 def _looks_like_ipv4(value):
     try:
         socket.inet_aton(value)
@@ -202,7 +211,7 @@ def _start_zenoh_router(
             runtime_dir = _zenoh_router_runtime_dir(
                 repo_root, ws_dir, topology_name)
             os.makedirs(runtime_dir, exist_ok=True)
-            log_file = os.path.join(runtime_dir, "zenoh_router.out")
+            log_file = os.path.join(runtime_dir, "zenohd_router.log")
             legacy_pid_file = os.path.join(runtime_dir, "zenoh_router.pid")
             env = os.environ.copy()
             # Bench clients use ZENOH_CONFIG_OVERRIDE, but the router itself
@@ -250,7 +259,7 @@ def _start_zenoh_router(
         else:
             runtime_dir = _zenoh_router_runtime_dir(
                 remote_repo_base, ws_dir, topology_name)
-            log_file = os.path.join(runtime_dir, "zenoh_router.out")
+            log_file = os.path.join(runtime_dir, "zenohd_router.log")
             legacy_pid_file = os.path.join(runtime_dir, "zenoh_router.pid")
             start_cmd = (
                 f"mkdir -p {shlex.quote(runtime_dir)}; "
@@ -461,11 +470,18 @@ Examples:
     local_timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
     run_timestamp = f"{local_timestamp}-{args.rmw}"
     local_session_dir = os.path.join(local_results_root, run_timestamp)
-    local_logs_dir = os.path.join(local_session_dir, "logs")
-    local_csv_dir = os.path.join(local_session_dir, "csv")
+    local_coordination_logs_dir = os.path.join(
+        local_session_dir, "coordination_logs")
+    local_raw_logs_dir = os.path.join(local_session_dir, "raw_logs")
+    local_analysis_dir = os.path.join(local_session_dir, "analysis")
 
-    os.makedirs(local_logs_dir, exist_ok=True)
-    os.makedirs(local_csv_dir, exist_ok=True)
+    os.makedirs(local_coordination_logs_dir, exist_ok=True)
+    os.makedirs(local_raw_logs_dir, exist_ok=True)
+    os.makedirs(local_analysis_dir, exist_ok=True)
+
+    # Backward-compatible aliases
+    _safe_replace_symlink("raw_logs", os.path.join(local_session_dir, "logs"))
+    _safe_replace_symlink("analysis", os.path.join(local_session_dir, "csv"))
 
     local_latest_link = os.path.join(local_results_root, f"latest-{args.rmw}")
     if os.path.lexists(local_latest_link):
@@ -491,8 +507,9 @@ Examples:
         sys.exit(1)
     print(f"Using hosts: {hosts}")
     print(f"Note: payload_size and period_ms are determined by topology JSON; eval_time can be overridden")
-    print(f"Local logs dir: {local_logs_dir}")
-    print(f"Local csv dir: {local_csv_dir}")
+    print(f"Local coordination logs dir: {local_coordination_logs_dir}")
+    print(f"Local raw logs dir: {local_raw_logs_dir}")
+    print(f"Local analysis dir: {local_analysis_dir}")
     print(f"Local latest alias: {local_latest_link} -> {run_timestamp}")
     print(f"SSH user for remote ops: {args.ssh_user}")
 
@@ -614,7 +631,7 @@ Examples:
             rmw=args.rmw,
             exec_policy=args.exec_policy,
             run_timestamp=run_timestamp,
-            log_dir=local_logs_dir,
+            coordination_log_dir=local_coordination_logs_dir,
         )
 
         for trial_idx in range(args.trials):
@@ -628,13 +645,13 @@ Examples:
                 exec_policy=args.exec_policy,
                 eval_time=eval_time,
                 run_timestamp=run_timestamp,
-                log_dir=local_logs_dir,
+                coordination_log_dir=local_coordination_logs_dir,
                 zenoh_config_override=zenoh_config_override,
             )
             time.sleep(10)
 
         collect_logs(
-            local_logs_dir,
+            local_raw_logs_dir,
             args.trials,
             hosts,
             ws_dir=args.ws_dir,
@@ -646,8 +663,8 @@ Examples:
         )
 
         aggregate_total_latency(
-            local_logs_dir,
-            local_csv_dir,
+            local_raw_logs_dir,
+            local_analysis_dir,
             args.trials,
             hosts,
             eval_time=eval_time,

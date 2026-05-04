@@ -25,19 +25,24 @@ For usage of `performance_test.py`, see the [Usage in Details](../README.md#usag
 results/
 ├── latest-fastdds -> 2026-04-26_13-21-45-fastdds/   # symlink per RMW
 ├── latest-zenoh   -> 2026-04-26_14-02-10-zenoh/
+├── runtime/
+│   ├── rest_server.log              # managed by manage_rest_servers.sh
+│   └── zenohd_router.log            # created when rmw_zenohd is started natively
 └── 2026-04-26_13-21-45-fastdds/
-    ├── logs/
-    │   ├── prepare_run.log             # stdout/stderr of the prepare_run REST phase (docker/native mode)
-    │   ├── trial1/
-    │   │   ├── <node>_log/              # per-node log directory
-    │   │   │   └── <topic>_log.txt      # raw latency log per topic
-    │   │   ├── <host>_monitor_host.csv  # per-Host resource usage time series
-    │   │   └── ...
-    │   ├── exec_trial1.log              # stdout/stderr of the REST call for trial 1 (docker/native mode)
-    │   ├── trial2/
+    ├── coordination_logs/
+    │   ├── prepare_run.log          # stdout/stderr of the prepare_run REST phase (docker/native mode)
+    │   ├── exec_trial1.log          # stdout/stderr of the REST call for trial 1 (docker/native mode)
     │   ├── exec_trial2.log
     │   └── ...
-    └── csv/
+    ├── raw_logs/
+    │   ├── trial1/
+    │   │   ├── <node>_log/          # per-node log directory
+    │   │   │   └── <topic>_log.txt  # raw latency log per topic
+    │   │   ├── <host>_monitor_host.csv # per-Host resource usage time series
+    │   │   └── ...
+    │   ├── trial2/
+    │   └── ...
+    └── analysis/
         ├── total_latency.csv
         ├── throughput.csv
         ├── host_trials_usage.csv

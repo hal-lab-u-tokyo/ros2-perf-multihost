@@ -138,8 +138,9 @@ This runs 3 trials, each lasting 10 seconds, using Fast DDS (default RMW).
 
 As a quick check, confirm that the following outputs are generated:
 
-- Logs: `<ws-dir>/<topology>/results/latest-<rmw>/logs/trial<N>/`
-- CSV: `<ws-dir>/<topology>/results/latest-<rmw>/csv/`
+- Coordination logs: `<ws-dir>/<topology>/results/latest-<rmw>/coordination_logs/`
+- Raw trial logs: `<ws-dir>/<topology>/results/latest-<rmw>/raw_logs/trial<N>/`
+- Analysis CSV: `<ws-dir>/<topology>/results/latest-<rmw>/analysis/`
 
 For example with the command above: `performance_ws/simple/results/latest-fastdds/`
 
@@ -508,8 +509,9 @@ The table below summarizes how zenohd is placed and managed for each exec-policy
 
 On prepare, the Manager creates `<ws-dir>/<topology>/results/<session_timestamp>-<rmw>/` and updates `<ws-dir>/<topology>/results/latest-<rmw>` to point to it.
 
-- Trial logs are collected under `<ws-dir>/<topology>/results/latest-<rmw>/logs/trial<N>/`.
-- Aggregated outputs such as `total_latency.csv`, `throughput.csv`, `host_trials_usage.csv`, and `host_usage_summary.csv` are written under `<ws-dir>/<topology>/results/latest-<rmw>/csv/`.
+- Coordination logs are written under `<ws-dir>/<topology>/results/latest-<rmw>/coordination_logs/`.
+- Trial logs are collected under `<ws-dir>/<topology>/results/latest-<rmw>/raw_logs/trial<N>/`.
+- Aggregated outputs such as `total_latency.csv`, `throughput.csv`, `host_trials_usage.csv`, and `host_usage_summary.csv` are written under `<ws-dir>/<topology>/results/latest-<rmw>/analysis/`.
 
 For details on output directory structure and CSV column definitions, see [performance_test/README.md](./performance_test/README.md).
 
@@ -533,7 +535,7 @@ Common issues and fixes:
 - REST benchmark does not start remote execution: ensure REST servers are running on every target Host (for example, run `./manager_scripts/manage_rest_servers.sh start <topology>` from the Manager before calling `performance_test.py`).
 - Docker mode fails on remote Hosts: pull `ghcr.io/hal-lab-u-tokyo/ros2-perf-multihost:latest` and confirm Docker permissions on each Host.
 - Native mode cannot find workspace paths: set `ROS2_PERF_WS` to the project root before running `<host_name>_exec_native.sh`.
-- Expected CSV outputs are missing: check `<ws-dir>/<topology>/results/latest-<rmw>/logs/trial<N>/` for trial logs and inspect script stderr for analyzer failures.
+- Expected CSV outputs are missing: check `<ws-dir>/<topology>/results/latest-<rmw>/raw_logs/trial<N>/` for trial logs and inspect coordination logs for analyzer failures.
 - REST server logs a chrony startup sync error (or fails to start when strict mode is enabled): confirm `chronyd` is running (`systemctl status chrony`) and that the sudoers entry for `chronyc` is in place (see [Clock synchronization for REST benchmark (chrony)](#clock-synchronization-for-rest-benchmark-chrony)).
 - `python3 remote_hosts_scripts/rest_server.py` exits at startup with a chrony sudo permission error: clear cached credentials with `sudo -k` and verify with `sudo -n chronyc -a makestep`; if it fails, configure the `chronyc` sudoers entry as described in [Clock synchronization for REST benchmark (chrony)](#clock-synchronization-for-rest-benchmark-chrony).
 - `prepare_run` returns `chrony check/sync failed` or `timed out`: check that `sudo -n chronyc -a makestep` runs without a password as the REST server user; if the NTP source is unreachable, verify network connectivity or adjust `ROS2_PERF_CHRONY_WAITSYNC_TRIES` and `ROS2_PERF_CHRONY_CMD_TIMEOUT_SEC`.

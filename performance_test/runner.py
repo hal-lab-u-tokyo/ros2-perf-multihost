@@ -53,10 +53,9 @@ def run_test(
     exec_policy="docker",
     eval_time=None,
     run_timestamp=None,
-    log_dir=None,
+    coordination_log_dir=None,
     zenoh_config_override=None,
 ):
-    print(f"=== Run trial={trial_idx + 1} ===")
 
     if exec_policy == "local":
         local_exec_sh = os.path.join(
@@ -113,9 +112,10 @@ def run_test(
     if zenoh_config_override is not None:
         env["ZENOH_CONFIG_OVERRIDE"] = str(zenoh_config_override)
 
-    if log_dir is not None:
-        log_path = os.path.join(log_dir, f"exec_trial{trial_idx + 1}.log")
-        os.makedirs(log_dir, exist_ok=True)
+    if coordination_log_dir is not None:
+        log_path = os.path.join(coordination_log_dir,
+                                f"exec_trial{trial_idx + 1}.log")
+        os.makedirs(coordination_log_dir, exist_ok=True)
     else:
         log_path = None
 
@@ -153,7 +153,7 @@ def prepare_run(
     rmw,
     exec_policy="docker",
     run_timestamp=None,
-    log_dir=None,
+    coordination_log_dir=None,
 ):
     """Initialize run timestamp/latest-rmw on all hosts before trial loop."""
     if exec_policy == "local":
@@ -183,9 +183,9 @@ def prepare_run(
 
     result = subprocess.run(cmd, text=True, capture_output=True)
     log_path = None
-    if log_dir is not None:
-        os.makedirs(log_dir, exist_ok=True)
-        log_path = os.path.join(log_dir, "prepare_run.log")
+    if coordination_log_dir is not None:
+        os.makedirs(coordination_log_dir, exist_ok=True)
+        log_path = os.path.join(coordination_log_dir, "prepare_run.log")
         with open(log_path, "w", encoding="utf-8") as f:
             f.write(result.stdout or "")
             if result.stderr:
@@ -205,7 +205,7 @@ def prepare_run(
 
 
 def collect_logs(
-    local_logs_dir,
+    local_raw_logs_dir,
     num_trials,
     hosts,
     ws_dir="performance_ws",
@@ -216,7 +216,7 @@ def collect_logs(
     ssh_user="ubuntu",
 ):
     """Collect trial logs from remote hosts into a local logs directory."""
-    src_log_dir = os.path.abspath(local_logs_dir)
+    src_log_dir = os.path.abspath(local_raw_logs_dir)
 
     if exec_policy == "local":
         if not topology_name:
