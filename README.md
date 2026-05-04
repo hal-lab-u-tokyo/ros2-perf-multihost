@@ -189,12 +189,15 @@ Therefore, configure the following settings on the Manager machine to meet this 
 
 - Generate and register SSH keys (e.g., `ssh-keygen -t ed25519 && ssh-copy-id ubuntu@host1`).
 - Ensure hostnames are resolvable from the Manager.
+- Consider assigning static IP addresses to each Host to avoid SSH connectivity issues after a reboot or DHCP lease renewal.
 - Recommended Manager-side configuration examples:
   - `/etc/hosts`:
     ```text
+    <sniped.>
     192.168.10.11 host1
     192.168.10.12 host2
     192.168.10.13 host3
+    <sniped.>
     ```
   - `~/.ssh/config`:
     ```text
@@ -287,17 +290,26 @@ sudo apt install -y python3-requests
 
 #### Clock synchronization for REST benchmark (chrony)
 
-For remote benchmark reproducibility, the REST server uses [chrony](https://chrony-project.org/) to synchronizes the clock between Hosts.
+For remote benchmark reproducibility, the REST server uses [chrony](https://chrony-project.org/) to synchronize the clock between Hosts.
 
-Because these operations invoke `sudo chronyc` from within the REST server process, the `ubuntu` user must be allowed to run `chronyc` via `sudo` without a password.
-The sudoers entry below grants passwordless `sudo` only for `/usr/bin/chronyc`, so no other commands are affected.
-
-Install chrony and configure the sudoers entry on each Host as follows:
+Install and enable chrony as follows:
 
 ```bash
 sudo apt install -y chrony
 sudo systemctl enable --now chrony
+```
 
+Because the REST server invokes `sudo chronyc`, the `ubuntu` user must be allowed to run `chronyc` via `sudo` without a password.
+The sudoers entry below grants passwordless `sudo` only for `/usr/bin/chronyc`, so no other commands are affected.
+
+Check the permission, and if needed, configure the sudoers entry on each Host as follows:
+
+```bash
+# Check the permission required by rest_server.py (makestep)
+sudo -k
+sudo -n chronyc -a makestep
+
+# If this command fails because a password is required, configure the sudoers entry as follows.
 cat <<'EOF' | sudo tee /etc/sudoers.d/ros2-perf-chrony
 ubuntu ALL=(root) NOPASSWD:/usr/bin/chronyc
 EOF
@@ -384,6 +396,8 @@ ssh ubuntu@hostX
 cd ros2-perf-multihost
 python3 remote_hosts_scripts/rest_server.py
 ```
+
+If the server asks for a sudo password at startup, check the chrony sudo setup in [Clock synchronization for REST benchmark (chrony)](#clock-synchronization-for-rest-benchmark-chrony).
 
 For details on the specification of REST server and environment variables, see [remote_hosts_scripts/README.md](./remote_hosts_scripts/README.md#rest_serverpy).
 
@@ -476,6 +490,7 @@ Common issues and fixes:
 - Native mode cannot find workspace paths: set `ROS2_PERF_WS` to the project root before running `host*_exec.sh`.
 - Expected CSV outputs are missing: check `<ws-dir>/<topology>/results/latest-<rmw>/logs/trial<N>/` for trial logs and inspect script stderr for analyzer failures.
 - REST server fails to start with a chrony error: confirm `chronyd` is running (`systemctl status chrony`) and that the sudoers entry for `chronyc` is in place (see [Clock synchronization for REST benchmark (chrony)](#clock-synchronization-for-rest-benchmark-chrony)).
+- `python3 remote_hosts_scripts/rest_server.py` asks for a sudo password: clear cached credentials with `sudo -k` and verify with `sudo -n chronyc -a makestep`; if it fails, configure the `chronyc` sudoers entry as described in [Clock synchronization for REST benchmark (chrony)](#clock-synchronization-for-rest-benchmark-chrony).
 - `prepare_run` returns `chrony check/sync failed` or `timed out`: check that `sudo chronyc tracking` runs without a password as the REST server user; if the NTP source is unreachable, verify network connectivity or adjust `ROS2_PERF_CHRONY_WAITSYNC_TRIES` and `ROS2_PERF_CHRONY_CMD_TIMEOUT_SEC`.
 - Clock offset between hosts causes unexpectedly large or negative latency values: re-run `chronyc tracking` on each Host to verify synchronization, and restart the REST server to trigger a fresh startup sync.
 
