@@ -1,6 +1,7 @@
 import argparse
 from datetime import datetime
 import os
+import shlex
 import socket
 import subprocess
 import sys
@@ -93,7 +94,8 @@ def _start_zenoh_router(target_kind, target_host, repo_root, remote_repo_base, s
         )
         try:
             result = subprocess.run(
-                ["ssh", f"{ssh_user}@{target_host}", "bash", "-c", start_cmd],
+                ["ssh", f"{ssh_user}@{target_host}",
+                    f"bash -lc {shlex.quote(start_cmd)}"],
                 text=True, capture_output=True, check=True,
             )
         except subprocess.CalledProcessError as exc:
@@ -110,7 +112,8 @@ def _start_zenoh_router(target_kind, target_host, repo_root, remote_repo_base, s
         )
         try:
             result = subprocess.run(
-                ["ssh", f"{ssh_user}@{target_host}", "bash", "-c", wait_cmd],
+                ["ssh", f"{ssh_user}@{target_host}",
+                    f"bash -lc {shlex.quote(wait_cmd)}"],
                 text=True, capture_output=True, check=True,
             )
         except subprocess.CalledProcessError:
@@ -144,7 +147,8 @@ def _stop_zenoh_router(target_kind, target_host, repo_root, remote_repo_base, ss
             f"echo 'Stopped rmw_zenohd (no PID file)'; fi"
         )
         result = subprocess.run(
-            ["ssh", f"{ssh_user}@{target_host}", "bash", "-c", stop_cmd],
+            ["ssh", f"{ssh_user}@{target_host}",
+                f"bash -lc {shlex.quote(stop_cmd)}"],
             text=True, capture_output=True,
         )
         if result.stdout:
