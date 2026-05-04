@@ -68,3 +68,37 @@ For the JSON schema, see [topology_example/README.md](../topology_example/README
 Each node launched from `<host_name>_exec_docker.sh`, `<host_name>_exec_native.sh`, or `local_exec.sh` receives a `--log-dir` under `results/YYYY-MM-DD_hh-mm-ss-<rmw>/exec_logs/trial<trial_idx>/` inside the generated topology directory. `results/latest-<rmw>` is updated as a symbolic link to the active run directory.
 
 Example: `performance_ws/simple/results/latest-fastdds/exec_logs/trial1/`
+
+## distribute_exec_scripts.sh
+
+`distribute_exec_scripts.sh` copies the host-specific execution files from `<ws-dir>/<topology>/exec_scripts/` to each remote Host listed in `metadata.txt`.
+
+It distributes the following files for each `<host_name>`:
+
+- `<host_name>.launch.py`
+- `<host_name>_exec_docker.sh`
+- `<host_name>_compose.yaml`
+- `metadata.txt`
+
+This script is mainly useful when you want to perform distribution manually before running the benchmark, or when you want to refresh remote files without starting a full test run. For normal `docker` and `native` benchmark runs, `performance_test.py` runs this distribution step automatically.
+
+```bash
+./manager_scripts/distribute_exec_scripts.sh \
+	<topology> \
+	[--ws-dir|-w <dir>] \
+	[--remote-repo-base|-b <dir>]
+```
+
+| Argument | Short | Description | Default |
+|---|---|---|---|
+| `<topology>` | — | Topology directory under `ws-dir` | required |
+| `--ws-dir` | `-w` | Workspace directory that contains generated topologies | `performance_ws` |
+| `--remote-repo-base` | `-b` | Remote repository base directory on each Host | `/home/ubuntu/ros2-perf-multihost` |
+
+Example:
+
+```bash
+./manager_scripts/distribute_exec_scripts.sh \
+	simple \
+	--remote-repo-base /home/ubuntu/ros2-perf-multihost
+```

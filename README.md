@@ -332,9 +332,7 @@ This section walks you through the full usage of the framework in detail, from g
 Define node placement, topic relationships, and QoS configuration in a topology JSON file.
 See [topology_example/README.md](./topology_example/README.md) for the JSON schema and definition guidance.
 
-### Step2: Generate and Distribute Execution Scripts
-
-#### Generate Execution Scripts
+### Step2: Generate Execution Scripts
 
 Generate execution scripts and Docker Compose files from a JSON topology file into `<ws-dir>/<json-file-name>/exec_scripts/`.
 
@@ -360,34 +358,7 @@ python3 manager_scripts/generate_exec_scripts.py \
   topology_example/simple.json
 ```
 
-For details on generated files in `exec_scripts/`, `metadata.txt` format, and runtime options supported by generated scripts, see [manager_scripts/README.md](./manager_scripts/README.md).
-
-#### Distribute to Hosts
-
-Distribute the generated `exec_scripts/` directory to each Host.
-`manager_scripts/distribute_exec_scripts.sh` reads `hosts`, `ws_dir`, and `topology_dir` from `performance_ws/<topology>/metadata.txt` and distributes the corresponding file in `exec_scripts/` to each Host.
-
-```bash
-./manager_scripts/distribute_exec_scripts.sh \
-  <topology> \
-  [--ws-dir|-w <dir>] \
-  [--remote-repo-base|-b <dir>]
-```
-
-Arguments:
-
-- `<topology>`: Topology directory under `ws-dir` (required)
-- `--ws-dir` (`-w`): Workspace directory that contains topologies (default: `performance_ws`)
-- `--remote-repo-base` (`-b`): Remote repository base directory (default: `/home/ubuntu/ros2-perf-multihost`)
-
-Example:
-
-```bash
-# Specify topology and remote path
-./manager_scripts/distribute_exec_scripts.sh \
-  simple \
-  --remote-repo-base /home/ubuntu/ros2-perf-multihost
-```
+For details on generated files in `exec_scripts/`, `metadata.txt` format, runtime options supported by generated scripts, see [manager_scripts/README.md](./manager_scripts/README.md).
 
 ### Step3: Automated Benchmark via REST
 
@@ -410,6 +381,8 @@ For details on the specification of REST server and environment variables, see [
 #### Run Benchmark (on the Manager)
 
 Then, run the benchmark script on the Manager.
+For `docker` and `native` modes, `performance_test.py` automatically distributes the generated host-specific execution files to each Host.
+It then prepares the run and executes each trial via the REST APIs, collects logs from each Host, and aggregates the CSV outputs.
 
 ```bash
 python3 performance_test/performance_test.py \
@@ -418,7 +391,8 @@ python3 performance_test/performance_test.py \
   [--exec-policy|-p <mode>] \
   [--eval-time|-e <sec>] \
   [--trials|-t <n>] \
-  [--ws-dir|-w <dir>]
+  [--ws-dir|-w <dir>] \
+  [--remote-repo-base|-b <dir>]
 ```
 
 Arguments:
@@ -429,6 +403,7 @@ Arguments:
 - `--eval-time` (`-e`): Override evaluation time; if omitted, the default from generated `*_exec_docker.sh` / `*_exec_native.sh` scripts is used
 - `--trials` (`-t`): Number of trials (default: `3`)
 - `--ws-dir` (`-w`): Base directory that contains generated execution scripts (default: `performance_ws`)
+- `--remote-repo-base` (`-b`): Remote repository base directory used for automatic distribution and log collection in `docker`/`native` modes (default: `/home/ubuntu/ros2-perf-multihost`)
 
 Example:
 
@@ -446,6 +421,8 @@ python3 performance_test/performance_test.py \
   --exec-policy native \
   --eval-time 10 --trials 3
 ```
+
+If you want to distribute the generated host-specific execution files to each Host manually in advance, use `manager_scripts/distribute_exec_scripts.sh` as documented in [manager_scripts/README.md](./manager_scripts/README.md), then run `performance_test.py` normally.
 
 #### Zenoh Router (on the Manager) [Zenoh only]
 

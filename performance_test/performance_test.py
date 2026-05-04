@@ -1,6 +1,7 @@
 import argparse
 from datetime import datetime
 import os
+import subprocess
 import sys
 import time
 
@@ -15,7 +16,7 @@ if __name__ == "__main__":
         usage=(
             "%(prog)s <topology> [--rmw|-m {fastdds,cyclonedds,zenoh}] "
             "[--exec-policy|-p {docker,native,local}] [--eval-time|-e SEC] "
-            "[--trials|-t N] [--ws-dir|-w DIR] [--help|-h]"
+            "[--trials|-t N] [--ws-dir|-w DIR] [--remote-repo-base|-b DIR] [--help|-h]"
         ),
         epilog="""
 Examples:
@@ -52,6 +53,13 @@ Examples:
         default="performance_ws",
         help="Workspace directory (default: performance_ws)",
     )
+    parser.add_argument(
+        "-b",
+        "--remote-repo-base",
+        type=str,
+        default="/home/ubuntu/ros2-perf-multihost",
+        help="Remote repository base directory used for distribution and log collection (default: /home/ubuntu/ros2-perf-multihost)",
+    )
     args = parser.parse_args()
 
     eval_time = args.eval_time
@@ -62,6 +70,8 @@ Examples:
     repo_root = os.path.dirname(script_dir)
     start_exec_scripts_py = os.path.join(
         repo_root, "remote_hosts_scripts", "start_exec_scripts.py")
+    distribute_exec_scripts_sh = os.path.join(
+        repo_root, "manager_scripts", "distribute_exec_scripts.sh")
 
     local_results_root = os.path.join(
         args.ws_dir, args.topology_name, "results")
@@ -102,6 +112,41 @@ Examples:
     print(f"Local logs dir: {local_logs_dir}")
     print(f"Local csv dir: {local_csv_dir}")
     print(f"Local latest alias: {local_latest_link} -> {run_timestamp}")
+
+    if args.exec_policy in ("docker", "native"):
+        distribute_cmd = [
+            distribute_exec_scripts_sh,
+            args.topology_name,
+            "--ws-dir",
+            args.ws_dir,
+            "--remote-repo-base",
+            args.remote_repo_base,
+        ]
+        print(
+            "Distributing host-specific exec scripts before remote benchmark run..."
+        )
+        try:
+            result = subprocess.run(
+                distribute_cmd,
+                text=True,
+                capture_output=True,
+                check=True,
+            )
+            if result.stdout:
+                print(result.stdout.strip())
+        except subprocess.CalledProcessError as exc:
+            print(
+                "ERROR: distribute_exec_scripts.sh failed before benchmark run.",
+                file=sys.stderr,
+            )
+            if exc.stdout:
+                print(exc.stdout.strip(), file=sys.stderr)
+            if exc.stderr:
+                print(exc.stderr.strip(), file=sys.stderr)
+            sys.exit(exc.returncode or 1)
+
+        # Keep log collection path aligned with distribution destination.
+        os.environ["ROS2_PERF_REPO_ROOT"] = args.remote_repo_base
 
     prepare_run(
         start_exec_scripts_py,
