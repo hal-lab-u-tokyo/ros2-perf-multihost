@@ -11,15 +11,6 @@ from analyzer import aggregate_total_latency
 from runner import collect_logs, prepare_run, resolve_host_list, run_test
 
 
-def _safe_replace_symlink(target, link_path):
-    """Create or replace a symlink at link_path pointing to target."""
-    if os.path.lexists(link_path):
-        if os.path.isdir(link_path) and not os.path.islink(link_path):
-            return  # real directory exists, leave it alone
-        os.remove(link_path)
-    os.symlink(target, link_path)
-
-
 def _looks_like_ipv4(value):
     try:
         socket.inet_aton(value)
@@ -478,10 +469,6 @@ Examples:
     os.makedirs(local_coordination_logs_dir, exist_ok=True)
     os.makedirs(local_raw_logs_dir, exist_ok=True)
     os.makedirs(local_analysis_dir, exist_ok=True)
-
-    # Backward-compatible aliases
-    _safe_replace_symlink("raw_logs", os.path.join(local_session_dir, "logs"))
-    _safe_replace_symlink("analysis", os.path.join(local_session_dir, "csv"))
 
     local_latest_link = os.path.join(local_results_root, f"latest-{args.rmw}")
     if os.path.lexists(local_latest_link):
