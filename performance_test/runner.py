@@ -184,6 +184,7 @@ def collect_logs(
     rmw=None,
     exec_policy="docker",
     run_timestamp=None,
+    ssh_user="ubuntu",
 ):
     """Collect trial logs from remote hosts into a local logs directory."""
     src_log_dir = os.path.abspath(local_logs_dir)
@@ -252,7 +253,7 @@ def collect_logs(
                     [
                         "scp",
                         "-r",
-                        f"ubuntu@{host}:{remote_log_dir}/*",
+                        f"{ssh_user}@{host}:{remote_log_dir}/*",
                         trial_log_dir + "/",
                     ],
                     text=True,

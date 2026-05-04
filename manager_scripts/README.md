@@ -1,6 +1,6 @@
 # manager_scripts
 
-This directory contains scripts for generating and distributing topology-specific execution artifacts, and for operating the Zenoh router.
+This directory contains scripts for generating and distributing topology-specific execution artifacts, starting REST servers on all Hosts, and operating the Zenoh router.
 
 ## Scripts
 
@@ -8,6 +8,7 @@ This directory contains scripts for generating and distributing topology-specifi
 |---|---|
 | `generate_exec_scripts.py` | Generates execution scripts and Compose files from a topology JSON file |
 | `distribute_exec_scripts.sh` | Distributes generated scripts to each host via SCP |
+| `manage_rest_servers.sh` | Manages `remote_hosts_scripts/rest_server.py` on all Hosts via SSH from the manager |
 | `operate_zenoh_router.sh` | Starts or stops the Zenoh router on the manager machine |
 
 For usage of each script, see the [Usage in Details](../README.md#usage-in-details) section in the top-level README.
@@ -86,7 +87,8 @@ This script is mainly useful when you want to perform distribution manually befo
 ./manager_scripts/distribute_exec_scripts.sh \
 	<topology> \
 	[--ws-dir|-w <dir>] \
-	[--remote-repo-base|-b <dir>]
+	[--remote-repo-base|-b <dir>] \
+	[--ssh-user|-u <user>]
 ```
 
 | Argument | Short | Description | Default |
@@ -94,6 +96,7 @@ This script is mainly useful when you want to perform distribution manually befo
 | `<topology>` | — | Topology directory under `ws-dir` | required |
 | `--ws-dir` | `-w` | Workspace directory that contains generated topologies | `performance_ws` |
 | `--remote-repo-base` | `-b` | Remote repository base directory on each Host | `/home/ubuntu/ros2-perf-multihost` |
+| `--ssh-user` | `-u` | SSH user for all Hosts | `ubuntu` |
 
 Example:
 
@@ -101,4 +104,64 @@ Example:
 ./manager_scripts/distribute_exec_scripts.sh \
 	simple \
 	--remote-repo-base /home/ubuntu/ros2-perf-multihost
+```
+
+## manage_rest_servers.sh
+
+`manage_rest_servers.sh` manages `remote_hosts_scripts/rest_server.py` on all target Hosts from the manager machine.
+It resolves host names from `<ws-dir>/<topology>/metadata.txt`.
+`start` launches REST servers in the background over SSH and waits until each server port is reachable.
+If command execution or readiness check fails on any Host, the script exits with a non-zero status.
+
+```bash
+./manager_scripts/manage_rest_servers.sh \
+	<command> \
+	<topology> \
+	[--ws-dir|-w <dir>] \
+	[--remote-repo-base|-b <dir>] \
+	[--ssh-user|-u <user>] \
+	[--port|-p <port>] \
+	[--wait-retries <n>] \
+	[--wait-interval <sec>]
+```
+
+Commands:
+
+- `start`: start REST servers on all Hosts and wait until each Host is ready
+- `stop`: stop REST servers on all Hosts using PID files
+- `restart`: stop and then start REST servers on all Hosts
+- `status`: show per-Host state (`PID` and port reachability)
+- `wait`: wait until all Hosts expose the REST port
+- `monitor`: periodically run status checks
+- `logs`: show REST server logs from all Hosts
+
+| Argument | Short | Description | Default |
+|---|---|---|---|
+| `<command>` | — | One of `start`, `stop`, `status`, `wait` | required |
+| `<topology>` | — | Topology directory under `ws-dir` | required |
+| `--ws-dir` | `-w` | Workspace directory that contains generated topologies | `performance_ws` |
+| `--remote-repo-base` | `-b` | Remote repository base directory on each Host | `/home/ubuntu/ros2-perf-multihost` |
+| `--ssh-user` | `-u` | SSH user for all Hosts | `ubuntu` |
+| `--port` | `-p` | REST server port to wait for | `5000` |
+| `--wait-retries` | — | Number of readiness checks per Host | `30` |
+| `--wait-interval` | — | Seconds between readiness checks | `2` |
+| `--monitor-interval` | — | Seconds between monitor samples | `5` |
+| `--monitor-count` | — | Number of monitor samples (`0` means infinite) | `0` |
+| `--log-lines` | — | Number of lines to show for `logs` | `100` |
+| `--follow` | — | Follow logs continuously (`logs` command) | off |
+
+Example:
+
+```bash
+./manager_scripts/manage_rest_servers.sh \
+	start \
+	simple \
+	--remote-repo-base /home/ubuntu/ros2-perf-multihost
+
+./manager_scripts/manage_rest_servers.sh restart simple
+./manager_scripts/manage_rest_servers.sh status simple
+./manager_scripts/manage_rest_servers.sh monitor simple --monitor-interval 2 --monitor-count 10
+./manager_scripts/manage_rest_servers.sh logs simple --log-lines 200
+./manager_scripts/manage_rest_servers.sh logs simple --follow
+./manager_scripts/manage_rest_servers.sh stop simple
 ```

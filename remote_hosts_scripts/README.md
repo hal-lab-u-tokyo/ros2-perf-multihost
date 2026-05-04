@@ -18,6 +18,14 @@ For overall usage, see the [Usage in Details](../README.md#usage-in-details) sec
 
 ### Start the server
 
+Recommended (from the Manager, starts all Hosts):
+
+```bash
+./manager_scripts/manage_rest_servers.sh start <topology>
+```
+
+Manual (needed on each Host):
+
 ```bash
 # on the Manager
 ssh ubuntu@hostX

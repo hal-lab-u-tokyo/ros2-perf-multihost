@@ -362,9 +362,51 @@ For details on generated files in `exec_scripts/`, `metadata.txt` format, runtim
 
 ### Step3: Run Benchmark via REST
 
-#### Start REST Servers (on each Host)
+#### Start REST Servers
 
-SSH into each Host from the Manager and start the REST server.
+Start the REST server on all Hosts from the Manager in one command.
+
+```bash
+./manager_scripts/manage_rest_servers.sh \
+  start \
+  <topology> \
+  [--ws-dir|-w <dir>] \
+  [--remote-repo-base|-b <dir>] \
+  [--ssh-user|-u <user>]
+```
+
+Arguments:
+
+- `<topology>`: Topology directory to use (required)
+- `--ws-dir` (`-w`): Workspace directory that contains generated topologies (default: `performance_ws`)
+- `--remote-repo-base` (`-b`): Remote repository base directory on each Host (default: `/home/ubuntu/ros2-perf-multihost`)
+- `--ssh-user` (`-u`): SSH username used to connect to each Host (default: `ubuntu`)
+
+Example:
+
+```bash
+./manager_scripts/manage_rest_servers.sh \
+  start \
+  simple \
+  --remote-repo-base /home/ubuntu/ros2-perf-multihost
+
+# Optional: check and stop
+./manager_scripts/manage_rest_servers.sh restart simple
+./manager_scripts/manage_rest_servers.sh status simple
+./manager_scripts/manage_rest_servers.sh stop simple
+```
+
+The target Host list is resolved from `<ws-dir>/<topology>/metadata.txt`.
+If SSH startup or readiness check fails on any Host, this command exits with a non-zero status.
+For full subcommand and option details (including `wait`, `monitor`, `logs`, and related options), see [manager_scripts/README.md](./manager_scripts/README.md#manage_rest_serverssh).
+
+If the server exits at startup with a chrony sudo permission error, check the chrony sudo setup in [Clock synchronization for REST benchmark (chrony)](#clock-synchronization-for-rest-benchmark-chrony).
+
+For details on the specification of REST server and environment variables, see [remote_hosts_scripts/README.md](./remote_hosts_scripts/README.md#rest_serverpy).
+
+##### Alternative method (manual startup on each Host):
+
+If you prefer to control startup host by host (for example, when debugging a specific Host or when centralized SSH fan-out is not available), you can start `rest_server.py` manually on each target Host.
 
 ```bash
 # on the Manager
@@ -374,11 +416,7 @@ cd ros2-perf-multihost
 python3 remote_hosts_scripts/rest_server.py
 ```
 
-If the server exits at startup with a chrony sudo permission error, check the chrony sudo setup in [Clock synchronization for REST benchmark (chrony)](#clock-synchronization-for-rest-benchmark-chrony).
-
-For details on the specification of REST server and environment variables, see [remote_hosts_scripts/README.md](./remote_hosts_scripts/README.md#rest_serverpy).
-
-#### Run Benchmark (on the Manager)
+#### Run Benchmark
 
 Then, run the benchmark script on the Manager.
 For `docker` and `native` modes, `performance_test.py` automatically distributes the generated host-specific execution files to each Host.
@@ -392,7 +430,8 @@ python3 performance_test/performance_test.py \
   [--eval-time|-e <sec>] \
   [--trials|-t <n>] \
   [--ws-dir|-w <dir>] \
-  [--remote-repo-base|-b <dir>]
+  [--remote-repo-base|-b <dir>] \
+  [--ssh-user|-u <user>]
 ```
 
 Arguments:
@@ -404,6 +443,7 @@ Arguments:
 - `--trials` (`-t`): Number of trials (default: `3`)
 - `--ws-dir` (`-w`): Base directory that contains generated execution scripts (default: `performance_ws`)
 - `--remote-repo-base` (`-b`): Remote repository base directory used for automatic distribution and log collection in `docker`/`native` modes (default: `/home/ubuntu/ros2-perf-multihost`)
+- `--ssh-user` (`-u`): SSH username used for distribution and log collection in `docker`/`native` modes (default: `ubuntu`)
 
 Example:
 
@@ -468,7 +508,7 @@ Common issues and fixes:
 
 - `python3 manager_scripts/generate_exec_scripts.py ...` fails because output exists: rerun with `--force` or remove the existing topology directory under `performance_ws/`.
 - `distribute_exec_scripts.sh` fails with SSH/SCP errors: verify hostnames, SSH keys, and that repository paths are identical across Hosts.
-- REST benchmark does not start remote execution: ensure `python3 remote_hosts_scripts/rest_server.py` is running on every target Host before calling `performance_test.py`.
+- REST benchmark does not start remote execution: ensure REST servers are running on every target Host (for example, run `./manager_scripts/manage_rest_servers.sh start <topology>` from the Manager before calling `performance_test.py`).
 - Docker mode fails on remote Hosts: pull `ghcr.io/hal-lab-u-tokyo/ros2-perf-multihost:latest` and confirm Docker permissions on each Host.
 - Native mode cannot find workspace paths: set `ROS2_PERF_WS` to the project root before running `<host_name>_exec_native.sh`.
 - Expected CSV outputs are missing: check `<ws-dir>/<topology>/results/latest-<rmw>/logs/trial<N>/` for trial logs and inspect script stderr for analyzer failures.

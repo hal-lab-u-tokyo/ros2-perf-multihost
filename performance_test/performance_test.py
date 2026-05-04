@@ -16,7 +16,7 @@ if __name__ == "__main__":
         usage=(
             "%(prog)s <topology> [--rmw|-m {fastdds,cyclonedds,zenoh}] "
             "[--exec-policy|-p {docker,native,local}] [--eval-time|-e SEC] "
-            "[--trials|-t N] [--ws-dir|-w DIR] [--remote-repo-base|-b DIR] [--help|-h]"
+            "[--trials|-t N] [--ws-dir|-w DIR] [--remote-repo-base|-b DIR] [--ssh-user|-u USER] [--help|-h]"
         ),
         epilog="""
 Examples:
@@ -59,6 +59,13 @@ Examples:
         type=str,
         default="/home/ubuntu/ros2-perf-multihost",
         help="Remote repository base directory used for distribution and log collection (default: /home/ubuntu/ros2-perf-multihost)",
+    )
+    parser.add_argument(
+        "-u",
+        "--ssh-user",
+        type=str,
+        default="ubuntu",
+        help="SSH username for distribution and log collection in docker/native modes (default: ubuntu)",
     )
     args = parser.parse_args()
 
@@ -112,6 +119,7 @@ Examples:
     print(f"Local logs dir: {local_logs_dir}")
     print(f"Local csv dir: {local_csv_dir}")
     print(f"Local latest alias: {local_latest_link} -> {run_timestamp}")
+    print(f"SSH user for remote ops: {args.ssh_user}")
 
     if args.exec_policy in ("docker", "native"):
         distribute_cmd = [
@@ -121,6 +129,8 @@ Examples:
             args.ws_dir,
             "--remote-repo-base",
             args.remote_repo_base,
+            "--ssh-user",
+            args.ssh_user,
         ]
         print(
             "Distributing host-specific exec scripts before remote benchmark run..."
@@ -156,6 +166,7 @@ Examples:
         rmw=args.rmw,
         exec_policy=args.exec_policy,
         run_timestamp=run_timestamp,
+        ssh_user=args.ssh_user,
     )
 
     for trial_idx in range(args.trials):
