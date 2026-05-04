@@ -141,15 +141,15 @@ def _sync_clock_on_startup():
         }
 
     sync_result = _chrony_makestep_and_waitsync()
-    tracking_result = _collect_chrony_tracking()
+    offset_sec = _parse_tracking_offset_seconds(sync_result["tracking"])
     return {
         "enabled": True,
         "corrected": True,
         "startup": True,
-        "offset_seconds": tracking_result["offset_seconds"],
+        "offset_seconds": offset_sec,
         "makestep": sync_result["makestep"],
         "waitsync": sync_result["waitsync"],
-        "tracking": tracking_result["tracking"],
+        "tracking": sync_result["tracking"],
     }
 
 
@@ -172,17 +172,17 @@ def _guard_clock_on_prepare():
         }
 
     sync_result = _chrony_makestep_and_waitsync()
-    post_tracking = _collect_chrony_tracking()
+    offset_sec_after = _parse_tracking_offset_seconds(sync_result["tracking"])
     return {
         "enabled": True,
         "corrected": True,
         "offset_seconds_before": offset_sec,
-        "offset_seconds_after": post_tracking["offset_seconds"],
+        "offset_seconds_after": offset_sec_after,
         "threshold_seconds": CHRONY_PREPARE_MAX_OFFSET_SEC,
         "tracking_before": tracking_result["tracking"],
         "makestep": sync_result["makestep"],
         "waitsync": sync_result["waitsync"],
-        "tracking_after": post_tracking["tracking"],
+        "tracking_after": sync_result["tracking"],
     }
 
 
