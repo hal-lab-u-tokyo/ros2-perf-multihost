@@ -85,7 +85,7 @@ def _collect_topic_runtime_config(ws_dir, topology_name):
 
 
 def _try_parse_total_latency_values(values, total_path):
-    """Return numeric latency values list or None when non-numeric fields exist."""
+    """Return numeric latency values list or None when malformed/non-numeric/non-finite fields exist."""
     if len(values) < 8:
         print(
             f"[WARN] Malformed total_latency row (expected 8 columns): path={total_path}, values={values}"
@@ -216,7 +216,6 @@ def aggregate_total_latency(
     all_throughputs_bps = []
     all_throughputs_mbps = []
     total_lost_all_trials = 0
-    all_trial_rows_numeric = True
     invalid_trial_issues = []
 
     for trial_idx in range(num_trials):
@@ -235,7 +234,6 @@ def aggregate_total_latency(
             print(
                 f"[WARN] Skipping malformed trial summary row: path={total_path}, values={values}"
             )
-            all_trial_rows_numeric = False
             invalid_trial_issues.append(
                 f"trial{trial_idx + 1}: malformed summary row (<8 columns) at {total_path}"
             )
@@ -266,7 +264,6 @@ def aggregate_total_latency(
         if numeric_values is not None:
             all_values.append(numeric_values)
         else:
-            all_trial_rows_numeric = False
             invalid_trial_issues.append(
                 f"trial{trial_idx + 1}: invalid latency summary values at {total_path}"
             )
@@ -301,7 +298,7 @@ def aggregate_total_latency(
             f"{details}"
         )
 
-    if all_values and all_trial_rows_numeric:
+    if all_values:
         all_values_np = np.array(all_values)
         total_lost = total_lost_all_trials
         mean = round(np.mean(all_values_np[:, 1]), 6)
