@@ -1,5 +1,6 @@
 import csv
 import json
+import math
 import os
 import subprocess
 import sys
@@ -91,14 +92,50 @@ def _try_parse_total_latency_values(values, total_path):
         )
         return None
 
+    parsed = []
     try:
-        return [float(values[0])] + [float(v) for v in values[1:8]]
+        for v in values[:8]:
+            parsed.append(float(v))
     except ValueError:
         print(
             f"[WARN] Non-numeric latency summary detected; skipping numeric aggregation for this trial: "
             f"path={total_path}, values={values[:8]}"
         )
         return None
+
+    if not all(math.isfinite(v) for v in parsed):
+        print(
+            f"[WARN] Non-finite latency summary detected; skipping numeric aggregation for this trial: "
+            f"path={total_path}, values={values[:8]}"
+        )
+        return None
+
+    return parsed
+
+
+def _try_parse_lost_count(raw_value, total_path):
+    """Parse lost count from summary row; returns int or None on malformed value."""
+    try:
+        parsed = float(raw_value)
+    except ValueError:
+        print(
+            f"[WARN] Non-numeric lost count in trial summary: path={total_path}, value={raw_value}"
+        )
+        return None
+
+    if not math.isfinite(parsed):
+        print(
+            f"[WARN] Non-finite lost count in trial summary: path={total_path}, value={raw_value}"
+        )
+        return None
+
+    if not parsed.is_integer():
+        print(
+            f"[WARN] Non-integer lost count in trial summary: path={total_path}, value={raw_value}"
+        )
+        return None
+
+    return int(parsed)
 
 
 def read_monitor_metrics(path):
@@ -178,6 +215,7 @@ def aggregate_total_latency(
     all_throughputs_bps = []
     all_throughputs_mbps = []
     total_lost_all_trials = 0
+    all_trial_rows_numeric = True
 
     for trial_idx in range(num_trials):
         trial_results_dir = os.path.join(trial_dir, f"trial{trial_idx + 1}")
@@ -210,16 +248,15 @@ def aggregate_total_latency(
                 values[7],
             ]
         )
-        try:
-            total_lost_all_trials += int(float(values[0]))
-        except ValueError:
-            print(
-                f"[WARN] Non-numeric lost count in trial summary: path={total_path}, value={values[0]}"
-            )
+        lost_count = _try_parse_lost_count(values[0], total_path)
+        if lost_count is not None:
+            total_lost_all_trials += lost_count
 
         numeric_values = _try_parse_total_latency_values(values, total_path)
         if numeric_values is not None:
             all_values.append(numeric_values)
+        else:
+            all_trial_rows_numeric = False
 
         print(f"  Aggregated trial{trial_idx + 1} from {total_path}")
         print(f"    Values: {values}")
@@ -244,7 +281,7 @@ def aggregate_total_latency(
         all_throughputs_bps.append(bps)
         all_throughputs_mbps.append(mbps)
 
-    if all_values:
+    if all_values and all_trial_rows_numeric:
         all_values_np = np.array(all_values)
         total_lost = total_lost_all_trials
         mean = round(np.mean(all_values_np[:, 1]), 6)
