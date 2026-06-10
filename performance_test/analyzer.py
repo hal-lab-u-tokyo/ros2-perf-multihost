@@ -83,6 +83,24 @@ def _collect_topic_runtime_config(ws_dir, topology_name):
     return topic_cfg
 
 
+def _try_parse_total_latency_values(values, total_path):
+    """Return numeric latency values list or None when non-numeric fields exist."""
+    if len(values) < 8:
+        print(
+            f"[WARN] Malformed total_latency row (expected 8 columns): path={total_path}, values={values}"
+        )
+        return None
+
+    try:
+        return [float(values[0])] + [float(v) for v in values[1:8]]
+    except ValueError:
+        print(
+            f"[WARN] Non-numeric latency summary detected; skipping numeric aggregation for this trial: "
+            f"path={total_path}, values={values[:8]}"
+        )
+        return None
+
+
 def read_monitor_metrics(path):
     # Returns dict: cpu_mean, cpu_max, mem_mean, mem_max, load1_mean, swap_mean, swap_max, samples
     vals = {"cpu_percent": [], "mem_percent": [],
@@ -159,6 +177,7 @@ def aggregate_total_latency(
     throughput_rows = []
     all_throughputs_bps = []
     all_throughputs_mbps = []
+    total_lost_all_trials = 0
 
     for trial_idx in range(num_trials):
         trial_results_dir = os.path.join(trial_dir, f"trial{trial_idx + 1}")
@@ -171,6 +190,12 @@ def aggregate_total_latency(
             if len(lines) < 3:
                 continue
             values = lines[2].strip().split()
+
+        if len(values) < 8:
+            print(
+                f"[WARN] Skipping malformed trial summary row: path={total_path}, values={values}"
+            )
+            continue
 
         rows.append(
             [
@@ -185,7 +210,17 @@ def aggregate_total_latency(
                 values[7],
             ]
         )
-        all_values.append([float(values[0])] + [float(v) for v in values[1:]])
+        try:
+            total_lost_all_trials += int(float(values[0]))
+        except ValueError:
+            print(
+                f"[WARN] Non-numeric lost count in trial summary: path={total_path}, value={values[0]}"
+            )
+
+        numeric_values = _try_parse_total_latency_values(values, total_path)
+        if numeric_values is not None:
+            all_values.append(numeric_values)
+
         print(f"  Aggregated trial{trial_idx + 1} from {total_path}")
         print(f"    Values: {values}")
 
@@ -211,7 +246,7 @@ def aggregate_total_latency(
 
     if all_values:
         all_values_np = np.array(all_values)
-        total_lost = int(np.sum(all_values_np[:, 0]))
+        total_lost = total_lost_all_trials
         mean = round(np.mean(all_values_np[:, 1]), 6)
         sd = round(np.std(all_values_np[:, 1]), 6)
         min_v = round(np.min(all_values_np[:, 3]), 6)
@@ -220,6 +255,9 @@ def aggregate_total_latency(
         q3 = round(np.mean(all_values_np[:, 6]), 6)
         max_v = round(np.max(all_values_np[:, 7]), 6)
         rows.append(["total", total_lost, mean, sd, min_v, q1, mid, q3, max_v])
+    elif rows:
+        rows.append(["total", total_lost_all_trials, "N/A",
+                    "N/A", "N/A", "N/A", "N/A", "N/A", "N/A"])
 
     if all_throughputs_bps:
         mean_bps = round(np.mean(all_throughputs_bps), 2)
