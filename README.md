@@ -433,7 +433,8 @@ python3 performance_test/performance_test.py \
   [--ws-dir|-w <dir>] \
   [--remote-repo-base|-b <dir>] \
   [--ssh-user|-u <user>] \
-  [--zenoh-router|-z <target>]
+  [--zenoh-router|-z <target>] \
+  [--strict-analysis|-s]
 ```
 
 Arguments:
@@ -450,6 +451,7 @@ Arguments:
   - (default): first host listed in the JSON topology file (e.g., `host1`)
   - `<host-name>` / `<ipv4>`: explicit host name or IPv4 address (e.g., `host2` / `192.168.1.10`)
   - `Manager`: the manager machine running `performance_test.py`
+- `--strict-analysis` (`-s`): Fail analysis when any trial summary contains malformed, `N/A`, `NaN`, or `inf` values (default: disabled)
 
 Example:
 
@@ -474,6 +476,13 @@ python3 performance_test/performance_test.py \
   --zenoh-router Manager \
   --exec-policy native \
   --eval-time 10 --trials 3
+
+# Local execution with strict analysis (fail fast on malformed/non-finite summary values)
+python3 performance_test/performance_test.py \
+  simple \
+  --exec-policy local \
+  --eval-time 10 --trials 3 \
+  --strict-analysis
 ```
 
 If you want to distribute the generated host-specific execution files to each Host manually in advance, use `manager_scripts/distribute_exec_scripts.sh` as documented in [manager_scripts/README.md](./manager_scripts/README.md), then run `performance_test.py` normally.
