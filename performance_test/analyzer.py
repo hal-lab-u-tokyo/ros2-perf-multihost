@@ -85,7 +85,7 @@ def _collect_topic_runtime_config(ws_dir, topology_name):
 
 
 def _try_parse_total_latency_values(values, total_path):
-    """Return numeric latency values list or None when non-numeric fields exist."""
+    """Return numeric latency values list or None when malformed/non-numeric/non-finite fields exist."""
     if len(values) < 8:
         print(
             f"[WARN] Malformed total_latency row (expected 8 columns): path={total_path}, values={values}"
@@ -185,6 +185,7 @@ def aggregate_total_latency(
     eval_time=None,
     ws_dir="performance_ws",
     topology_name=None,
+    strict_analysis=False,
 ):
     if eval_time is None:
         eval_time = 60
@@ -215,7 +216,7 @@ def aggregate_total_latency(
     all_throughputs_bps = []
     all_throughputs_mbps = []
     total_lost_all_trials = 0
-    all_trial_rows_numeric = True
+    invalid_trial_issues = []
 
     for trial_idx in range(num_trials):
         trial_results_dir = os.path.join(trial_dir, f"trial{trial_idx + 1}")
@@ -232,6 +233,9 @@ def aggregate_total_latency(
         if len(values) < 8:
             print(
                 f"[WARN] Skipping malformed trial summary row: path={total_path}, values={values}"
+            )
+            invalid_trial_issues.append(
+                f"trial{trial_idx + 1}: malformed summary row (<8 columns) at {total_path}"
             )
             continue
 
@@ -251,12 +255,18 @@ def aggregate_total_latency(
         lost_count = _try_parse_lost_count(values[0], total_path)
         if lost_count is not None:
             total_lost_all_trials += lost_count
+        else:
+            invalid_trial_issues.append(
+                f"trial{trial_idx + 1}: invalid lost count at {total_path} (value={values[0]})"
+            )
 
         numeric_values = _try_parse_total_latency_values(values, total_path)
         if numeric_values is not None:
             all_values.append(numeric_values)
         else:
-            all_trial_rows_numeric = False
+            invalid_trial_issues.append(
+                f"trial{trial_idx + 1}: invalid latency summary values at {total_path}"
+            )
 
         print(f"  Aggregated trial{trial_idx + 1} from {total_path}")
         print(f"    Values: {values}")
@@ -281,7 +291,14 @@ def aggregate_total_latency(
         all_throughputs_bps.append(bps)
         all_throughputs_mbps.append(mbps)
 
-    if all_values and all_trial_rows_numeric:
+    if strict_analysis and invalid_trial_issues:
+        details = "\n".join(f"- {issue}" for issue in invalid_trial_issues)
+        raise RuntimeError(
+            "Strict analysis failed: malformed/non-finite trial summary values were detected:\n"
+            f"{details}"
+        )
+
+    if all_values:
         all_values_np = np.array(all_values)
         total_lost = total_lost_all_trials
         mean = round(np.mean(all_values_np[:, 1]), 6)

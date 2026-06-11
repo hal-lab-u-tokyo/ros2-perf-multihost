@@ -64,11 +64,12 @@ if __name__ == "__main__":
             "%(prog)s <topology> [--rmw|-m {fastdds,cyclonedds,zenoh}] "
             "[--exec-policy|-p {docker,native,local}] [--eval-time|-e SEC] "
             "[--trials|-t N] [--ws-dir|-w DIR] [--remote-repo-base|-b DIR] [--ssh-user|-u USER] "
-            "[--zenoh-router|-z TARGET] [--help|-h]"
+            "[--zenoh-router|-z TARGET] [--strict-analysis|-s] [--help|-h]"
         ),
         epilog="""
 Examples:
     python3 performance_test/performance_test.py simple --exec-policy local --eval-time 60 --trials 5
+    python3 performance_test/performance_test.py simple --exec-policy local --eval-time 60 --trials 5 --strict-analysis
     python3 performance_test/performance_test.py simple --rmw zenoh --exec-policy local --eval-time 60 --trials 5
     short: python3 performance_test/performance_test.py simple -m zenoh -p local -e 60 -t 5
 """,
@@ -124,6 +125,15 @@ Examples:
             "Router target for --rmw zenoh: Manager | <host-name> | <ipv4> "
             "(default: first host in topology). "
             "Examples: --zenoh-router Manager | --zenoh-router host2 | --zenoh-router 192.168.1.10"
+        ),
+    )
+    parser.add_argument(
+        "-s",
+        "--strict-analysis",
+        action="store_true",
+        help=(
+            "Treat malformed/non-finite trial summary values as fatal during analysis "
+            "(default: disabled)"
         ),
     )
     args = parser.parse_args()
@@ -184,6 +194,7 @@ Examples:
     print(f"Local analysis dir: {local_analysis_dir}")
     print(f"Local latest alias: {local_latest_link} -> {run_timestamp}")
     print(f"SSH user for remote ops: {args.ssh_user}")
+    print(f"Strict analysis mode: {args.strict_analysis}")
 
     if args.exec_policy in ("docker", "native"):
         print("Preflight: checking SSH reachability on all hosts...")
@@ -342,6 +353,7 @@ Examples:
             eval_time=eval_time,
             ws_dir=args.ws_dir,
             topology_name=args.topology_name,
+            strict_analysis=args.strict_analysis,
         )
     finally:
         if args.exec_policy in ("docker", "native"):

@@ -17,6 +17,9 @@ This directory contains scripts for trial automation, log collection, and CSV ag
 
 For usage of `performance_test.py`, see the [Usage in Details](../README.md#usage-in-details) section in the top-level README.
 
+When `performance_test.py` is run with `--strict-analysis`, aggregation fails if any trial summary (`analysis/trialN/total_latency.txt`) contains malformed, `N/A`, `NaN`, or `inf` values.
+Use this mode for CI or formal evaluations where partially valid totals are not acceptable.
+
 ## Output Structure
 
 `performance_test.py` creates run-scoped outputs under `<ws-dir>/<topology>/results/<timestamp>-<rmw>/`, and related tools may also manage shared runtime logs under `<ws-dir>/<topology>/results/runtime/`:
