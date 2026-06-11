@@ -683,6 +683,15 @@ def generate_local_run_script(json_content, output_dir, project_root, settings):
                 'LOG_DIR="$LOG_DIR" '
                 'docker compose -f "$COMPOSE_FILE" down --remove-orphans >/dev/null 2>&1 || true'
             ),
+            'cleanup_compose() {',
+            '  LOCAL_UID="$LOCAL_UID" LOCAL_GID="$LOCAL_GID" EVAL_TIME="$EVAL_TIME" '
+            'RMW_CHOICE="$RMW_CHOICE" RMW_IMPLEMENTATION="$RMW_IMPLEMENTATION" '
+            'ZENOH_CONFIG_OVERRIDE="${ZENOH_CONFIG_OVERRIDE:-}" '
+            'ZENOH_ROUTER_CHECK_ATTEMPTS="${ZENOH_ROUTER_CHECK_ATTEMPTS:-}" '
+            'RUST_LOG="${RUST_LOG:-}" LOG_DIR="$LOG_DIR" '
+            'docker compose -f "$COMPOSE_FILE" down --remove-orphans >/dev/null 2>&1 || true',
+            '}',
+            'trap cleanup_compose EXIT',
             "",
             "# Clean up FastDDS shared memory segments from host /dev/shm only for FastDDS runs.",
             "# ipc:host causes residual SHM segments to remain after each trial; FastDDS fails to",
