@@ -24,6 +24,10 @@ For `--exec-policy local`, analysis waits for trial log finalization before pars
 You can tune this with `ROS2_PERF_LOCAL_LOG_FINALIZE_TIMEOUT_SEC` (default: `20`) and
 `ROS2_PERF_LOCAL_LOG_FINALIZE_POLL_SEC` (default: `0.5`).
 
+For `--exec-policy local`, generated launch files also support a shutdown grace window
+before emitting global shutdown after all target nodes exit successfully.
+You can tune this with `ROS2_PERF_SHUTDOWN_GRACE_SEC` (default: `1.0`).
+
 ## Output Structure
 
 `performance_test.py` creates run-scoped outputs under `<ws-dir>/<topology>/results/<timestamp>-<rmw>/`, and related tools may also manage shared runtime logs under `<ws-dir>/<topology>/results/runtime/`:

@@ -271,7 +271,7 @@ def generate_exec_scripts(json_content, output_dir, settings):
         # Assemble the full launch file
         lines = [
             "from launch import LaunchDescription",
-            "from launch.actions import DeclareLaunchArgument, EmitEvent, ExecuteProcess, RegisterEventHandler",
+            "from launch.actions import DeclareLaunchArgument, EmitEvent, ExecuteProcess, RegisterEventHandler, TimerAction",
             "from launch.event_handlers import OnProcessExit",
             "from launch.events import Shutdown",
             "from launch.substitutions import EnvironmentVariable, LaunchConfiguration, PathJoinSubstitution",
@@ -281,6 +281,7 @@ def generate_exec_scripts(json_content, output_dir, settings):
             "def generate_launch_description():",
             '    eval_time = LaunchConfiguration("eval_time")',
             '    log_dir = LaunchConfiguration("log_dir")',
+            '    shutdown_grace_sec = LaunchConfiguration("shutdown_grace_sec")',
             '    project_root = EnvironmentVariable("ROS2_PERF_REPO_ROOT", default_value=EnvironmentVariable("ROS2_PERF_WS", default_value="/workdir/ros2-perf-multihost"))',
             "",
             *node_var_lines,
@@ -297,7 +298,7 @@ def generate_exec_scripts(json_content, output_dir, settings):
                 "            return [EmitEvent(event=Shutdown())]",
                 "        _remaining[0] -= 1",
                 "        if _remaining[0] <= 0:",
-                "            return [EmitEvent(event=Shutdown())]",
+                "            return [TimerAction(period=shutdown_grace_sec, actions=[EmitEvent(event=Shutdown())])]",
                 "        return []",
                 "",
             ])
@@ -307,6 +308,7 @@ def generate_exec_scripts(json_content, output_dir, settings):
             "        [",
             f'            DeclareLaunchArgument("eval_time", default_value=EnvironmentVariable("EVAL_TIME", default_value="{eval_time_default}")),',
             '            DeclareLaunchArgument("log_dir", default_value=EnvironmentVariable("LOG_DIR", default_value="")),',
+            '            DeclareLaunchArgument("shutdown_grace_sec", default_value=EnvironmentVariable("ROS2_PERF_SHUTDOWN_GRACE_SEC", default_value="1.0")),',
             "            ExecuteProcess(",
             "                cmd=[",
             '                    "python3",',
