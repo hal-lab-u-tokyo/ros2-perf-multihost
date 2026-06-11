@@ -306,7 +306,7 @@ def generate_exec_scripts(json_content, output_dir, settings):
             "    return LaunchDescription(",
             "        [",
             f'            DeclareLaunchArgument("eval_time", default_value=EnvironmentVariable("EVAL_TIME", default_value="{eval_time_default}")),',
-            '            DeclareLaunchArgument("log_dir", default_value=EnvironmentVariable("LOG_DIR", default_value="")),'
+            '            DeclareLaunchArgument("log_dir", default_value=EnvironmentVariable("LOG_DIR", default_value="")),',
             "            ExecuteProcess(",
             "                cmd=[",
             '                    "python3",',
