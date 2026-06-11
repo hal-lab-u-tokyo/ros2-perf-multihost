@@ -219,7 +219,6 @@ def collect_logs(
     """Collect trial logs from remote hosts into a local logs directory."""
     src_log_dir = os.path.abspath(local_raw_logs_dir)
 
-
     if exec_policy == "local":
         # For local exec_policy, node logs are written directly into
         # raw_logs/trial{N}/ by local_exec.sh, so no copying is needed.
