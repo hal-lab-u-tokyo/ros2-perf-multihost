@@ -3,6 +3,7 @@ import shlex
 import shutil
 import subprocess
 import sys
+import time
 
 
 def get_metadata_value(key, metadata_path):
@@ -219,9 +220,89 @@ def collect_logs(
     """Collect trial logs from remote hosts into a local logs directory."""
     src_log_dir = os.path.abspath(local_raw_logs_dir)
 
+    def _get_topic_log_files(trial_log_dir):
+        files = []
+        for root, _, names in os.walk(trial_log_dir):
+            for name in names:
+                if name.endswith("_log.txt"):
+                    files.append(os.path.join(root, name))
+        return sorted(files)
+
+    def _trial_logs_finalized(trial_log_dir):
+        topic_log_files = _get_topic_log_files(trial_log_dir)
+        if not topic_log_files:
+            return False, ["<no topic log files>"]
+
+        missing = []
+        for path in topic_log_files:
+            has_start = False
+            has_end = False
+            try:
+                with open(path, "r") as f:
+                    for line in f:
+                        if line.startswith("StartTime:"):
+                            has_start = True
+                        elif line.startswith("EndTime:"):
+                            has_end = True
+                        if has_start and has_end:
+                            break
+            except OSError:
+                missing.append(os.path.relpath(path, trial_log_dir))
+                continue
+
+            if not (has_start and has_end):
+                missing.append(os.path.relpath(path, trial_log_dir))
+
+        return len(missing) == 0, missing
+
+    def _wait_for_local_logs_finalization(trials_dir, trials_count):
+        timeout_default = 20.0
+        poll_default = 0.5
+        try:
+            timeout_sec = float(
+                os.environ.get(
+                    "ROS2_PERF_LOCAL_LOG_FINALIZE_TIMEOUT_SEC",
+                    str(timeout_default),
+                )
+            )
+        except ValueError:
+            timeout_sec = timeout_default
+        try:
+            poll_sec = float(
+                os.environ.get(
+                    "ROS2_PERF_LOCAL_LOG_FINALIZE_POLL_SEC",
+                    str(poll_default),
+                )
+            )
+        except ValueError:
+            poll_sec = poll_default
+
+        timeout_sec = max(timeout_sec, 0.0)
+        poll_sec = max(poll_sec, 0.1)
+
+        for trial_idx in range(trials_count):
+            trial_no = trial_idx + 1
+            trial_log_dir = os.path.join(trials_dir, f"trial{trial_no}")
+
+            deadline = time.monotonic() + timeout_sec
+            while True:
+                finalized, missing = _trial_logs_finalized(trial_log_dir)
+                if finalized:
+                    break
+                if time.monotonic() >= deadline:
+                    sample = ", ".join(missing[:3])
+                    print(
+                        f"WARNING: Local trial{trial_no} logs were not finalized within {timeout_sec:.1f}s "
+                        f"(missing StartTime/EndTime in: {sample})",
+                        file=sys.stderr,
+                    )
+                    break
+                time.sleep(poll_sec)
+
     if exec_policy == "local":
         # For local exec_policy, node logs are written directly into
         # raw_logs/trial{N}/ by local_exec.sh, so no copying is needed.
+        _wait_for_local_logs_finalization(src_log_dir, num_trials)
         print(f"Local exec: logs already in {src_log_dir}")
         return
 

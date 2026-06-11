@@ -20,6 +20,10 @@ For usage of `performance_test.py`, see the [Usage in Details](../README.md#usag
 When `performance_test.py` is run with `--strict-analysis`, aggregation fails if any trial summary (`analysis/trialN/total_latency.txt`) contains malformed, `N/A`, `NaN`, or `inf` values.
 Use this mode for CI or formal evaluations where partially valid totals are not acceptable.
 
+For `--exec-policy local`, analysis waits for trial log finalization before parsing.
+You can tune this with `ROS2_PERF_LOCAL_LOG_FINALIZE_TIMEOUT_SEC` (default: `20`) and
+`ROS2_PERF_LOCAL_LOG_FINALIZE_POLL_SEC` (default: `0.5`).
+
 ## Output Structure
 
 `performance_test.py` creates run-scoped outputs under `<ws-dir>/<topology>/results/<timestamp>-<rmw>/`, and related tools may also manage shared runtime logs under `<ws-dir>/<topology>/results/runtime/`:
