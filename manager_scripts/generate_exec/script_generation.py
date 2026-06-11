@@ -684,12 +684,7 @@ def generate_local_run_script(json_content, output_dir, project_root, settings):
                 'docker compose -f "$COMPOSE_FILE" down --remove-orphans >/dev/null 2>&1 || true'
             ),
             'cleanup_compose() {',
-            '  LOCAL_UID="$LOCAL_UID" LOCAL_GID="$LOCAL_GID" EVAL_TIME="$EVAL_TIME" '
-            'RMW_CHOICE="$RMW_CHOICE" RMW_IMPLEMENTATION="$RMW_IMPLEMENTATION" '
-            'ZENOH_CONFIG_OVERRIDE="${ZENOH_CONFIG_OVERRIDE:-}" '
-            'ZENOH_ROUTER_CHECK_ATTEMPTS="${ZENOH_ROUTER_CHECK_ATTEMPTS:-}" '
-            'RUST_LOG="${RUST_LOG:-}" LOG_DIR="$LOG_DIR" '
-            'docker compose -f "$COMPOSE_FILE" down --remove-orphans >/dev/null 2>&1 || true',
+            '  LOCAL_UID="$LOCAL_UID" LOCAL_GID="$LOCAL_GID" EVAL_TIME="$EVAL_TIME" RMW_CHOICE="$RMW_CHOICE" RMW_IMPLEMENTATION="$RMW_IMPLEMENTATION" ZENOH_CONFIG_OVERRIDE="${ZENOH_CONFIG_OVERRIDE:-}" ZENOH_ROUTER_CHECK_ATTEMPTS="${ZENOH_ROUTER_CHECK_ATTEMPTS:-}" RUST_LOG="${RUST_LOG:-}" LOG_DIR="$LOG_DIR" docker compose -f "$COMPOSE_FILE" down --remove-orphans >/dev/null 2>&1 || true',
             '}',
             'trap cleanup_compose EXIT',
             "",
