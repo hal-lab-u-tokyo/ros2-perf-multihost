@@ -40,7 +40,7 @@ results/
 │   ├── rest_server.log              # managed by manage_rest_servers.sh
 │   └── zenohd_router.log            # created when rmw_zenohd is started natively
 └── 2026-04-26_13-21-45-fastdds/
-    ├── coordination_logs/           # created in docker/native mode
+    ├── coordination_logs/           # created in docker/native mode; local_exec.sh also writes local_exec_trial<N>.log
     │   ├── prepare_run.log          # stdout/stderr of the prepare_run REST phase
     │   ├── exec_trial1.log          # stdout/stderr of the REST call for trial 1
     │   ├── exec_trial2.log

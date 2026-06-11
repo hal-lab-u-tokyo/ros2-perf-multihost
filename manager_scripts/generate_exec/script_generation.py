@@ -671,6 +671,11 @@ def generate_local_run_script(json_content, output_dir, project_root, settings):
         lines, rel_root, settings.default_eval_time, settings)
     lines.extend(
         [
+            'COORD_LOGS_HOST_DIR="$RUN_RESULTS_HOST_DIR/coordination_logs"',
+            'mkdir -p "$COORD_LOGS_HOST_DIR"',
+            'LOCAL_EXEC_LOG_PATH="$COORD_LOGS_HOST_DIR/local_exec_trial${TRIAL_IDX}.log"',
+            'exec > >(tee -a "$LOCAL_EXEC_LOG_PATH") 2>&1',
+            'echo "Local execution log: $LOCAL_EXEC_LOG_PATH"',
             'COMPOSE_FILE="$SCRIPT_DIR/local_compose.yaml"',
             'echo "Using compose file: $COMPOSE_FILE"',
             'echo "Cleaning up previous containers (including orphans)..."',
