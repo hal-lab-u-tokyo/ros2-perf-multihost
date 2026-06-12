@@ -669,6 +669,11 @@ def generate_local_run_script(json_content, output_dir, project_root, settings):
         lines, rel_root, settings.default_eval_time, settings)
     lines.extend(
         [
+            'COORD_LOGS_HOST_DIR="$RUN_RESULTS_HOST_DIR/coordination_logs"',
+            'mkdir -p "$COORD_LOGS_HOST_DIR"',
+            'LOCAL_EXEC_LOG_PATH="$COORD_LOGS_HOST_DIR/local_exec_trial${TRIAL_IDX}.log"',
+            'exec > >(tee -a "$LOCAL_EXEC_LOG_PATH") 2>&1',
+            'echo "Local execution log: $LOCAL_EXEC_LOG_PATH"',
             'COMPOSE_FILE="$SCRIPT_DIR/local_compose.yaml"',
             'echo "Using compose file: $COMPOSE_FILE"',
             'echo "Cleaning up previous containers (including orphans)..."',
@@ -683,6 +688,10 @@ def generate_local_run_script(json_content, output_dir, project_root, settings):
                 'LOG_DIR="$LOG_DIR" '
                 'docker compose -f "$COMPOSE_FILE" down --remove-orphans >/dev/null 2>&1 || true'
             ),
+            'cleanup_compose() {',
+            '  LOCAL_UID="$LOCAL_UID" LOCAL_GID="$LOCAL_GID" EVAL_TIME="$EVAL_TIME" RMW_CHOICE="$RMW_CHOICE" RMW_IMPLEMENTATION="$RMW_IMPLEMENTATION" ZENOH_CONFIG_OVERRIDE="${ZENOH_CONFIG_OVERRIDE:-}" ZENOH_ROUTER_CHECK_ATTEMPTS="${ZENOH_ROUTER_CHECK_ATTEMPTS:-}" RUST_LOG="${RUST_LOG:-}" LOG_DIR="$LOG_DIR" docker compose -f "$COMPOSE_FILE" down --remove-orphans >/dev/null 2>&1 || true',
+            '}',
+            'trap cleanup_compose EXIT',
             "",
             "# Clean up FastDDS shared memory segments from host /dev/shm only for FastDDS runs.",
             "# ipc:host causes residual SHM segments to remain after each trial; FastDDS fails to",
