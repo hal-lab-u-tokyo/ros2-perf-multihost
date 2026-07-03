@@ -391,7 +391,7 @@ def write_sources_csv(path: Path, rows: list[HostCheckResult]) -> None:
 
 def main() -> int:
     args = parse_args()
-    repo_root = Path(__file__).resolve().parents[1]
+    repo_root = Path(__file__).resolve().parents[2]
 
     hosts_from_arg: list[str] = []
     if args.hosts:

@@ -563,9 +563,7 @@ def write_pairwise_csv(path: Path, summaries: dict[str, dict[str, str | int]], h
                 host_b = hosts[j]
                 s_a = summaries.get(host_a, {})
                 s_b = summaries.get(host_b, {})
-                if not s_a or not s_b:
-                    continue
-                if not s_a.get("best_offset_ns") or not s_b.get("best_offset_ns"):
+                if s_a.get("best_offset_ns") in ("", None) or s_b.get("best_offset_ns") in ("", None):
                     continue
 
                 skew_ns = int(s_b["best_offset_ns"]) - \
@@ -624,7 +622,7 @@ def main() -> int:
         print("ERROR: --timeout must be > 0", file=sys.stderr)
         return 2
 
-    repo_root = Path(__file__).resolve().parents[1]
+    repo_root = Path(__file__).resolve().parents[2]
 
     hosts_from_arg: list[str] = []
     if args.hosts:
