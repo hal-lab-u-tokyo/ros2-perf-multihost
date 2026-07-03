@@ -345,15 +345,13 @@ def _resolve_active_timestamp(ctx, rmw):
 def clock_probe():
     """Return host-side timestamps for NTP-style offset estimation."""
     recv_ns = time.time_ns()
-    send_ns = time.time_ns()
+    payload = {
+        "hostname": socket.gethostname(),
+        "server_recv_time_ns": recv_ns,
+    }
+    payload["server_send_time_ns"] = time.time_ns()
     return (
-        jsonify(
-            {
-                "hostname": socket.gethostname(),
-                "server_recv_time_ns": recv_ns,
-                "server_send_time_ns": send_ns,
-            }
-        ),
+        jsonify(payload),
         200,
     )
 

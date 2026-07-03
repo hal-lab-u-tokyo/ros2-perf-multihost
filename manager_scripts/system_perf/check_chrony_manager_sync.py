@@ -10,6 +10,7 @@ from __future__ import annotations
 import argparse
 import csv
 import json
+import re
 import socket
 import subprocess
 import sys
@@ -186,6 +187,11 @@ def run_ssh(host: str, ssh_user: str, remote_cmd: str) -> tuple[bool, str, str]:
 
 
 def parse_manager_row(raw_sources: str, manager_ip: str) -> tuple[bool, str, str]:
+    """Parse a matching manager source row from chronyc CSV output.
+
+    Supports both formats where mode/state are split columns and where they are
+    combined in the first column (e.g. '^*').
+    """
     for line in raw_sources.splitlines():
         line = line.strip()
         if not line:
@@ -194,13 +200,24 @@ def parse_manager_row(raw_sources: str, manager_ip: str) -> tuple[bool, str, str
         if len(cols) < 6:
             continue
 
-        source_name = cols[2].strip("[]")
-        if source_name != manager_ip:
-            continue
+        # Format A: mode/state/source are split columns.
+        #   [mode, state, source, stratum, poll, reach, ...]
+        if len(cols) >= 6 and len(cols[0]) == 1 and len(cols[1]) == 1:
+            source_name = cols[2].strip("[]")
+            if source_name == manager_ip:
+                state = cols[1]
+                reach = cols[5]
+                return True, state, reach
 
-        state = cols[1]
-        reach = cols[5]
-        return True, state, reach
+        # Format B: mode+state are combined in the first column (e.g. '^*').
+        #   [mode_state, source, stratum, poll, reach, ...]
+        if len(cols) >= 5 and len(cols[0]) >= 2:
+            mode_state = cols[0]
+            source_name = cols[1].strip("[]")
+            if source_name == manager_ip:
+                state = mode_state[1]
+                reach = cols[4]
+                return True, state, reach
 
     return False, "", ""
 
@@ -228,10 +245,11 @@ def check_host(host: str, args: argparse.Namespace) -> HostCheckResult:
 
     chrony_active = active_out.strip() == "active"
 
+    manager_ip_pat = re.escape(str(args.manager_ip))
     conf_cmd = (
         "bash -lc "
         f"'grep -E "
-        f"\"^[[:space:]]*(server|pool)[[:space:]]+{args.manager_ip}([[:space:]]|$)\" "
+        f"\"^[[:space:]]*(server|pool)[[:space:]]+{manager_ip_pat}([[:space:]]|$)\" "
         f"{args.chrony_conf} >/dev/null 2>&1 && echo yes || echo no'"
     )
     _, conf_out, _ = run_ssh(host, args.ssh_user, conf_cmd)
@@ -240,7 +258,7 @@ def check_host(host: str, args: argparse.Namespace) -> HostCheckResult:
     _, sources_out, sources_err = run_ssh(
         host,
         args.ssh_user,
-        "chronyc -c -n sources 2>/dev/null || true",
+        "chronyc -c -n sources || true",
     )
 
     if not chrony_active:
