@@ -552,6 +552,23 @@ def _resolve_output_dir(
     return repo_root / candidate
 
 
+def _update_latest_alias(output_dir: Path, run_dir: Path) -> tuple[bool, str]:
+    latest_link = output_dir / "latest"
+    rel_target = Path(run_dir.name)
+    try:
+        if latest_link.is_symlink() or latest_link.exists():
+            if latest_link.is_dir() and not latest_link.is_symlink():
+                return (
+                    False,
+                    f"{latest_link} exists as a directory; could not update alias",
+                )
+            latest_link.unlink()
+        latest_link.symlink_to(rel_target)
+        return True, str(latest_link)
+    except OSError as exc:
+        return False, f"failed to create latest alias: {exc}"
+
+
 def main() -> int:
     args = parse_args()
     if args.samples <= 0:
@@ -611,7 +628,8 @@ def main() -> int:
 
         for host in hosts:
             out(f"--- {host} ---")
-            probe = check_clock_probe_availability(host, args.port, args.timeout)
+            probe = check_clock_probe_availability(
+                host, args.port, args.timeout)
             if not probe.ok and probe.category in (
                 "missing_clock_probe",
                 "connection_refused",
@@ -652,7 +670,8 @@ def main() -> int:
                 continue
 
             best = min(ok_rows, key=lambda r: r.net_delay_ns)
-            mean_offset = int(round(statistics.fmean(r.offset_ns for r in ok_rows)))
+            mean_offset = int(
+                round(statistics.fmean(r.offset_ns for r in ok_rows)))
             sd_offset = int(
                 round(statistics.pstdev([r.offset_ns for r in ok_rows]))
             ) if len(ok_rows) > 1 else 0
@@ -689,7 +708,8 @@ def main() -> int:
                 if s_a.get("best_offset_ns") in ("", None) or s_b.get("best_offset_ns") in ("", None):
                     continue
 
-                skew_ns = int(s_b["best_offset_ns"]) - int(s_a["best_offset_ns"])
+                skew_ns = int(s_b["best_offset_ns"]) - \
+                    int(s_a["best_offset_ns"])
                 combined_uncertainty_ns = int(s_a["best_uncertainty_ns"]) + int(
                     s_b["best_uncertainty_ns"]
                 )
@@ -708,6 +728,12 @@ def main() -> int:
         out(f"summary  : {summary_csv}")
         out(f"pairwise : {pairwise_csv}")
         out(f"result   : {result_log}")
+
+        latest_ok, latest_msg = _update_latest_alias(output_dir, run_dir)
+        if latest_ok:
+            out(f"latest   : {latest_msg}")
+        else:
+            out(f"latest   : unavailable ({latest_msg})")
 
         any_ok = any(r.ok for r in all_rows)
         if not any_ok:
