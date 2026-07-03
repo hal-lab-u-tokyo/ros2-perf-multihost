@@ -583,6 +583,37 @@ def write_pairwise_csv(path: Path, summaries: dict[str, dict[str, str | int]], h
                 )
 
 
+def write_manager_host_csv(path: Path, summaries: dict[str, dict[str, str | int]], hosts: list[str]) -> None:
+    with path.open("w", encoding="utf-8", newline="") as fh:
+        writer = csv.writer(fh)
+        writer.writerow(
+            [
+                "manager",
+                "host",
+                "best_offset_ns",
+                "best_offset_ms",
+                "best_uncertainty_ns",
+                "best_uncertainty_ms",
+            ]
+        )
+
+        for host in hosts:
+            s = summaries.get(host, {})
+            if s.get("best_offset_ns") in ("", None):
+                continue
+
+            writer.writerow(
+                [
+                    "manager",
+                    host,
+                    int(s["best_offset_ns"]),
+                    ns_to_ms_str(int(s["best_offset_ns"])),
+                    int(s["best_uncertainty_ns"]),
+                    ns_to_ms_str(int(s["best_uncertainty_ns"])),
+                ]
+            )
+
+
 def _resolve_output_dir(
     repo_root: Path,
     output_dir_arg: str,
@@ -672,10 +703,12 @@ def main() -> int:
         samples_csv = run_dir / f"{args.csv_prefix}_samples.csv"
         summary_csv = run_dir / f"{args.csv_prefix}_summary.csv"
         pairwise_csv = run_dir / f"{args.csv_prefix}_pairwise.csv"
+        manager_host_csv = run_dir / f"{args.csv_prefix}_manager_host.csv"
     else:
         samples_csv = run_dir / "samples.csv"
         summary_csv = run_dir / "summary.csv"
         pairwise_csv = run_dir / "pairwise.csv"
+        manager_host_csv = run_dir / "manager_host.csv"
     result_log = run_dir / "result.log"
 
     rows_by_host: dict[str, list[Sample]] = {}
@@ -771,7 +804,28 @@ def main() -> int:
 
         write_samples_csv(samples_csv, all_rows)
         summaries = write_summary_csv(summary_csv, rows_by_host)
+        write_manager_host_csv(manager_host_csv, summaries, hosts)
         write_pairwise_csv(pairwise_csv, summaries, hosts)
+
+        out("=== Manager-to-Host Skew (best estimates) ===")
+        manager_host_count = 0
+        for host in hosts:
+            s = summaries.get(host, {})
+            if s.get("best_offset_ns") in ("", None):
+                continue
+
+            offset_ns = int(s["best_offset_ns"])
+            uncertainty_ns = int(s["best_uncertainty_ns"])
+            out(
+                f"{host} - manager = {offset_ns} ns ({ns_to_ms_str(offset_ns)} ms), "
+                f"uncertainty=+/-{uncertainty_ns} ns"
+            )
+            manager_host_count += 1
+
+        if manager_host_count == 0:
+            out("No manager-to-host skew available (insufficient valid host samples).")
+
+        out("")
 
         out("=== Host-to-Host Skew (best estimates) ===")
         pair_count = 0
@@ -805,6 +859,7 @@ def main() -> int:
         out("=== CSV Output ===")
         out(f"samples  : {samples_csv}")
         out(f"summary  : {summary_csv}")
+        out(f"mgr-host : {manager_host_csv}")
         out(f"pairwise : {pairwise_csv}")
         out(f"result   : {result_log}")
 

@@ -272,12 +272,7 @@ python3 manager_scripts/system_perf/check_clock_skew_rest.py --topology topology
 You can specify `--hosts`, `--topology`, or both.
 If both are specified and the host lists do not match, the script prints a warning and aborts without evaluation.
 
-`check_clock_skew_rest.py` saves three CSV files under `performance_ws/system_perf/clock_skew/<timestamp>/` by default:
-
-- `samples.csv`
-- `summary.csv`
-- `pairwise.csv`
-
+`check_clock_skew_rest.py` saves CSV files under `performance_ws/system_perf/clock_skew/<timestamp>/` by default.
 For option details and output field definitions, see:
 
 - [manager_scripts/system_perf/README.md#check_clock_skew_restpy](./manager_scripts/system_perf/README.md#check_clock_skew_restpy)

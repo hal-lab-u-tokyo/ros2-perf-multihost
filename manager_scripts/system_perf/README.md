@@ -63,8 +63,9 @@ CSV outputs:
 - default layout: `performance_ws/system_perf/clock_skew/<timestamp>/`
 - `samples.csv`: one row per sample with t0/t1/t2/t3, RTT, delay, offset, uncertainty
 - `summary.csv`: per-host best/mean/sd/range summaries
+- `manager_host.csv`: manager-to-host skew (`host - manager`) and uncertainty from best samples
 - `pairwise.csv`: host-to-host skew and combined uncertainty from best samples
-- when `--csv-prefix` is set, filenames become `<prefix>_samples.csv`, `<prefix>_summary.csv`, `<prefix>_pairwise.csv`
+- when `--csv-prefix` is set, filenames become `<prefix>_samples.csv`, `<prefix>_summary.csv`, `<prefix>_manager_host.csv`, `<prefix>_pairwise.csv`
 
 Failure diagnosis behavior:
 
