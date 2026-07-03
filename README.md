@@ -364,6 +364,24 @@ You can also wait until correction converges on each Host:
 sudo chronyc waitsync 20 0.001
 ```
 
+After applying Manager/Host chrony settings, run the Manager-side checker below to validate that each Host is actually synchronized to the expected Manager source and to catch likely `allow` CIDR/firewall mistakes:
+
+```bash
+python3 manager_scripts/check_chrony_manager_sync.py \
+  --hosts host1,host2,host3
+
+# optional: resolve Hosts from topology JSON instead
+python3 manager_scripts/check_chrony_manager_sync.py \
+  --topology topology_example/simple.json
+```
+
+`--hosts` is the primary input. `--topology` is optional and can be used when you want to resolve host names from a topology JSON.
+
+`--manager-ip` is optional. If omitted, the script auto-detects the Manager local IP from the route to target Hosts.
+If your Manager has multiple NICs/routes and auto-detection becomes ambiguous, specify `--manager-ip` explicitly.
+
+For options and output fields, see [manager_scripts/README.md#check_chrony_manager_syncpy](./manager_scripts/README.md#check_chrony_manager_syncpy).
+
 Because the REST server invokes `sudo -n chronyc` (non-interactive), the `ubuntu` user must be allowed to run `chronyc` via `sudo` without a password.
 The sudoers entry below grants passwordless `sudo` only for `/usr/bin/chronyc`, so no other commands are affected.
 
