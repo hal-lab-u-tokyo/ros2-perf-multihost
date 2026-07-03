@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """Estimate host clock skew via REST using NTP-style four timestamps.
 
-This script queries /clock_probe on each host resolved from metadata.txt and
-saves detailed samples and summaries as CSV files.
+This script queries /clock_probe on each host resolved from --hosts and/or
+--topology and saves detailed samples and summaries as CSV files.
 """
 
 from __future__ import annotations
@@ -217,8 +217,16 @@ def parse_args() -> argparse.Namespace:
     )
     parser.add_argument(
         "--hosts",
-        required=True,
-        help="Comma-separated host list (required, e.g. host1,host2,host3)",
+        required=False,
+        help="Comma-separated host list (e.g. host1,host2,host3)",
+    )
+    parser.add_argument(
+        "--topology",
+        default=None,
+        help=(
+            "Topology JSON path used to resolve host names from hosts[].host_name "
+            "(relative to repository root or absolute path)."
+        ),
     )
     return parser.parse_args()
 
@@ -227,6 +235,41 @@ def parse_hosts_csv(hosts_csv: str) -> list[str]:
     hosts = [h.strip() for h in hosts_csv.split(",") if h.strip()]
     if not hosts:
         raise ValueError("resolved host list is empty")
+    return hosts
+
+
+def _resolve_topology_path(repo_root: Path, topology_arg: str) -> Path:
+    candidate = Path(topology_arg)
+    if candidate.is_absolute():
+        return candidate
+    return repo_root / candidate
+
+
+def parse_hosts_from_topology(topology_path: Path) -> list[str]:
+    try:
+        with topology_path.open("r", encoding="utf-8") as fh:
+            data = json.load(fh)
+    except OSError as exc:
+        raise ValueError(
+            f"failed to read topology file: {topology_path} ({exc})") from exc
+    except json.JSONDecodeError as exc:
+        raise ValueError(
+            f"invalid topology JSON: {topology_path} ({exc})") from exc
+
+    hosts_data = data.get("hosts")
+    if not isinstance(hosts_data, list) or not hosts_data:
+        raise ValueError("topology JSON must contain non-empty 'hosts' array")
+
+    hosts: list[str] = []
+    for idx, host_obj in enumerate(hosts_data):
+        if not isinstance(host_obj, dict):
+            raise ValueError(f"topology hosts[{idx}] must be an object")
+        host_name = str(host_obj.get("host_name", "")).strip()
+        if not host_name:
+            raise ValueError(
+                f"topology hosts[{idx}].host_name is missing or empty")
+        hosts.append(host_name)
+
     return hosts
 
 
@@ -583,11 +626,42 @@ def main() -> int:
 
     repo_root = Path(__file__).resolve().parents[1]
 
-    try:
-        hosts = parse_hosts_csv(args.hosts)
-    except ValueError as exc:
-        print(f"ERROR: {exc}", file=sys.stderr)
+    hosts_from_arg: list[str] = []
+    if args.hosts:
+        try:
+            hosts_from_arg = parse_hosts_csv(args.hosts)
+        except ValueError as exc:
+            print(f"ERROR: {exc}", file=sys.stderr)
+            return 1
+
+    hosts_from_topology: list[str] = []
+    topology_path: Path | None = None
+    if args.topology:
+        topology_path = _resolve_topology_path(repo_root, args.topology)
+        try:
+            hosts_from_topology = parse_hosts_from_topology(topology_path)
+        except ValueError as exc:
+            print(f"ERROR: {exc}", file=sys.stderr)
+            return 1
+
+    if not hosts_from_arg and not hosts_from_topology:
+        print("ERROR: either --hosts or --topology must be specified", file=sys.stderr)
+        return 2
+
+    if hosts_from_arg and hosts_from_topology and hosts_from_arg != hosts_from_topology:
+        print(
+            "WARNING: --hosts and --topology host list mismatch; evaluation is aborted.",
+            file=sys.stderr,
+        )
+        print(f"  --hosts    : {', '.join(hosts_from_arg)}", file=sys.stderr)
+        print(
+            f"  --topology : {', '.join(hosts_from_topology)} "
+            f"(from {topology_path})",
+            file=sys.stderr,
+        )
         return 1
+
+    hosts = hosts_from_arg if hosts_from_arg else hosts_from_topology
 
     output_dir = _resolve_output_dir(repo_root, args.output_dir)
     output_dir.mkdir(parents=True, exist_ok=True)
@@ -616,7 +690,14 @@ def main() -> int:
             log_fh.flush()
 
         out("=== REST Clock Skew Check ===")
-        out("host_source   : hosts")
+        if hosts_from_arg and hosts_from_topology:
+            out("host_source   : hosts+topology (validated)")
+            out(f"topology      : {topology_path}")
+        elif hosts_from_arg:
+            out("host_source   : hosts")
+        else:
+            out("host_source   : topology")
+            out(f"topology      : {topology_path}")
         out(f"hosts         : {' '.join(hosts)}")
         out(f"rest_port     : {args.port}")
         out(f"samples       : {args.samples}")

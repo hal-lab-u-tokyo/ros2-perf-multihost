@@ -189,11 +189,13 @@ It calls `POST /clock_probe` on each Host and applies the NTP-style four-timesta
 
 This script writes detailed CSV outputs for sample-level and host-level analysis.
 
-This tool is benchmark-independent and resolves targets directly from `--hosts`.
+This tool is benchmark-independent and resolves targets from `--hosts` and/or `--topology`.
+When both are specified, host lists must match exactly; otherwise the tool prints a warning and aborts without running evaluation.
 
 ```bash
 python3 manager_scripts/check_clock_skew_rest.py \
-	--hosts <host1,host2,...> \
+	[--hosts <host1,host2,...>] \
+	[--topology <path/to/topology.json>] \
 	[--port|-p <port>] \
 	[--samples <n>] \
 	[--interval <sec>] \
@@ -204,7 +206,8 @@ python3 manager_scripts/check_clock_skew_rest.py \
 
 | Argument | Short | Description | Default |
 |---|---|---|---|
-| `--hosts` | — | Comma-separated host list | required |
+| `--hosts` | — | Comma-separated host list | — |
+| `--topology` | — | Topology JSON path; resolves hosts from `hosts[].host_name` | — |
 | `--port` | `-p` | REST server port | `5000` |
 | `--samples` | — | Samples per Host | `15` |
 | `--interval` | — | Sleep interval between samples (seconds) | `0.1` |
@@ -212,10 +215,13 @@ python3 manager_scripts/check_clock_skew_rest.py \
 | `--output-dir` | — | Output root directory (relative to repository root or absolute path) | `performance_ws/system_perf/clock_skew` |
 | `--csv-prefix` | — | Prefix for generated CSV filenames | `clock_skew_rest_<timestamp>` |
 
+Requirement: specify at least one of `--hosts` or `--topology`.
+
 Example:
 
 ```bash
 python3 manager_scripts/check_clock_skew_rest.py --hosts host1,host2,host3 --samples 30 --interval 0.05
+python3 manager_scripts/check_clock_skew_rest.py --topology topology_example/simple.json --samples 30
 python3 manager_scripts/check_clock_skew_rest.py --hosts host1,host2,host3 --samples 30 --output-dir performance_ws/system_perf/clock_skew
 ```
 

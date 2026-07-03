@@ -413,7 +413,11 @@ Stricter REST-based check (recommended for REST benchmark runs):
 
 ```bash
 python3 manager_scripts/check_clock_skew_rest.py --hosts host1,host2,host3 --samples 30 --interval 0.05
+python3 manager_scripts/check_clock_skew_rest.py --topology topology_example/simple.json --samples 30 --interval 0.05
 ```
+
+You can specify `--hosts`, `--topology`, or both.
+If both are specified and the host lists do not match, the script prints a warning and aborts without evaluation.
 
 `check_clock_skew_rest.py` saves three CSV files under `performance_ws/system_perf/clock_skew/<timestamp>/` by default:
 
