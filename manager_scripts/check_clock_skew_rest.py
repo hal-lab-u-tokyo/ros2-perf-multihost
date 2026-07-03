@@ -587,93 +587,134 @@ def main() -> int:
         samples_csv = run_dir / "samples.csv"
         summary_csv = run_dir / "summary.csv"
         pairwise_csv = run_dir / "pairwise.csv"
-
-    print("=== REST Clock Skew Check ===")
-    print("host_source   : hosts")
-    print(f"hosts         : {' '.join(hosts)}")
-    print(f"rest_port     : {args.port}")
-    print(f"samples       : {args.samples}")
-    print(f"interval_sec  : {args.interval}")
-    print(f"timeout_sec   : {args.timeout}")
-    print(f"output_dir    : {output_dir}")
-    print(f"run_dir       : {run_dir}")
-    print("")
+    result_log = run_dir / "result.log"
 
     rows_by_host: dict[str, list[Sample]] = {}
     all_rows: list[Sample] = []
 
-    for host in hosts:
-        print(f"--- {host} ---")
-        probe = check_clock_probe_availability(host, args.port, args.timeout)
-        if not probe.ok and probe.category in (
-            "missing_clock_probe",
-            "connection_refused",
-            "name_resolution",
-        ):
-            print(f"[{host}] ERROR: {probe.detail}")
-            if probe.hint:
-                print(f"[{host}] hint: {probe.hint}")
-            rows = make_error_rows(
-                host,
-                args.samples,
-                probe.category,
-                probe.detail,
-                probe.hint,
+    with result_log.open("w", encoding="utf-8") as log_fh:
+        def out(message: str = "") -> None:
+            print(message)
+            log_fh.write(f"{message}\n")
+            log_fh.flush()
+
+        out("=== REST Clock Skew Check ===")
+        out("host_source   : hosts")
+        out(f"hosts         : {' '.join(hosts)}")
+        out(f"rest_port     : {args.port}")
+        out(f"samples       : {args.samples}")
+        out(f"interval_sec  : {args.interval}")
+        out(f"timeout_sec   : {args.timeout}")
+        out(f"output_dir    : {output_dir}")
+        out(f"run_dir       : {run_dir}")
+        out("")
+
+        for host in hosts:
+            out(f"--- {host} ---")
+            probe = check_clock_probe_availability(host, args.port, args.timeout)
+            if not probe.ok and probe.category in (
+                "missing_clock_probe",
+                "connection_refused",
+                "name_resolution",
+            ):
+                out(f"[{host}] ERROR: {probe.detail}")
+                if probe.hint:
+                    out(f"[{host}] hint: {probe.hint}")
+                rows = make_error_rows(
+                    host,
+                    args.samples,
+                    probe.category,
+                    probe.detail,
+                    probe.hint,
+                )
+            else:
+                rows = measure_host(
+                    host,
+                    args.port,
+                    args.samples,
+                    args.interval,
+                    args.timeout,
+                )
+            rows_by_host[host] = rows
+            all_rows.extend(rows)
+
+            ok_rows = [r for r in rows if r.ok]
+            failed = len(rows) - len(ok_rows)
+            if not ok_rows:
+                out(f"[{host}] ERROR: no valid samples (failed={failed}/{len(rows)})")
+                first_category = rows[0].error_category if rows else ""
+                first_error = rows[0].error if rows else ""
+                first_hint = rows[0].hint if rows else ""
+                if first_category or first_error:
+                    out(f"[{host}] reason: {first_error}")
+                if first_hint:
+                    out(f"[{host}] hint: {first_hint}")
+                continue
+
+            best = min(ok_rows, key=lambda r: r.net_delay_ns)
+            mean_offset = int(round(statistics.fmean(r.offset_ns for r in ok_rows)))
+            sd_offset = int(
+                round(statistics.pstdev([r.offset_ns for r in ok_rows]))
+            ) if len(ok_rows) > 1 else 0
+            out(f"[{host}] samples_ok={len(ok_rows)}/{len(rows)} failed={failed}")
+            out(
+                f"[{host}] best_offset_vs_manager_ns={best.offset_ns} "
+                f"({ns_to_ms_str(best.offset_ns)} ms)"
             )
-        else:
-            rows = measure_host(host, args.port, args.samples,
-                                args.interval, args.timeout)
-        rows_by_host[host] = rows
-        all_rows.extend(rows)
+            out(
+                f"[{host}] best_net_delay_ns={best.net_delay_ns} "
+                f"({ns_to_ms_str(best.net_delay_ns)} ms), uncertainty=+/-{best.uncertainty_ns} ns"
+            )
+            out(
+                f"[{host}] mean_offset_ns={mean_offset} ({ns_to_ms_str(mean_offset)} ms), "
+                f"sd={sd_offset} ns ({ns_to_ms_str(sd_offset)} ms)"
+            )
+            out("")
 
-        ok_rows = [r for r in rows if r.ok]
-        failed = len(rows) - len(ok_rows)
-        if not ok_rows:
-            print(f"[{host}] ERROR: no valid samples (failed={failed}/{len(rows)})")
-            first_category = rows[0].error_category if rows else ""
-            first_error = rows[0].error if rows else ""
-            first_hint = rows[0].hint if rows else ""
-            if first_category or first_error:
-                print(f"[{host}] reason: {first_error}")
-            if first_hint:
-                print(f"[{host}] hint: {first_hint}")
-            continue
+        write_samples_csv(samples_csv, all_rows)
+        summaries = write_summary_csv(summary_csv, rows_by_host)
+        write_pairwise_csv(pairwise_csv, summaries, hosts)
 
-        best = min(ok_rows, key=lambda r: r.net_delay_ns)
-        mean_offset = int(
-            round(statistics.fmean(r.offset_ns for r in ok_rows)))
-        sd_offset = int(round(statistics.pstdev(
-            [r.offset_ns for r in ok_rows]))) if len(ok_rows) > 1 else 0
-        print(f"[{host}] samples_ok={len(ok_rows)}/{len(rows)} failed={failed}")
-        print(
-            f"[{host}] best_offset_vs_manager_ns={best.offset_ns} "
-            f"({ns_to_ms_str(best.offset_ns)} ms)"
-        )
-        print(
-            f"[{host}] best_net_delay_ns={best.net_delay_ns} "
-            f"({ns_to_ms_str(best.net_delay_ns)} ms), uncertainty=+/-{best.uncertainty_ns} ns"
-        )
-        print(
-            f"[{host}] mean_offset_ns={mean_offset} ({ns_to_ms_str(mean_offset)} ms), "
-            f"sd={sd_offset} ns ({ns_to_ms_str(sd_offset)} ms)"
-        )
-        print("")
+        out("=== Host-to-Host Skew (best estimates) ===")
+        pair_count = 0
+        for i in range(len(hosts)):
+            for j in range(i + 1, len(hosts)):
+                host_a = hosts[i]
+                host_b = hosts[j]
+                s_a = summaries.get(host_a, {})
+                s_b = summaries.get(host_b, {})
+                if not s_a or not s_b:
+                    continue
 
-    write_samples_csv(samples_csv, all_rows)
-    summaries = write_summary_csv(summary_csv, rows_by_host)
-    write_pairwise_csv(pairwise_csv, summaries, hosts)
+                if s_a.get("best_offset_ns") in ("", None) or s_b.get("best_offset_ns") in ("", None):
+                    continue
 
-    print("=== CSV Output ===")
-    print(f"samples  : {samples_csv}")
-    print(f"summary  : {summary_csv}")
-    print(f"pairwise : {pairwise_csv}")
+                skew_ns = int(s_b["best_offset_ns"]) - int(s_a["best_offset_ns"])
+                combined_uncertainty_ns = int(s_a["best_uncertainty_ns"]) + int(
+                    s_b["best_uncertainty_ns"]
+                )
+                out(
+                    f"{host_b} - {host_a} = {skew_ns} ns ({ns_to_ms_str(skew_ns)} ms), "
+                    f"combined_uncertainty=+/-{combined_uncertainty_ns} ns"
+                )
+                pair_count += 1
 
-    any_ok = any(r.ok for r in all_rows)
-    if not any_ok:
-        print("Completed with errors: no valid samples collected.", file=sys.stderr)
-        return 1
+        if pair_count == 0:
+            out("No pairwise skew available (insufficient valid host samples).")
 
-    print("Completed successfully.")
+        out("")
+        out("=== CSV Output ===")
+        out(f"samples  : {samples_csv}")
+        out(f"summary  : {summary_csv}")
+        out(f"pairwise : {pairwise_csv}")
+        out(f"result   : {result_log}")
+
+        any_ok = any(r.ok for r in all_rows)
+        if not any_ok:
+            out("Completed with errors: no valid samples collected.")
+            return 1
+
+        out("Completed successfully.")
     return 0
 
 
