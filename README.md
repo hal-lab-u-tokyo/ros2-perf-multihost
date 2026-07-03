@@ -264,6 +264,8 @@ When you need stricter one-way latency interpretation, evaluate inter-host clock
 
 Stricter REST-based check (recommended for REST benchmark runs):
 
+Prerequisite: start `remote_hosts_scripts/rest_server.py` on each target Host first. If REST is not running/reachable, clock probe requests fail (timeout/connection error) and that Host is recorded as `error`.
+
 ```bash
 python3 manager_scripts/system_perf/check_clock_skew_rest.py --hosts host1,host2,host3 --samples 30 --interval 0.05
 python3 manager_scripts/system_perf/check_clock_skew_rest.py --topology topology_example/simple.json --samples 30 --interval 0.05

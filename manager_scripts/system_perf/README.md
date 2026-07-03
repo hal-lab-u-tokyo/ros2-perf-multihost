@@ -22,6 +22,9 @@ It calls `POST /clock_probe` on each Host and applies the NTP-style four-timesta
 
 This script writes detailed CSV outputs for sample-level and host-level analysis.
 
+Prerequisite: start `remote_hosts_scripts/rest_server.py` on each target Host before running this checker.
+If REST is not running/reachable, probes fail with timeout/connection errors and the Host is recorded as `error`.
+
 This tool is benchmark-independent and resolves targets from `--hosts` and/or `--topology`.
 When both are specified, host lists must match exactly; otherwise the tool prints a warning and aborts without running evaluation.
 
