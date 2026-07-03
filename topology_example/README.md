@@ -144,3 +144,32 @@ The RMW implementation is selected at runtime (for example via `performance_test
   ]
 }
 ```
+
+## 6. Draft QoS Sweep Input
+
+For future sweep converters and runners, `qos` can be represented as an array.
+Each element is one QoS case to run with the same host and node allocation.
+The current `manager_scripts/generate_exec_scripts.py` flow is not expected to
+consume this array format until a compatible converter is added.
+
+```json
+{
+  "qos": [
+    {
+      "history": "KEEP_LAST",
+      "depth": 1,
+      "reliability": "RELIABLE"
+    },
+    {
+      "history": "KEEP_LAST",
+      "depth": 1,
+      "reliability": "BEST_EFFORT"
+    },
+    {
+      "history": "KEEP_ALL",
+      "reliability": "RELIABLE"
+    }
+  ],
+  "hosts": []
+}
+```

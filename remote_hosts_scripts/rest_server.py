@@ -57,6 +57,48 @@ def _to_int(value, name):
         raise ValueError(f"{name} must be an integer") from exc
 
 
+def _resolve_qos_context(request_json):
+    request_json = request_json or {}
+    raw_qos = request_json.get("qos")
+    if raw_qos is None:
+        return None
+    if not isinstance(raw_qos, dict):
+        raise ValueError("qos must be an object for one sweep case")
+
+    qos = {}
+    history = raw_qos.get("history")
+    if history is not None:
+        if history not in ("KEEP_LAST", "KEEP_ALL"):
+            raise ValueError("qos.history must be KEEP_LAST or KEEP_ALL")
+        qos["history"] = history
+
+    depth = raw_qos.get("depth")
+    if depth is not None:
+        qos["depth"] = _to_int(depth, "qos.depth")
+
+    reliability = raw_qos.get("reliability")
+    if reliability is not None:
+        if reliability not in ("RELIABLE", "BEST_EFFORT"):
+            raise ValueError(
+                "qos.reliability must be RELIABLE or BEST_EFFORT")
+        qos["reliability"] = reliability
+
+    return qos
+
+
+def _apply_qos_env(env, qos, qos_case_idx=None):
+    if qos_case_idx is not None:
+        env["QOS_CASE_INDEX"] = str(qos_case_idx)
+    if not qos:
+        return
+    if "history" in qos:
+        env["QOS_HISTORY"] = str(qos["history"])
+    if "depth" in qos:
+        env["QOS_DEPTH"] = str(qos["depth"])
+    if "reliability" in qos:
+        env["QOS_RELIABILITY"] = str(qos["reliability"])
+
+
 def _format_command(argv):
     return " ".join(shlex.quote(part) for part in argv)
 
@@ -388,13 +430,17 @@ def start_docker():
     eval_time = body.get("eval_time")
     rmw = body.get("rmw")
     zenoh_config_override = body.get("zenoh_config_override")
+    qos_case_idx = body.get("qos_case_idx")
 
     try:
         trial_idx = _to_int(trial_idx, "trial_idx")
+        if qos_case_idx is not None:
+            qos_case_idx = _to_int(qos_case_idx, "qos_case_idx")
         if eval_time is not None:
             eval_time = _to_int(eval_time, "eval_time")
         if rmw not in ("fastdds", "cyclonedds", "zenoh"):
             raise ValueError("rmw must be one of: fastdds, cyclonedds, zenoh")
+        qos = _resolve_qos_context(body)
 
         ctx = _resolve_exec_context(body)
         resolved_host, script_path = _resolve_host_script(
@@ -409,15 +455,18 @@ def start_docker():
         env = os.environ.copy()
         env["RUN_TIMESTAMP"] = run_timestamp
         env["RMW_CHOICE"] = rmw
+        _apply_qos_env(env, qos, qos_case_idx)
         if zenoh_config_override is not None:
             env["ZENOH_CONFIG_OVERRIDE"] = str(zenoh_config_override)
 
         app.logger.info(
-            "[start_docker] host=%s topology=%s rmw=%s trial=%s timestamp=%s script=%s",
+            "[start_docker] host=%s topology=%s rmw=%s trial=%s qos_case=%s qos=%s timestamp=%s script=%s",
             resolved_host,
             ctx["topology_dir"],
             rmw,
             trial_idx,
+            qos_case_idx,
+            qos,
             run_timestamp,
             script_path,
         )
@@ -440,13 +489,17 @@ def start_native():
     eval_time = body.get("eval_time")
     rmw = body.get("rmw")
     zenoh_config_override = body.get("zenoh_config_override")
+    qos_case_idx = body.get("qos_case_idx")
 
     try:
         trial_idx = _to_int(trial_idx, "trial_idx")
+        if qos_case_idx is not None:
+            qos_case_idx = _to_int(qos_case_idx, "qos_case_idx")
         if eval_time is not None:
             eval_time = _to_int(eval_time, "eval_time")
         if rmw not in ("fastdds", "cyclonedds", "zenoh"):
             raise ValueError("rmw must be one of: fastdds, cyclonedds, zenoh")
+        qos = _resolve_qos_context(body)
 
         ctx = _resolve_exec_context(body)
         resolved_host, script_path = _resolve_host_script(
@@ -461,17 +514,20 @@ def start_native():
         env = os.environ.copy()
         env["RUN_TIMESTAMP"] = run_timestamp
         env["RMW_CHOICE"] = rmw
+        _apply_qos_env(env, qos, qos_case_idx)
         if zenoh_config_override is not None:
             env["ZENOH_CONFIG_OVERRIDE"] = str(zenoh_config_override)
         env.setdefault("ROS2_PERF_REPO_ROOT", REPO_ROOT)
         env.setdefault("ROS2_PERF_WS", REPO_ROOT)
 
         app.logger.info(
-            "[start_native] host=%s topology=%s rmw=%s trial=%s timestamp=%s script=%s",
+            "[start_native] host=%s topology=%s rmw=%s trial=%s qos_case=%s qos=%s timestamp=%s script=%s",
             resolved_host,
             ctx["topology_dir"],
             rmw,
             trial_idx,
+            qos_case_idx,
+            qos,
             run_timestamp,
             script_path,
         )

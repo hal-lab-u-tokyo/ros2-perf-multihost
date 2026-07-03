@@ -55,9 +55,8 @@ def ensure_only_allowed_keys(entry, allowed_keys, context):
         )
 
 
-def validate_qos_schema(qos):
-    """Validate optional qos object."""
-    context = "root.qos"
+def validate_qos_case_schema(qos, context):
+    """Validate one QoS case object."""
     if not isinstance(qos, dict):
         raise ValueError(f"{context}: must be an object")
 
@@ -82,6 +81,41 @@ def validate_qos_schema(qos):
             raise ValueError(
                 f"{context}: 'reliability' must be one of RELIABLE, BEST_EFFORT"
             )
+
+
+def validate_qos_schema(qos):
+    """Validate optional qos object or qos sweep array."""
+    context = "root.qos"
+    if isinstance(qos, list):
+        if not qos:
+            raise ValueError(f"{context}: must be a non-empty array")
+        for idx, qos_case in enumerate(qos):
+            validate_qos_case_schema(qos_case, f"{context}[{idx}]")
+        return
+
+    validate_qos_case_schema(qos, context)
+
+
+def normalize_qos_cases(qos):
+    """Return QoS cases with defaults filled, preserving array order."""
+    if qos is None:
+        qos_values = [{}]
+    elif isinstance(qos, list):
+        qos_values = qos
+    else:
+        qos_values = [qos]
+
+    normalized = []
+    for qos_case in qos_values:
+        history = qos_case.get("history", "KEEP_LAST")
+        normalized.append(
+            {
+                "history": history,
+                "depth": int(qos_case.get("depth", 1)),
+                "reliability": qos_case.get("reliability", "RELIABLE"),
+            }
+        )
+    return normalized
 
 
 def validate_publisher_entries(pub_entries, context):

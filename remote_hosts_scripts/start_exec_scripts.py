@@ -3,7 +3,7 @@ Unified script to start test execution on all hosts.
 Supports both Docker and native execution modes.
 
 Usage:
-    python3 start_exec_scripts.py <topology> [--rmw|-m {fastdds,cyclonedds,zenoh}] [--exec-policy|-p {docker,native}] [--trial-idx|-i N] [--ws-dir|-w DIR] [--prepare-run] [--hosts-list|-l HOSTS] [--help|-h]
+    python3 start_exec_scripts.py <topology> [--rmw|-m {fastdds,cyclonedds,zenoh}] [--exec-policy|-p {docker,native}] [--trial-idx|-i N] [--ws-dir|-w DIR] [--prepare-run] [--hosts-list|-l HOSTS] [--qos-case-idx N] [--qos-history {KEEP_LAST,KEEP_ALL}] [--qos-depth N] [--qos-reliability {RELIABLE,BEST_EFFORT}] [--help|-h]
 
     # Docker mode (sends /start_docker requests)
     python3 start_exec_scripts.py simple --exec-policy docker --trial-idx 1 --ws-dir performance_ws --hosts-list host1,host2,host3
@@ -69,7 +69,9 @@ def main():
         usage=(
             "%(prog)s <topology> [--rmw|-m {fastdds,cyclonedds,zenoh}] "
             "[--exec-policy|-p {docker,native}] [--trial-idx|-i N] "
-            "[--ws-dir|-w DIR] [--prepare-run] [--hosts-list|-l HOSTS] [--help|-h]"
+            "[--ws-dir|-w DIR] [--prepare-run] [--hosts-list|-l HOSTS] "
+            "[--qos-case-idx N] [--qos-history {KEEP_LAST,KEEP_ALL}] "
+            "[--qos-depth N] [--qos-reliability {RELIABLE,BEST_EFFORT}] [--help|-h]"
         ),
         epilog="""
 Examples:
@@ -109,6 +111,14 @@ Examples:
     )
     parser.add_argument("-l", "--hosts-list", default=None,
                         help="Comma-separated list of hosts (optional; if not provided, resolved from metadata)")
+    parser.add_argument("--qos-case-idx", type=int, default=None,
+                        help="QoS sweep case index from topology JSON qos array")
+    parser.add_argument("--qos-history", choices=["KEEP_LAST", "KEEP_ALL"], default=None,
+                        help="QoS history for the current sweep case")
+    parser.add_argument("--qos-depth", type=int, default=None,
+                        help="QoS depth for the current sweep case; used only with KEEP_LAST")
+    parser.add_argument("--qos-reliability", choices=["RELIABLE", "BEST_EFFORT"], default=None,
+                        help="QoS reliability for the current sweep case")
 
     args = parser.parse_args()
 
@@ -117,6 +127,12 @@ Examples:
     topology_name = args.topology
     rmw = args.rmw
     hosts_list = args.hosts_list
+    qos_fields = {
+        "history": args.qos_history,
+        "depth": args.qos_depth,
+        "reliability": args.qos_reliability,
+    }
+    qos = {key: value for key, value in qos_fields.items() if value is not None}
 
     # Support host list from parameter or resolve from metadata
     if hosts_list:
@@ -181,6 +197,10 @@ Examples:
                 request_body["eval_time"] = eval_time
             if zenoh_config_override is not None and not args.prepare_run:
                 request_body["zenoh_config_override"] = zenoh_config_override
+            if args.qos_case_idx is not None and not args.prepare_run:
+                request_body["qos_case_idx"] = args.qos_case_idx
+            if qos and not args.prepare_run:
+                request_body["qos"] = qos
 
             r = requests.post(
                 f"http://{host}:5000{endpoint}",

@@ -6,7 +6,7 @@ import shlex
 import sys
 from datetime import datetime
 
-from .validation import normalize_intermediate_entries, require_positive_int
+from .validation import normalize_intermediate_entries, normalize_qos_cases, require_positive_int
 
 
 def collect_metadata_node_names(json_content):
@@ -122,7 +122,9 @@ def generate_metadata_file(
     ]
     node_count = len(all_nodes)
 
-    qos = json_content.get("qos", {})
+    qos_cases = normalize_qos_cases(json_content.get("qos"))
+    default_qos = qos_cases[0]
+    qos_mode = "sweep" if isinstance(json_content.get("qos"), list) else "single"
     timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
     sections = [
         [
@@ -136,9 +138,15 @@ def generate_metadata_file(
         ],
         [
             "# --- 2. test config ---",
-            f"qos_history: {qos.get('history', 'KEEP_LAST')}",
-            f"qos_depth: {qos.get('depth', 1)}",
-            f"qos_reliability: {qos.get('reliability', 'RELIABLE')}",
+            f"qos_mode: {qos_mode}",
+            f"qos_case_count: {len(qos_cases)}",
+            (
+                "qos_json: "
+                f"{json.dumps(qos_cases, separators=(',', ':'), sort_keys=True)}"
+            ),
+            f"qos_history: {default_qos['history']}",
+            f"qos_depth: {default_qos['depth']}",
+            f"qos_reliability: {default_qos['reliability']}",
         ],
         [
             "# --- 3. topology stats ---",

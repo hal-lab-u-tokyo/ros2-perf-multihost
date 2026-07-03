@@ -61,6 +61,32 @@ results/
 `results/runtime/rest_server.log`, so it may include entries from previous runs
 unless the REST server was restarted before benchmarking.
 
+When generated `metadata.txt` contains a QoS sweep (`qos_json` with multiple
+cases), `performance_test.py` runs all trials once per QoS case. The top-level
+run directory keeps a `qos_cases.json` manifest and stores each case separately:
+
+```
+results/
+└── 2026-04-26_13-21-45-fastdds/
+    ├── qos_cases.json
+    ├── qos_case0/
+    │   ├── raw_logs/
+    │   │   ├── trial1/
+    │   │   └── ...
+    │   ├── analysis/
+    │   │   ├── total_latency.csv
+    │   │   ├── throughput.csv
+    │   │   └── host_usage_summary.csv
+    │   └── coordination_logs/
+    ├── qos_case1/
+    │   └── ...
+    └── analysis/
+        └── qos_sweep_summary.csv
+```
+
+For single-QoS input, the original non-nested `raw_logs/` and `analysis/`
+layout is preserved.
+
 ## CSV Formats
 
 ### total_latency.csv
@@ -121,3 +147,16 @@ Per-Host summary aggregated across all trials.
 | `swap_mean_mean[%]` | % | Mean of per-trial swap means |
 | `swap_max_max[%]` | % | Maximum of per-trial swap peaks |
 | `trials_covered` | count | Number of trials included in the summary |
+
+### qos_sweep_summary.csv
+
+Created only for QoS sweep runs. One row summarizes one QoS case by copying the
+`total` rows from that case's `total_latency.csv` and `throughput.csv`.
+
+| Column | Unit | Description |
+|---|---|---|
+| `qos_case` | — | QoS case label, for example `qos_case0` |
+| `history` / `depth` / `reliability` | — | QoS settings used for the case |
+| `lost[#]` | count | Total lost messages across trials |
+| `mean[ms]` / `sd[ms]` / `min[ms]` / `q1[ms]` / `mid[ms]` / `q3[ms]` / `max[ms]` | ms | Aggregate latency summary |
+| `throughput[B/s]` / `throughput[MB/s]` | B/s, MB/s | Mean throughput summary |
