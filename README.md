@@ -367,11 +367,11 @@ sudo chronyc waitsync 20 0.001
 After applying Manager/Host chrony settings, run the Manager-side checker below to validate that each Host is actually synchronized to the expected Manager source and to catch likely `allow` CIDR/firewall mistakes:
 
 ```bash
-python3 manager_scripts/check_chrony_manager_sync.py \
+python3 manager_scripts/system_perf/check_chrony_manager_sync.py \
   --hosts host1,host2,host3
 
 # optional: resolve Hosts from topology JSON instead
-python3 manager_scripts/check_chrony_manager_sync.py \
+python3 manager_scripts/system_perf/check_chrony_manager_sync.py \
   --topology topology_example/simple.json
 ```
 
@@ -380,7 +380,7 @@ python3 manager_scripts/check_chrony_manager_sync.py \
 `--manager-ip` is optional. If omitted, the script auto-detects the Manager local IP from the route to target Hosts.
 If your Manager has multiple NICs/routes and auto-detection becomes ambiguous, specify `--manager-ip` explicitly.
 
-For options and output fields, see [manager_scripts/README.md#check_chrony_manager_syncpy](./manager_scripts/README.md#check_chrony_manager_syncpy).
+For options and output fields, see [manager_scripts/system_perf/README.md#check_chrony_manager_syncpy](./manager_scripts/system_perf/README.md#check_chrony_manager_syncpy).
 
 Because the REST server invokes `sudo -n chronyc` (non-interactive), the `ubuntu` user must be allowed to run `chronyc` via `sudo` without a password.
 The sudoers entry below grants passwordless `sudo` only for `/usr/bin/chronyc`, so no other commands are affected.
@@ -495,8 +495,8 @@ When you need stricter one-way latency interpretation, evaluate inter-host clock
 Stricter REST-based check (recommended for REST benchmark runs):
 
 ```bash
-python3 manager_scripts/check_clock_skew_rest.py --hosts host1,host2,host3 --samples 30 --interval 0.05
-python3 manager_scripts/check_clock_skew_rest.py --topology topology_example/simple.json --samples 30 --interval 0.05
+python3 manager_scripts/system_perf/check_clock_skew_rest.py --hosts host1,host2,host3 --samples 30 --interval 0.05
+python3 manager_scripts/system_perf/check_clock_skew_rest.py --topology topology_example/simple.json --samples 30 --interval 0.05
 ```
 
 You can specify `--hosts`, `--topology`, or both.
@@ -510,7 +510,7 @@ If both are specified and the host lists do not match, the script prints a warni
 
 For option details and output field definitions, see:
 
-- [manager_scripts/README.md#check_clock_skew_restpy](./manager_scripts/README.md#check_clock_skew_restpy)
+- [manager_scripts/system_perf/README.md#check_clock_skew_restpy](./manager_scripts/system_perf/README.md#check_clock_skew_restpy)
 - [remote_hosts_scripts/README.md#rest_serverpy](./remote_hosts_scripts/README.md#rest_serverpy)
 
 ##### Alternative method (manual startup on each Host):
@@ -651,7 +651,7 @@ Common issues and fixes:
 - `python3 manager_scripts/generate_exec_scripts.py ...` fails because output exists: rerun with `--force` or remove the existing topology directory under `performance_ws/`.
 - `distribute_exec_scripts.sh` fails with SSH/SCP errors: verify hostnames, SSH keys, and that repository paths are identical across Hosts.
 - REST benchmark does not start remote execution: ensure REST servers are running on every target Host (for example, run `./manager_scripts/manage_rest_servers.sh start <topology>` from the Manager before calling `performance_test.py`).
-- Clock skew should be measured more strictly before latency trials: run `python3 manager_scripts/check_clock_skew_rest.py --hosts host1,host2,host3 --samples 30 --interval 0.05` and review `performance_ws/system_perf/clock_skew/<timestamp>/{summary,pairwise}.csv`.
+- Clock skew should be measured more strictly before latency trials: run `python3 manager_scripts/system_perf/check_clock_skew_rest.py --hosts host1,host2,host3 --samples 30 --interval 0.05` and review `performance_ws/system_perf/clock_skew/<timestamp>/{summary,pairwise}.csv`.
 - Docker mode fails on remote Hosts: pull `ghcr.io/hal-lab-u-tokyo/ros2-perf-multihost:latest` and confirm Docker permissions on each Host.
 - Native mode cannot find workspace paths: set `ROS2_PERF_WS` to the project root before running `<host_name>_exec_native.sh`.
 - Expected CSV outputs are missing: check `<ws-dir>/<topology>/results/latest-<rmw>/raw_logs/trial<N>/` for trial logs and analyzer error output from the CSV-generation step; `coordination_logs/` only covers the REST prepare/start phases.

@@ -60,7 +60,7 @@ All endpoints accept a JSON body. Common request fields:
 - `server_recv_time_ns`
 - `server_send_time_ns`
 
-These timestamps are used by `manager_scripts/check_clock_skew_rest.py` on the Manager to estimate per-Host offset and uncertainty.
+These timestamps are used by `manager_scripts/system_perf/check_clock_skew_rest.py` on the Manager to estimate per-Host offset and uncertainty.
 
 ### Clock synchronization (chrony)
 
