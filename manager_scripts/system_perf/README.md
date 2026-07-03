@@ -2,6 +2,10 @@
 
 System-performance checks run from the Manager and store outputs under `performance_ws/system_perf/`.
 
+Note: in `performance_test.py` (`docker`/`native`), these checks are executed automatically as preflight on every run.
+In that flow, `--output-dir` is overridden so outputs are stored under:
+`<ws-dir>/<topology>/results/<timestamp>-<rmw>/system_perf/`.
+
 ## Scripts
 
 | Script | Description |

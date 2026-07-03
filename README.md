@@ -297,6 +297,8 @@ python3 remote_hosts_scripts/rest_server.py
 Then, run the benchmark script on the Manager.
 For `docker` and `native` modes, `performance_test.py` automatically distributes the generated host-specific execution files to each Host.
 It then prepares the run and executes each trial via the REST APIs, collects logs from each Host, and aggregates the CSV outputs.
+It also runs `system_perf` preflight checks (`check_chrony_manager_sync.py` and `check_clock_skew_rest.py`) before trials on every run.
+These preflight outputs are saved under `<ws-dir>/<topology>/results/<timestamp>-<rmw>/system_perf/`.
 
 ```bash
 python3 performance_test/performance_test.py \

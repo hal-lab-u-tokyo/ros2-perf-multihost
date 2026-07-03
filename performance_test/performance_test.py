@@ -56,6 +56,69 @@ def _preflight_check_rest_port_all_hosts(hosts, port=5000):
         )
 
 
+def _run_system_perf_preflight(repo_root, hosts, local_session_dir):
+    """Run mandatory chrony and clock-skew checks before benchmark trials."""
+    if not hosts:
+        raise RuntimeError("No hosts resolved for system_perf preflight")
+
+    hosts_csv = ",".join(hosts)
+    system_perf_dir = os.path.join(local_session_dir, "system_perf")
+    chrony_output_dir = os.path.join(system_perf_dir, "chrony_check")
+    skew_output_dir = os.path.join(system_perf_dir, "clock_skew")
+    os.makedirs(system_perf_dir, exist_ok=True)
+
+    chrony_script = os.path.join(
+        repo_root, "manager_scripts", "system_perf", "check_chrony_manager_sync.py"
+    )
+    skew_script = os.path.join(
+        repo_root, "manager_scripts", "system_perf", "check_clock_skew_rest.py"
+    )
+
+    checks = [
+        (
+            "chrony manager-sync check",
+            [
+                sys.executable,
+                chrony_script,
+                "--hosts",
+                hosts_csv,
+                "--output-dir",
+                chrony_output_dir,
+            ],
+        ),
+        (
+            "REST clock-skew check",
+            [
+                sys.executable,
+                skew_script,
+                "--hosts",
+                hosts_csv,
+                "--output-dir",
+                skew_output_dir,
+            ],
+        ),
+    ]
+
+    for label, cmd in checks:
+        print(f"Preflight(system_perf): running {label}...")
+        result = subprocess.run(
+            cmd,
+            text=True,
+            capture_output=True,
+            cwd=repo_root,
+        )
+        if result.stdout:
+            print(result.stdout.strip())
+        if result.returncode != 0:
+            if result.stderr:
+                print(result.stderr.strip(), file=sys.stderr)
+            raise RuntimeError(
+                f"system_perf preflight failed during {label}: rc={result.returncode}"
+            )
+
+    print(f"Preflight(system_perf) outputs: {system_perf_dir}")
+
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(
         description="Run performance tests using generated exec script defaults",
@@ -207,6 +270,13 @@ Examples:
         print("Preflight: checking REST server reachability on port 5000...")
         try:
             _preflight_check_rest_port_all_hosts(hosts, port=5000)
+        except RuntimeError as exc:
+            print(f"ERROR: {exc}", file=sys.stderr)
+            sys.exit(1)
+
+        print("Preflight: running mandatory system_perf checks...")
+        try:
+            _run_system_perf_preflight(repo_root, hosts, local_session_dir)
         except RuntimeError as exc:
             print(f"ERROR: {exc}", file=sys.stderr)
             sys.exit(1)
