@@ -8,6 +8,7 @@ import shutil
 import socket
 import subprocess
 import sys
+import time
 
 
 logging.basicConfig(
@@ -338,6 +339,23 @@ def _resolve_active_timestamp(ctx, rmw):
     if os.path.islink(latest_link):
         return os.readlink(latest_link)
     return _prepare_results_timestamp(ctx, rmw)
+
+
+@app.route("/clock_probe", methods=["POST"])
+def clock_probe():
+    """Return host-side timestamps for NTP-style offset estimation."""
+    recv_ns = time.time_ns()
+    send_ns = time.time_ns()
+    return (
+        jsonify(
+            {
+                "hostname": socket.gethostname(),
+                "server_recv_time_ns": recv_ns,
+                "server_send_time_ns": send_ns,
+            }
+        ),
+        200,
+    )
 
 
 @app.route("/prepare_run", methods=["POST"])

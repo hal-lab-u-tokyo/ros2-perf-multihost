@@ -9,6 +9,7 @@ This directory contains scripts for generating and distributing topology-specifi
 | `generate_exec_scripts.py` | Generates execution scripts and Compose files from a topology JSON file |
 | `distribute_exec_scripts.sh` | Distributes generated scripts to each host via SCP |
 | `manage_rest_servers.sh` | Manages `remote_hosts_scripts/rest_server.py` on all Hosts via SSH from the Manager |
+| `check_clock_skew_rest.py` | Estimates per-host clock skew via REST four-timestamp probes and saves CSV reports |
 
 For usage of each script, see the [Usage in Details](../README.md#usage-in-details) section in the top-level README.
 
@@ -174,3 +175,60 @@ Example:
 ./manager_scripts/manage_rest_servers.sh logs simple --follow
 ./manager_scripts/manage_rest_servers.sh stop simple
 ```
+
+## check_clock_skew_rest.py
+
+`check_clock_skew_rest.py` is the stricter clock skew checker for REST-based benchmark setups.
+It calls `POST /clock_probe` on each Host and applies the NTP-style four-timestamp estimate:
+
+- manager send: `t0`
+- host receive: `t1`
+- host send: `t2`
+- manager receive: `t3`
+- offset estimate (`host - manager`): `((t1 - t0) + (t2 - t3)) / 2`
+
+This script writes detailed CSV outputs for sample-level and host-level analysis.
+
+This tool is benchmark-independent and resolves targets directly from `--hosts`.
+
+```bash
+python3 manager_scripts/check_clock_skew_rest.py \
+	--hosts <host1,host2,...> \
+	[--port|-p <port>] \
+	[--samples <n>] \
+	[--interval <sec>] \
+	[--timeout <sec>] \
+	[--output-dir <dir>] \
+	[--csv-prefix <prefix>]
+```
+
+| Argument | Short | Description | Default |
+|---|---|---|---|
+| `--hosts` | — | Comma-separated host list | required |
+| `--port` | `-p` | REST server port | `5000` |
+| `--samples` | — | Samples per Host | `15` |
+| `--interval` | — | Sleep interval between samples (seconds) | `0.1` |
+| `--timeout` | — | HTTP timeout per request (seconds) | `2.0` |
+| `--output-dir` | — | Output root directory (relative to repository root or absolute path) | `performance_ws/system_perf/clock_skew` |
+| `--csv-prefix` | — | Prefix for generated CSV filenames | `clock_skew_rest_<timestamp>` |
+
+Example:
+
+```bash
+python3 manager_scripts/check_clock_skew_rest.py --hosts host1,host2,host3 --samples 30 --interval 0.05
+python3 manager_scripts/check_clock_skew_rest.py --hosts host1,host2,host3 --samples 30 --output-dir performance_ws/system_perf/clock_skew
+```
+
+CSV outputs:
+
+- default layout: `performance_ws/system_perf/clock_skew/<timestamp>/`
+- `samples.csv`: one row per sample with t0/t1/t2/t3, RTT, delay, offset, uncertainty
+- `summary.csv`: per-host best/mean/sd/range summaries
+- `pairwise.csv`: host-to-host skew and combined uncertainty from best samples
+- when `--csv-prefix` is set, filenames become `<prefix>_samples.csv`, `<prefix>_summary.csv`, `<prefix>_pairwise.csv`
+
+Failure diagnosis behavior:
+
+- If REST server is not running/reachable, host output includes a `connection_refused` / timeout-style reason with a startup hint.
+- If REST server is reachable but `/clock_probe` is missing (`HTTP 404`), host output is classified as `missing_clock_probe` with guidance to update remote `rest_server.py` and restart.
+- `samples.csv` includes `error_category` and `hint` columns, and `summary.csv` includes `error_category`, `error`, and `hint` for failed hosts.

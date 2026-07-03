@@ -405,6 +405,27 @@ If the server exits at startup with a chrony sudo permission error, check the ch
 
 For details on the specification of REST server and environment variables, see [remote_hosts_scripts/README.md](./remote_hosts_scripts/README.md#rest_serverpy).
 
+#### Evaluate Clock Skew Before Benchmark (Recommended)
+
+When you need stricter one-way latency interpretation, evaluate inter-host clock skew before running trials.
+
+Stricter REST-based check (recommended for REST benchmark runs):
+
+```bash
+python3 manager_scripts/check_clock_skew_rest.py --hosts host1,host2,host3 --samples 30 --interval 0.05
+```
+
+`check_clock_skew_rest.py` saves three CSV files under `performance_ws/system_perf/clock_skew/<timestamp>/` by default:
+
+- `samples.csv`
+- `summary.csv`
+- `pairwise.csv`
+
+For option details and output field definitions, see:
+
+- [manager_scripts/README.md#check_clock_skew_restpy](./manager_scripts/README.md#check_clock_skew_restpy)
+- [remote_hosts_scripts/README.md#rest_serverpy](./remote_hosts_scripts/README.md#rest_serverpy)
+
 ##### Alternative method (manual startup on each Host):
 
 If you prefer to control startup host by host (for example, when debugging a specific Host or when centralized SSH fan-out is not available), you can start `rest_server.py` manually on each target Host.
@@ -543,6 +564,7 @@ Common issues and fixes:
 - `python3 manager_scripts/generate_exec_scripts.py ...` fails because output exists: rerun with `--force` or remove the existing topology directory under `performance_ws/`.
 - `distribute_exec_scripts.sh` fails with SSH/SCP errors: verify hostnames, SSH keys, and that repository paths are identical across Hosts.
 - REST benchmark does not start remote execution: ensure REST servers are running on every target Host (for example, run `./manager_scripts/manage_rest_servers.sh start <topology>` from the Manager before calling `performance_test.py`).
+- Clock skew should be measured more strictly before latency trials: run `python3 manager_scripts/check_clock_skew_rest.py --hosts host1,host2,host3 --samples 30 --interval 0.05` and review `performance_ws/system_perf/clock_skew/<timestamp>/{summary,pairwise}.csv`.
 - Docker mode fails on remote Hosts: pull `ghcr.io/hal-lab-u-tokyo/ros2-perf-multihost:latest` and confirm Docker permissions on each Host.
 - Native mode cannot find workspace paths: set `ROS2_PERF_WS` to the project root before running `<host_name>_exec_native.sh`.
 - Expected CSV outputs are missing: check `<ws-dir>/<topology>/results/latest-<rmw>/raw_logs/trial<N>/` for trial logs and analyzer error output from the CSV-generation step; `coordination_logs/` only covers the REST prepare/start phases.

@@ -38,6 +38,7 @@ python3 remote_hosts_scripts/rest_server.py
 
 | Method | Path | Description |
 |---|---|---|
+| `POST` | `/clock_probe` | Returns host receive/send timestamps for NTP-style offset estimation |
 | `POST` | `/prepare_run` | Synchronizes the clock (if needed) and creates the run timestamp directory |
 | `POST` | `/start_docker` | Runs the host-specific `<host_name>_exec_docker.sh` script (Docker execution mode) |
 | `POST` | `/start_native` | Runs the host-specific `<host_name>_exec_native.sh` script (native execution mode) |
@@ -52,6 +53,14 @@ All endpoints accept a JSON body. Common request fields:
 | `trial_idx` | integer | Trial index, used by `/start_native` and `/start_docker` (default: `1`) |
 | `eval_time` | integer | Override evaluation duration in seconds (optional) |
 | `zenoh_config_override` | string | Optional `ZENOH_CONFIG_OVERRIDE` value forwarded to the execution script environment |
+
+`/clock_probe` accepts an empty JSON body (`{}`) and returns:
+
+- `hostname`
+- `server_recv_time_ns`
+- `server_send_time_ns`
+
+These timestamps are used by `manager_scripts/check_clock_skew_rest.py` on the Manager to estimate per-Host offset and uncertainty.
 
 ### Clock synchronization (chrony)
 
