@@ -292,11 +292,76 @@ sudo apt install -y python3-requests
 
 For remote benchmark reproducibility, the REST server uses [chrony](https://chrony-project.org/) to synchronize the clock between Hosts.
 
-Install and enable chrony as follows:
+Use the following procedure when you want all Hosts to synchronize to the Manager as the LAN-side NTP server.
+
+Important: install and enable `chrony` on both Manager and all Hosts.
+
+1) Install and enable chrony on all machines (Manager and each Host)
 
 ```bash
+# on Manager and each Host
+sudo apt update
 sudo apt install -y chrony
 sudo systemctl enable --now chrony
+```
+
+2) Manager: allow LAN clients and keep upstream time source
+
+In the examples below, replace `192.168.0.0/24` with your actual LAN subnet.
+
+Edit `/etc/chrony/chrony.conf` on the Manager and add/update entries like the following:
+
+```conf
+# Manager uses upstream sources (example)
+pool ntp.ubuntu.com        iburst maxsources 4
+pool 0.ubuntu.pool.ntp.org iburst maxsources 1
+pool 1.ubuntu.pool.ntp.org iburst maxsources 1
+pool 2.ubuntu.pool.ntp.org iburst maxsources 2
+
+# Add: allow Hosts in your LAN to query this Manager
+allow 192.168.0.0/24
+```
+
+Then reload/restart chrony and verify:
+
+```bash
+# on Manager
+sudo systemctl restart chrony
+chronyc sources -v
+chronyc tracking
+```
+
+If UFW is enabled on Manager, allow NTP from LAN Hosts:
+
+```bash
+# Replace 192.168.0.0/24 with your actual LAN subnet
+sudo ufw allow from 192.168.0.0/24 to any port 123 proto udp
+```
+
+3) Hosts: configure chrony to use Manager
+
+Replace `<MANAGER_LAN_IP>` with the actual IP of your Manager on the same LAN as Hosts.
+
+On each Host, edit `/etc/chrony/chrony.conf` and set the Manager as source:
+
+```conf
+# Disable or remove default pool/server lines, then set Manager
+server <MANAGER_LAN_IP> iburst prefer
+```
+
+Apply and verify on each Host:
+
+```bash
+# on each Host
+sudo systemctl restart chrony
+chronyc sources -v
+chronyc tracking
+```
+
+You can also wait until correction converges on each Host:
+
+```bash
+sudo chronyc waitsync 20 0.001
 ```
 
 Because the REST server invokes `sudo -n chronyc` (non-interactive), the `ubuntu` user must be allowed to run `chronyc` via `sudo` without a password.
