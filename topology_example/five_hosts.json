@@ -1,14 +1,16 @@
 {
   "eval_time": 60,
   "period_ms": 100,
-  "qos": {
+  "qos": [
+    {
     "history": "KEEP_LAST",
     "depth": 1,
     "reliability": "RELIABLE"
-  },
+    }
+  ],
   "hosts": [
     {
-      "host_name": "pi0",
+      "host_name": "host1",
       "nodes": [
         {
           "node_name": "montreal",
@@ -47,7 +49,7 @@
       ]
     },
     {
-      "host_name": "pi1",
+      "host_name": "host2",
       "nodes": [
         {
           "node_name": "hamburg",
@@ -95,7 +97,7 @@
       ]
     },
     {
-      "host_name": "pi2",
+      "host_name": "host3",
       "nodes": [
         {
           "node_name": "mandalay",
@@ -146,7 +148,7 @@
       ]
     },
     {
-      "host_name": "pi3",
+      "host_name": "host4",
       "nodes": [
         {
           "node_name": "barcelona",
@@ -185,7 +187,7 @@
       ]
     },
     {
-      "host_name": "pi4",
+      "host_name": "host5",
       "nodes": [
         {
           "node_name": "geneva",
@@ -212,9 +214,13 @@
         },
         {
           "node_name": "arequipa",
-          "subscriber": [
+          "intermediate": [
             {
-              "topic_name": "arkansas"
+              "subscriber": [
+                {
+                  "topic_name": "arkansas"
+                }
+              ]
             }
           ]
         }
