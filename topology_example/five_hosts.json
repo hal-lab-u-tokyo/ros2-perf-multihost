@@ -238,13 +238,9 @@
         },
         {
           "node_name": "arequipa",
-          "intermediate": [
+          "subscriber": [
             {
-              "subscriber": [
-                {
-                  "topic_name": "arkansas"
-                }
-              ]
+              "topic_name": "arkansas"
             }
           ]
         }
