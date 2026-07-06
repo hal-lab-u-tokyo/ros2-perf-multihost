@@ -4,7 +4,7 @@ This directory is for maintainers who build the shared Docker image and publish 
 
 Users are not expected to build the image from this directory. The intended workflow is to pull the published image instead.
 
-- Published image: [`ghcr.io/hal-lab-u-tokyo/ros2-perf-QoS-multihost:latest`](https://github.com/hal-lab-u-tokyo/ros2-perf-QoS-multihost/pkgs/container/ros2-perf-QoS-multihost)
+- Published image: [`ghcr.io/hal-lab-u-tokyo/ros2-perf-multihost:latest`](https://github.com/hal-lab-u-tokyo/ros2-perf-multihost/pkgs/container/ros2-perf-multihost)
 
 ## Log In to GHCR
 
@@ -15,7 +15,7 @@ docker login ghcr.io -u <YOUR_GITHUB_USERNAME>
 
 ## Build
 
-`compose.yaml` in this directory targets both `linux/amd64` and `linux/arm64`. The `Dockerfile` expects the build context to be copied into `/workdir/ros2-perf-QoS-multihost/`, so the build context must be the repository root (`..`).
+`compose.yaml` in this directory targets both `linux/amd64` and `linux/arm64`. The `Dockerfile` expects the build context to be copied into `/workdir/ros2-perf-multihost/`, so the build context must be the repository root (`..`).
 
 ```bash
 cd docker

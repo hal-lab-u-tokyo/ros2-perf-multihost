@@ -1,11 +1,11 @@
 services:
-  ros2-perf-QoS-multihost-builder:
-    image: ghcr.io/hal-lab-u-tokyo/ros2-perf-QoS-multihost:latest
+  ros2-perf-multihost-builder:
+    image: ghcr.io/hal-lab-u-tokyo/ros2-perf-multihost:latest
     build:
       context: ..
-      dockerfile: docker/dockerfile
+      dockerfile: docker/Dockerfile
       platforms:
         - "linux/amd64"
-        - "linux/amd64"
+        - "linux/arm64"
       labels:
-        - "org.openconteiners.image.source=https://github.com/hal-lab-u-tokyo/ros2-perf-QoS-multihost"
+        - "org.opencontainers.image.source=https://github.com/hal-lab-u-tokyo/ros2-perf-multihost"
