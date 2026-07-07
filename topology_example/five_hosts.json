@@ -4,39 +4,6 @@
     "history": "KEEP_LAST",
     "depth": 1,
     "reliability": "RELIABLE"
-    },
-    {
-    "history": "KEEP_LAST",
-      "depth": 1,
-      "reliability": "BEST_EFFORT"
-    },
-    {
-      "history": "KEEP_LAST",
-      "depth": 10,
-      "reliability": "RELIABLE"
-    },
-    {
-      "history": "KEEP_LAST",
-      "depth": 10,
-      "reliability": "BEST_EFFORT"
-    },
-    {
-      "history": "KEEP_LAST",
-      "depth": 100,
-      "reliability": "RELIABLE"
-    },
-    {
-      "history": "KEEP_LAST",
-      "depth": 100,
-      "reliability": "BEST_EFFORT"
-    },
-    {
-      "history": "KEEP_ALL",
-      "reliability": "RELIABLE"
-    },
-    {
-      "history": "KEEP_ALL",
-      "reliability": "BEST_EFFORT"
     }
   ],
   "hosts": [
