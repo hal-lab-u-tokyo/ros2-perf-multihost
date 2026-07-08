@@ -4,39 +4,6 @@
     "history": "KEEP_LAST",
     "depth": 1,
     "reliability": "RELIABLE"
-    },
-    {
-    "history": "KEEP_LAST",
-    "depth": 1,
-    "reliability": "BEST_EFFORT"
-    },
-    {
-    "history": "KEEP_LAST",
-    "depth": 10,
-    "reliability": "RELIABLE"
-    },
-    {
-    "history": "KEEP_LAST",
-    "depth": 10,
-    "reliability": "BEST_EFFORT"
-    },
-    {
-    "history": "KEEP_LAST",
-    "depth": 100,
-    "reliability": "RELIABLE"
-    },
-    {
-    "history": "KEEP_LAST",
-    "depth": 100,
-    "reliability": "BEST_EFFORT"
-    },
-    {
-    "history": "KEEP_ALL",
-    "reliability": "RELIABLE"
-    },
-    {
-    "history": "KEEP_ALL",
-    "reliability": "BEST_EFFORT"
     }
   ],
 
@@ -49,22 +16,22 @@
           "publisher": [
             {
               "topic_name": "amazon",
-              "payload_size": 64,
+              "payload_size": 2000000,
               "period_ms": 100
             },
             {
               "topic_name": "nile",
-              "payload_size": 64,
+              "payload_size": 2000000,
               "period_ms": 100
             },
             {
               "topic_name": "ganges",
-              "payload_size": 64,
+              "payload_size": 2000000,
               "period_ms": 100
             },
             {
               "topic_name": "danube",
-              "payload_size": 64,
+              "payload_size": 2000000,
               "period_ms": 100
             }
           ]
@@ -81,7 +48,7 @@
               "publisher": [
                 {
                   "topic_name": "tigris",
-                  "payload_size": 64,
+                  "payload_size": 2000000,
                   "period_ms": 100
                 }
               ]
@@ -114,7 +81,7 @@
               "publisher": [
                 {
                   "topic_name": "parana",
-                  "payload_size": 64,
+                  "payload_size": 2000000,
                   "period_ms": 100
                 }
               ]
@@ -133,7 +100,7 @@
               "publisher": [
                 {
                   "topic_name": "salween",
-                  "payload_size": 64,
+                  "payload_size": 2000000,
                   "period_ms": 100
                 }
               ]
@@ -160,7 +127,7 @@
               "publisher": [
                 {
                   "topic_name": "missouri",
-                  "payload_size": 64,
+                  "payload_size": 2000000,
                   "period_ms": 100
                 }
               ]
@@ -185,12 +152,12 @@
               "publisher": [
                 {
                   "topic_name": "mekong",
-                  "payload_size": 64,
+                  "payload_size": 2000000,
                   "period_ms": 100
                 },
                 {
                   "topic_name": "congo",
-                  "payload_size": 64,
+                  "payload_size": 2000000,
                   "period_ms": 100
                 }
               ]
@@ -214,7 +181,7 @@
               "publisher": [
                 {
                   "topic_name": "lena",
-                  "payload_size": 64,
+                  "payload_size": 2000000,
                   "period_ms": 100
                 }
               ]
@@ -233,7 +200,7 @@
               "publisher": [
                 {
                   "topic_name": "volga",
-                  "payload_size": 64,
+                  "payload_size": 2000000,
                   "period_ms": 100
                 }
               ]
@@ -263,7 +230,7 @@
               "publisher": [
                 {
                   "topic_name": "arkansas",
-                  "payload_size": 64,
+                  "payload_size": 2000000,
                   "period_ms": 100
                 }
               ]
