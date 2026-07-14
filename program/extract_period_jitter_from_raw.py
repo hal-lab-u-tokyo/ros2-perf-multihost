@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import argparse
 import csv
 import re
 import statistics
@@ -7,9 +8,11 @@ import zipfile
 from collections import defaultdict
 from pathlib import Path
 
+from analysis_config import RAW_DATA_DIR, output_path
 
-RAW_DIR = Path("/Users/kudoutakumi/Downloads/raw-data")
-OUTPUT_DIR = Path("outputs/raw_period_jitter")
+
+RAW_DIR = RAW_DATA_DIR
+OUTPUT_DIR = output_path("raw_period_jitter")
 
 MESSAGE_RE = re.compile(r"Pub Node_Name: (?P<node>[^,]+), Index: (?P<idx>\d+), Timestamp: (?P<ts>\d+)")
 TRIAL_RE = re.compile(r"/raw_logs/(trial\d+)/")
@@ -194,7 +197,20 @@ def write_csv(path: Path, rows: list[dict]) -> None:
         writer.writerows(rows)
 
 
+def parse_args() -> argparse.Namespace:
+    parser = argparse.ArgumentParser(description="Extract period jitter from raw log zip files.")
+    parser.add_argument("--raw-dir", type=Path, default=RAW_DATA_DIR)
+    parser.add_argument("--output-dir", type=Path, default=output_path("raw_period_jitter"))
+    return parser.parse_args()
+
+
 def main() -> None:
+    global RAW_DIR, OUTPUT_DIR
+
+    args = parse_args()
+    RAW_DIR = args.raw_dir.expanduser().resolve()
+    OUTPUT_DIR = args.output_dir.expanduser().resolve()
+
     all_stream_rows = []
     all_trial_rows = []
     for zip_path in sorted(RAW_DIR.glob("*.zip")):

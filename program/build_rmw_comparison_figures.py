@@ -6,10 +6,11 @@ import pandas as pd
 
 from period_jitter_data import attach_period_jitter, constant_jitter_trials
 from trimmed_metrics_data import apply_trimmed_metrics, constant_trimmed_trials
+from analysis_config import RMW_COMPARISON_BASE, ZENOH_NATIVE2_BASE, output_path
 
 
-BASE = Path("/Users/kudoutakumi/Downloads/Result_File/qos_constant")
-OUTPUT_DIR = Path("outputs/rmw_comparison")
+BASE = RMW_COMPARISON_BASE
+OUTPUT_DIR = output_path("rmw_comparison")
 FIGURE_DIR = OUTPUT_DIR / "figures"
 USE_TRIMMED_2S = False
 
@@ -19,7 +20,7 @@ DATASETS = [
     ("CycloneDDS", "Docker", BASE / "cyclonedds" / "docker"),
     ("CycloneDDS", "Native", BASE / "cyclonedds" / "Native"),
     ("Zenoh", "Docker", BASE / "Zenoh" / "docker"),
-    ("Zenoh", "Native", Path("/Users/kudoutakumi/Downloads/native2")),
+    ("Zenoh", "Native", ZENOH_NATIVE2_BASE),
 ]
 
 RMW_ORDER = ["FastDDS", "CycloneDDS", "Zenoh"]

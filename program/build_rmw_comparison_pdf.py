@@ -7,13 +7,15 @@ from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet
 from reportlab.lib.units import inch
 from reportlab.platypus import Image, PageBreak, Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle
 
+from analysis_config import RMW_COMPARISON_BASE, ZENOH_NATIVE2_BASE, output_path, pdf_path
 
-OUTPUT_DIR = Path("outputs/rmw_comparison")
+
+OUTPUT_DIR = output_path("rmw_comparison")
 FIGURE_DIR = OUTPUT_DIR / "figures"
-PDF_DIR = Path("output/pdf")
-OUTPUT_PDF = PDF_DIR / "rmw_comparison_report.pdf"
-SOURCE_DIR = Path("/Users/kudoutakumi/Downloads/Result_File/qos_constant")
-ZENOH_NATIVE_SOURCE = Path("/Users/kudoutakumi/Downloads/native2")
+OUTPUT_PDF = pdf_path("rmw_comparison_report.pdf")
+PDF_DIR = OUTPUT_PDF.parent
+SOURCE_DIR = RMW_COMPARISON_BASE
+ZENOH_NATIVE_SOURCE = ZENOH_NATIVE2_BASE
 REPORT_TITLE = "RMW Comparison Report"
 FILTER_NOTE = ""
 

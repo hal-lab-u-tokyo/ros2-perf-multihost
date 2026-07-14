@@ -1,11 +1,10 @@
-from pathlib import Path
-
 import build_qos_rmw_comparison_figures as qos_figures
+from analysis_config import ZENOH_QOS_BASE, output_path
 
 
-ZENOH_BASE = Path("/Users/kudoutakumi/Downloads/zenoh")
+ZENOH_BASE = ZENOH_QOS_BASE
 
-qos_figures.OUTPUT_DIR = Path("outputs/zenoh_qos_sweep")
+qos_figures.OUTPUT_DIR = output_path("zenoh_qos_sweep")
 qos_figures.FIGURE_DIR = qos_figures.OUTPUT_DIR / "figures"
 qos_figures.DATASETS = [
     ("Zenoh Docker", ZENOH_BASE / "docker"),

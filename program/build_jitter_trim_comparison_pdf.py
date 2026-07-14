@@ -10,11 +10,13 @@ from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet
 from reportlab.lib.units import inch
 from reportlab.platypus import Image, PageBreak, Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle
 
+from analysis_config import output_path, pdf_path
 
-OUTPUT_DIR = Path("outputs/jitter_trim1s_3s")
+
+OUTPUT_DIR = output_path("jitter_trim1s_3s")
 FIGURE_DIR = OUTPUT_DIR / "figures"
-PDF_DIR = Path("output/pdf")
-OUTPUT_PDF = PDF_DIR / "jitter_trim1s_3s_report.pdf"
+OUTPUT_PDF = pdf_path("jitter_trim1s_3s_report.pdf")
+PDF_DIR = OUTPUT_PDF.parent
 
 
 def add_page_number(canvas, doc) -> None:

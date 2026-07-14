@@ -2,8 +2,10 @@ from pathlib import Path
 
 import pandas as pd
 
+from analysis_config import output_path
 
-JITTER_CSV = Path("outputs/raw_period_jitter/period_jitter_trials.csv")
+
+JITTER_CSV = output_path("raw_period_jitter", "period_jitter_trials.csv")
 JITTER_VALUE_COL = "period_jitter_mean_abs_ms"
 
 CONSTANT_SOURCES = {

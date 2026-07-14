@@ -4,10 +4,11 @@ import matplotlib.pyplot as plt
 import pandas as pd
 
 from period_jitter_data import attach_period_jitter, constant_jitter_trials
+from analysis_config import ZENOH_NATIVE2_BASE, output_path
 
 
-BASE = Path("/Users/kudoutakumi/Downloads/native2")
-OUTPUT_DIR = Path("outputs/zenoh_native2")
+BASE = ZENOH_NATIVE2_BASE
+OUTPUT_DIR = output_path("zenoh_native2")
 FIGURE_DIR = OUTPUT_DIR / "figures"
 
 

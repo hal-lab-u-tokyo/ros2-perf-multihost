@@ -7,12 +7,14 @@ from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet
 from reportlab.lib.units import inch
 from reportlab.platypus import Image, PageBreak, Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle
 
+from analysis_config import FASTDDS_DOCKER_QOS_BASE, output_path, pdf_path
 
-OUTPUT_DIR = Path("outputs/fastdds_docker_qos_sweep")
+
+OUTPUT_DIR = output_path("fastdds_docker_qos_sweep")
 FIGURE_DIR = OUTPUT_DIR / "figures"
-PDF_DIR = Path("output/pdf")
-OUTPUT_PDF = PDF_DIR / "fastdds_docker_qos_sweep_report.pdf"
-SOURCE_CSV = Path("/Users/kudoutakumi/Downloads/fastdds-docker/qos_sweep_summary.csv")
+OUTPUT_PDF = pdf_path("fastdds_docker_qos_sweep_report.pdf")
+PDF_DIR = OUTPUT_PDF.parent
+SOURCE_CSV = FASTDDS_DOCKER_QOS_BASE / "qos_sweep_summary.csv"
 
 
 def add_page_number(canvas, doc) -> None:

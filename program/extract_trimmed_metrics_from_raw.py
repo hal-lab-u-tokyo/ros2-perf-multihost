@@ -9,9 +9,11 @@ import zipfile
 from collections import defaultdict
 from pathlib import Path
 
+from analysis_config import RAW_DATA_DIR, output_path
 
-RAW_DIR = Path("/Users/kudoutakumi/Downloads/raw-data")
-OUTPUT_DIR = Path("outputs/raw_trimmed_2s")
+
+RAW_DIR = RAW_DATA_DIR
+OUTPUT_DIR = output_path("raw_trimmed_2s")
 TRIM_SECONDS = 2.0
 
 PUB_MESSAGE_RE = re.compile(r"Pub Node_Name: (?P<node>[^,]+), Index: (?P<idx>\d+), Timestamp: (?P<ts>\d+)")
@@ -271,16 +273,18 @@ def trim_tag(seconds: float) -> str:
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Extract per-trial metrics after dropping an initial time window.")
     parser.add_argument("trim_seconds", nargs="?", type=float, default=2.0)
+    parser.add_argument("--raw-dir", type=Path, default=RAW_DATA_DIR)
     parser.add_argument("--output-dir", type=Path)
     return parser.parse_args()
 
 
 def main() -> None:
-    global OUTPUT_DIR, TRIM_SECONDS
+    global RAW_DIR, OUTPUT_DIR, TRIM_SECONDS
 
     args = parse_args()
     TRIM_SECONDS = args.trim_seconds
-    OUTPUT_DIR = args.output_dir or Path(f"outputs/raw_trimmed_{trim_tag(TRIM_SECONDS)}")
+    RAW_DIR = args.raw_dir.expanduser().resolve()
+    OUTPUT_DIR = args.output_dir.expanduser().resolve() if args.output_dir else output_path(f"raw_trimmed_{trim_tag(TRIM_SECONDS)}")
 
     all_rows = []
     for zip_path in sorted(RAW_DIR.glob("*.zip")):

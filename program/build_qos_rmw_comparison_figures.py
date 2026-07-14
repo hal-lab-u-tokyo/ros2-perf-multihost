@@ -7,10 +7,11 @@ from matplotlib.lines import Line2D
 
 from period_jitter_data import attach_period_jitter, qos_jitter_trials
 from trimmed_metrics_data import apply_trimmed_metrics, qos_trimmed_trials
+from analysis_config import QOS_VARIANT_BASE, output_path
 
 
-BASE = Path("/Users/kudoutakumi/Downloads/qos_variant")
-OUTPUT_DIR = Path("outputs/qos_rmw_comparison")
+BASE = QOS_VARIANT_BASE
+OUTPUT_DIR = output_path("qos_rmw_comparison")
 FIGURE_DIR = OUTPUT_DIR / "figures"
 USE_TRIMMED_2S = False
 

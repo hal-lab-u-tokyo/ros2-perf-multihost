@@ -8,13 +8,15 @@ from reportlab.lib.styles import getSampleStyleSheet
 from reportlab.lib.units import inch
 from reportlab.platypus import Image, PageBreak, Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle
 
+from analysis_config import RMW_COMPARISON_BASE, output_path, pdf_path
 
-INPUT_CSV = Path("/Users/kudoutakumi/Downloads/fastdds/docker/host_trials_usage.csv")
-EXCEL_RENDER_DIR = Path("outputs/fastdds_docker_usage")
+
+INPUT_CSV = RMW_COMPARISON_BASE / "fastdds" / "docker" / "host_trials_usage.csv"
+EXCEL_RENDER_DIR = output_path("fastdds_docker_usage")
 PAPER_FIGURE_DIR = EXCEL_RENDER_DIR / "paper_style_figures"
 TMP_DIR = Path("tmp/pdfs")
-OUTPUT_DIR = Path("output/pdf")
-OUTPUT_PDF = OUTPUT_DIR / "fastdds_docker_usage_report.pdf"
+OUTPUT_PDF = pdf_path("fastdds_docker_usage_report.pdf")
+OUTPUT_DIR = OUTPUT_PDF.parent
 
 
 def prepare_data() -> pd.DataFrame:

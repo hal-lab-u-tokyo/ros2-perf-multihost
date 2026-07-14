@@ -2,10 +2,11 @@ from pathlib import Path
 
 import pandas as pd
 
+from analysis_config import output_path
 from period_jitter_data import CONSTANT_SOURCES, PAYLOAD_SOURCES, QOS_SOURCES, trial_number
 
 
-TRIMMED_CSV = Path("outputs/raw_trimmed_2s/trimmed_trials.csv")
+TRIMMED_CSV = output_path("raw_trimmed_2s", "trimmed_trials.csv")
 METRIC_COLUMNS = [
     "lost[#]",
     "mean[ms]",

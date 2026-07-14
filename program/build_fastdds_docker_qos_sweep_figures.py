@@ -5,10 +5,11 @@ import numpy as np
 import pandas as pd
 
 from period_jitter_data import attach_period_jitter, qos_jitter_trials
+from analysis_config import FASTDDS_DOCKER_QOS_BASE, output_path
 
 
-BASE = Path("/Users/kudoutakumi/Downloads/fastdds-docker")
-OUTPUT_DIR = Path("outputs/fastdds_docker_qos_sweep")
+BASE = FASTDDS_DOCKER_QOS_BASE
+OUTPUT_DIR = output_path("fastdds_docker_qos_sweep")
 FIGURE_DIR = OUTPUT_DIR / "figures"
 
 CASE_ORDER = [f"qos_case{i}" for i in range(8)]

@@ -7,12 +7,14 @@ from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet
 from reportlab.lib.units import inch
 from reportlab.platypus import Image, PageBreak, Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle
 
+from analysis_config import PAYLOADSIZE_BASE, output_path, pdf_path
 
-OUTPUT_DIR = Path("outputs/payloadsize_rmw_comparison")
+
+OUTPUT_DIR = output_path("payloadsize_rmw_comparison")
 FIGURE_DIR = OUTPUT_DIR / "figures"
-PDF_DIR = Path("output/pdf")
-OUTPUT_PDF = PDF_DIR / "payloadsize_rmw_comparison_report.pdf"
-SOURCE_DIR = Path("/Users/kudoutakumi/Downloads/payloadsize_variant")
+OUTPUT_PDF = pdf_path("payloadsize_rmw_comparison_report.pdf")
+PDF_DIR = OUTPUT_PDF.parent
+SOURCE_DIR = PAYLOADSIZE_BASE
 REPORT_TITLE = "Payload Size RMW Comparison Report"
 FILTER_NOTE = ""
 

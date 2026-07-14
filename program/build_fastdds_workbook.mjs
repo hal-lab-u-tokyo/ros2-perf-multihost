@@ -1,11 +1,16 @@
 import fs from "node:fs/promises";
 import path from "node:path";
+import { fileURLToPath } from "node:url";
 import { SpreadsheetFile, Workbook } from "@oai/artifact-tool";
 
-const inputCsv = "/Users/kudoutakumi/Downloads/fastdds/docker/host_trials_usage.csv";
-const latencyCsv = "/Users/kudoutakumi/Downloads/fastdds/docker/total_latency.csv";
-const throughputCsv = "/Users/kudoutakumi/Downloads/fastdds/docker/throughput.csv";
-const outputDir = "outputs/fastdds_docker_usage";
+const programDir = path.dirname(fileURLToPath(import.meta.url));
+const rmwBase = process.env.ROS2_ANALYSIS_RMW_BASE ?? path.join(programDir, "data", "qos_constant");
+const fastddsDockerBase = path.join(rmwBase, "fastdds", "docker");
+const inputCsv = path.join(fastddsDockerBase, "host_trials_usage.csv");
+const latencyCsv = path.join(fastddsDockerBase, "total_latency.csv");
+const throughputCsv = path.join(fastddsDockerBase, "throughput.csv");
+const outputRoot = process.env.ROS2_ANALYSIS_OUTPUT_ROOT ?? path.join(programDir, "outputs");
+const outputDir = path.join(outputRoot, "fastdds_docker_usage");
 const outputXlsx = path.join(outputDir, "fastdds_docker_usage_graphs.xlsx");
 const paperFigureDir = path.join(outputDir, "paper_style_figures");
 

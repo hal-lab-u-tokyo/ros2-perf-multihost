@@ -8,10 +8,11 @@ from matplotlib.patches import Patch
 
 from period_jitter_data import attach_period_jitter, payload_jitter_trials
 from trimmed_metrics_data import apply_trimmed_metrics, payload_trimmed_trials
+from analysis_config import PAYLOADSIZE_BASE, output_path
 
 
-BASE = Path("/Users/kudoutakumi/Downloads/payloadsize_variant")
-OUTPUT_DIR = Path("outputs/payloadsize_rmw_comparison")
+BASE = PAYLOADSIZE_BASE
+OUTPUT_DIR = output_path("payloadsize_rmw_comparison")
 FIGURE_DIR = OUTPUT_DIR / "figures"
 USE_TRIMMED_2S = False
 

@@ -7,13 +7,14 @@ from reportlab.lib.units import inch
 from reportlab.platypus import Image, PageBreak, Paragraph, SimpleDocTemplate, Spacer
 
 from build_qos_rmw_comparison_pdf import add_figure, add_page_number, summary_table
+from analysis_config import ZENOH_QOS_BASE, output_path, pdf_path
 
 
-OUTPUT_DIR = Path("outputs/zenoh_qos_sweep")
+OUTPUT_DIR = output_path("zenoh_qos_sweep")
 FIGURE_DIR = OUTPUT_DIR / "figures"
-PDF_DIR = Path("output/pdf")
-OUTPUT_PDF = PDF_DIR / "zenoh_qos_sweep_report.pdf"
-SOURCE_DIR = Path("/Users/kudoutakumi/Downloads/zenoh")
+OUTPUT_PDF = pdf_path("zenoh_qos_sweep_report.pdf")
+PDF_DIR = OUTPUT_PDF.parent
+SOURCE_DIR = ZENOH_QOS_BASE
 REPORT_TITLE = "Zenoh QoS Sweep Report"
 FILTER_NOTE = ""
 

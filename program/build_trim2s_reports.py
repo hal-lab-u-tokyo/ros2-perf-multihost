@@ -1,6 +1,7 @@
-from pathlib import Path
 import importlib
 import sys
+
+from analysis_config import ZENOH_QOS_BASE, output_path, pdf_path
 
 
 NOTE = "All network metrics in this report exclude messages received during the first 2 seconds of each trial."
@@ -9,7 +10,7 @@ NOTE = "All network metrics in this report exclude messages received during the 
 def build_rmw_figures() -> None:
     import build_rmw_comparison_figures as figures
 
-    figures.OUTPUT_DIR = Path("outputs/rmw_comparison_trim2s")
+    figures.OUTPUT_DIR = output_path("rmw_comparison_trim2s")
     figures.FIGURE_DIR = figures.OUTPUT_DIR / "figures"
     figures.USE_TRIMMED_2S = True
     figures.main()
@@ -18,10 +19,10 @@ def build_rmw_figures() -> None:
 def build_rmw_pdf() -> None:
     import build_rmw_comparison_pdf as pdf
 
-    output_dir = Path("outputs/rmw_comparison_trim2s")
+    output_dir = output_path("rmw_comparison_trim2s")
     pdf.OUTPUT_DIR = output_dir
     pdf.FIGURE_DIR = output_dir / "figures"
-    pdf.OUTPUT_PDF = Path("output/pdf/rmw_comparison_trim2s_report.pdf")
+    pdf.OUTPUT_PDF = pdf_path("rmw_comparison_trim2s_report.pdf")
     pdf.REPORT_TITLE = "RMW Comparison Report - First 2 Seconds Excluded"
     pdf.FILTER_NOTE = NOTE
     pdf.build_pdf()
@@ -30,7 +31,7 @@ def build_rmw_pdf() -> None:
 def build_qos_rmw_figures() -> None:
     import build_qos_rmw_comparison_figures as figures
 
-    figures.OUTPUT_DIR = Path("outputs/qos_rmw_comparison_trim2s")
+    figures.OUTPUT_DIR = output_path("qos_rmw_comparison_trim2s")
     figures.FIGURE_DIR = figures.OUTPUT_DIR / "figures"
     figures.DATASETS = [
         ("FastDDS", figures.BASE / "fastdds-docker"),
@@ -47,10 +48,10 @@ def build_qos_rmw_figures() -> None:
 def build_qos_rmw_pdf() -> None:
     import build_qos_rmw_comparison_pdf as pdf
 
-    output_dir = Path("outputs/qos_rmw_comparison_trim2s")
+    output_dir = output_path("qos_rmw_comparison_trim2s")
     pdf.OUTPUT_DIR = output_dir
     pdf.FIGURE_DIR = output_dir / "figures"
-    pdf.OUTPUT_PDF = Path("output/pdf/qos_rmw_comparison_trim2s_report.pdf")
+    pdf.OUTPUT_PDF = pdf_path("qos_rmw_comparison_trim2s_report.pdf")
     pdf.REPORT_TITLE = "QoS And RMW Docker Comparison Report - First 2 Seconds Excluded"
     pdf.FILTER_NOTE = NOTE
     pdf.build_pdf()
@@ -60,8 +61,8 @@ def build_zenoh_qos_figures() -> None:
     import build_qos_rmw_comparison_figures as figures
 
     figures = importlib.reload(figures)
-    zenoh_base = Path("/Users/kudoutakumi/Downloads/zenoh")
-    figures.OUTPUT_DIR = Path("outputs/zenoh_qos_sweep_trim2s")
+    zenoh_base = ZENOH_QOS_BASE
+    figures.OUTPUT_DIR = output_path("zenoh_qos_sweep_trim2s")
     figures.FIGURE_DIR = figures.OUTPUT_DIR / "figures"
     figures.DATASETS = [
         ("Zenoh Docker", zenoh_base / "docker"),
@@ -78,10 +79,10 @@ def build_zenoh_qos_figures() -> None:
 def build_zenoh_qos_pdf() -> None:
     import build_zenoh_qos_sweep_pdf as pdf
 
-    output_dir = Path("outputs/zenoh_qos_sweep_trim2s")
+    output_dir = output_path("zenoh_qos_sweep_trim2s")
     pdf.OUTPUT_DIR = output_dir
     pdf.FIGURE_DIR = output_dir / "figures"
-    pdf.OUTPUT_PDF = Path("output/pdf/zenoh_qos_sweep_trim2s_report.pdf")
+    pdf.OUTPUT_PDF = pdf_path("zenoh_qos_sweep_trim2s_report.pdf")
     pdf.REPORT_TITLE = "Zenoh QoS Sweep Report - First 2 Seconds Excluded"
     pdf.FILTER_NOTE = NOTE
     pdf.build_pdf()
@@ -90,7 +91,7 @@ def build_zenoh_qos_pdf() -> None:
 def build_payload_figures() -> None:
     import build_payloadsize_rmw_comparison_figures as figures
 
-    figures.OUTPUT_DIR = Path("outputs/payloadsize_rmw_comparison_trim2s")
+    figures.OUTPUT_DIR = output_path("payloadsize_rmw_comparison_trim2s")
     figures.FIGURE_DIR = figures.OUTPUT_DIR / "figures"
     figures.USE_TRIMMED_2S = True
     figures.main()
@@ -99,10 +100,10 @@ def build_payload_figures() -> None:
 def build_payload_pdf() -> None:
     import build_payloadsize_rmw_comparison_pdf as pdf
 
-    output_dir = Path("outputs/payloadsize_rmw_comparison_trim2s")
+    output_dir = output_path("payloadsize_rmw_comparison_trim2s")
     pdf.OUTPUT_DIR = output_dir
     pdf.FIGURE_DIR = output_dir / "figures"
-    pdf.OUTPUT_PDF = Path("output/pdf/payloadsize_rmw_comparison_trim2s_report.pdf")
+    pdf.OUTPUT_PDF = pdf_path("payloadsize_rmw_comparison_trim2s_report.pdf")
     pdf.REPORT_TITLE = "Payload Size RMW Comparison Report - First 2 Seconds Excluded"
     pdf.FILTER_NOTE = NOTE
     pdf.build_pdf()

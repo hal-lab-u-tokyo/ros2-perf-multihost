@@ -3,9 +3,11 @@ from pathlib import Path
 import matplotlib.pyplot as plt
 import pandas as pd
 
+from analysis_config import RMW_COMPARISON_BASE, output_path
 
-BASE = Path("/Users/kudoutakumi/Downloads/fastdds/docker")
-OUTPUT_DIR = Path("outputs/fastdds_docker_usage/paper_style_figures")
+
+BASE = RMW_COMPARISON_BASE / "fastdds" / "docker"
+OUTPUT_DIR = output_path("fastdds_docker_usage", "paper_style_figures")
 
 
 def configure_style() -> None:

@@ -9,10 +9,11 @@ from reportlab.lib import colors
 from reportlab.lib.pagesizes import A3, landscape
 from reportlab.pdfgen import canvas
 
+from analysis_config import REPO_ROOT, pdf_path
 
-INPUT_JSON = Path("/Users/kudoutakumi/ros2-perf-multihost/topology_example/five_hosts.json")
-OUTPUT_DIR = Path("output/pdf")
-OUTPUT_PDF = OUTPUT_DIR / "five_hosts_ros_graph.pdf"
+INPUT_JSON = REPO_ROOT / "topology_example" / "five_hosts.json"
+OUTPUT_PDF = pdf_path("five_hosts_ros_graph.pdf")
+OUTPUT_DIR = OUTPUT_PDF.parent
 OUTPUT_DOT = OUTPUT_DIR / "five_hosts_ros_graph.dot"
 
 

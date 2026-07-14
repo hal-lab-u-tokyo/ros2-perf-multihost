@@ -9,18 +9,18 @@ from matplotlib.lines import Line2D
 from matplotlib.patches import Patch
 
 from period_jitter_data import CONSTANT_SOURCES, PAYLOAD_SOURCES, QOS_SOURCES, trial_number
+from analysis_config import QOS_VARIANT_BASE, ZENOH_QOS_BASE, output_path
 
 
 TRIMS = [1.0, 3.0]
 TRIM_LABELS = {1.0: "Drop first 1s", 3.0: "Drop first 3s"}
 INPUT_BY_TRIM = {
-    1.0: Path("outputs/raw_trimmed_1s/trimmed_trials.csv"),
-    3.0: Path("outputs/raw_trimmed_3s/trimmed_trials.csv"),
+    1.0: output_path("raw_trimmed_1s", "trimmed_trials.csv"),
+    3.0: output_path("raw_trimmed_3s", "trimmed_trials.csv"),
 }
-OUTPUT_DIR = Path("outputs/jitter_trim1s_3s")
+OUTPUT_DIR = output_path("jitter_trim1s_3s")
 FIGURE_DIR = OUTPUT_DIR / "figures"
-QOS_BASE = Path("/Users/kudoutakumi/Downloads/qos_variant")
-ZENOH_QOS_BASE = Path("/Users/kudoutakumi/Downloads/zenoh")
+QOS_BASE = QOS_VARIANT_BASE
 
 RMW_ORDER = ["FastDDS", "CycloneDDS", "Zenoh"]
 ENV_ORDER = ["Docker", "Native"]
