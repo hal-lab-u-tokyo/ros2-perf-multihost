@@ -134,6 +134,19 @@ Examples:
     }
     qos = {key: value for key, value in qos_fields.items() if value is not None}
 
+    provided_qos_keys = [k for k, v in qos_fields.items() if v is not None]
+
+    if args.qos_case_idx is not None:
+        if args.qos_case_idx < 0:
+            print("ERROR: --qos-case-idx must be >= 0", file=sys.stderr)
+            sys.exit(1)
+    elif provided_qos_keys:
+        print(
+            "ERROR: QoS fields require --qos-case-idx to preserve case traceability",
+            file=sys.stderr,
+        )
+        sys.exit(1)
+
     # Support host list from parameter or resolve from metadata
     if hosts_list:
         # Host list passed from performance_test.py (comma-separated)

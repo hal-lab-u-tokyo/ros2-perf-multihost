@@ -1,5 +1,6 @@
 from flask import Flask, jsonify, request
 from datetime import datetime
+import json
 import logging
 import os
 import re
@@ -66,28 +67,114 @@ def _resolve_qos_context(request_json):
     if not isinstance(raw_qos, dict):
         raise ValueError("qos must be an object for one sweep case")
 
-    qos = {}
-    history = raw_qos.get("history")
-    if history is not None:
-        if history not in ("KEEP_LAST", "KEEP_ALL"):
-            raise ValueError("qos.history must be KEEP_LAST or KEEP_ALL")
-        qos["history"] = history
+    allowed_keys = {"history", "depth", "reliability"}
+    unexpected = sorted(set(raw_qos.keys()) - allowed_keys)
+    if unexpected:
+        raise ValueError(
+            f"qos contains unsupported key(s): {', '.join(unexpected)}"
+        )
 
-    depth = raw_qos.get("depth")
-    if depth is not None:
-        depth = _to_int(depth, "qos.depth")
-        if depth <= 0:
-            raise ValueError("qos.depth must be > 0")
-        qos["depth"] = depth
+    history = raw_qos.get("history", "KEEP_LAST")
+    if history not in ("KEEP_LAST", "KEEP_ALL"):
+        raise ValueError("qos.history must be KEEP_LAST or KEEP_ALL")
+    qos = {"history": history}
 
-    reliability = raw_qos.get("reliability")
-    if reliability is not None:
-        if reliability not in ("RELIABLE", "BEST_EFFORT"):
-            raise ValueError(
-                "qos.reliability must be RELIABLE or BEST_EFFORT")
-        qos["reliability"] = reliability
+    depth = raw_qos.get("depth", 1)
+    depth = _to_int(depth, "qos.depth")
+    if depth <= 0:
+        raise ValueError("qos.depth must be > 0")
+    qos["depth"] = depth
+
+    reliability = raw_qos.get("reliability", "RELIABLE")
+    if reliability not in ("RELIABLE", "BEST_EFFORT"):
+        raise ValueError(
+            "qos.reliability must be RELIABLE or BEST_EFFORT")
+    qos["reliability"] = reliability
 
     return qos
+
+
+def _normalize_qos_case(qos_case, idx, context):
+    if not isinstance(qos_case, dict):
+        raise ValueError(f"{context}[{idx}] must be an object")
+
+    history = qos_case.get("history", "KEEP_LAST")
+    if history not in ("KEEP_LAST", "KEEP_ALL"):
+        raise ValueError(
+            f"{context}[{idx}].history must be KEEP_LAST or KEEP_ALL"
+        )
+
+    depth = _to_int(qos_case.get("depth", 1), f"{context}[{idx}].depth")
+    if depth <= 0:
+        raise ValueError(f"{context}[{idx}].depth must be > 0")
+
+    reliability = qos_case.get("reliability", "RELIABLE")
+    if reliability not in ("RELIABLE", "BEST_EFFORT"):
+        raise ValueError(
+            f"{context}[{idx}].reliability must be RELIABLE or BEST_EFFORT"
+        )
+
+    return {
+        "history": history,
+        "depth": depth,
+        "reliability": reliability,
+    }
+
+
+def _load_qos_cases_from_metadata(metadata_path):
+    metadata = _parse_simple_metadata(metadata_path)
+    qos_json = metadata.get("qos_json")
+    if qos_json:
+        try:
+            loaded = json.loads(qos_json)
+        except json.JSONDecodeError as exc:
+            raise ValueError(
+                f"qos_json in metadata is invalid JSON: {metadata_path}"
+            ) from exc
+        if not isinstance(loaded, list) or not loaded:
+            raise ValueError(
+                f"qos_json must be a non-empty array in metadata: {metadata_path}"
+            )
+        return [
+            _normalize_qos_case(case, idx, "qos_json")
+            for idx, case in enumerate(loaded)
+        ]
+
+    legacy_case = {
+        "history": metadata.get("qos_history", "KEEP_LAST"),
+        "depth": metadata.get("qos_depth", 1),
+        "reliability": metadata.get("qos_reliability", "RELIABLE"),
+    }
+    return [_normalize_qos_case(legacy_case, 0, "metadata")]
+
+
+def _resolve_qos_case_request(body, metadata_path):
+    raw_idx = body.get("qos_case_idx")
+    qos = _resolve_qos_context(body)
+
+    if raw_idx is None and qos is None:
+        return None, None
+    if raw_idx is None:
+        raise ValueError("qos_case_idx is required when qos is provided")
+
+    qos_case_idx = _to_int(raw_idx, "qos_case_idx")
+    if qos_case_idx < 0:
+        raise ValueError("qos_case_idx must be >= 0")
+
+    qos_cases = _load_qos_cases_from_metadata(metadata_path)
+    if qos_case_idx >= len(qos_cases):
+        raise ValueError(
+            f"qos_case_idx out of range: {qos_case_idx} (available: 0..{len(qos_cases) - 1})"
+        )
+
+    expected = qos_cases[qos_case_idx]
+    if qos is None:
+        return qos_case_idx, expected
+    if qos != expected:
+        raise ValueError(
+            f"qos does not match metadata qos_case_idx={qos_case_idx}: expected={expected}, got={qos}"
+        )
+    return qos_case_idx, qos
 
 
 def _apply_qos_env(env, qos, qos_case_idx=None):
@@ -449,19 +536,16 @@ def start_docker():
     eval_time = body.get("eval_time")
     rmw = body.get("rmw")
     zenoh_config_override = body.get("zenoh_config_override")
-    qos_case_idx = body.get("qos_case_idx")
-
     try:
         trial_idx = _to_int(trial_idx, "trial_idx")
-        if qos_case_idx is not None:
-            qos_case_idx = _to_int(qos_case_idx, "qos_case_idx")
         if eval_time is not None:
             eval_time = _to_int(eval_time, "eval_time")
         if rmw not in ("fastdds", "cyclonedds", "zenoh"):
             raise ValueError("rmw must be one of: fastdds, cyclonedds, zenoh")
-        qos = _resolve_qos_context(body)
 
         ctx = _resolve_exec_context(body)
+        qos_case_idx, qos = _resolve_qos_case_request(
+            body, ctx["metadata_path"])
         resolved_host, script_path = _resolve_host_script(
             ctx["exec_dir"], ctx["hosts"], "exec_docker.sh")
         run_timestamp = _resolve_active_timestamp(ctx, rmw)
@@ -508,19 +592,16 @@ def start_native():
     eval_time = body.get("eval_time")
     rmw = body.get("rmw")
     zenoh_config_override = body.get("zenoh_config_override")
-    qos_case_idx = body.get("qos_case_idx")
-
     try:
         trial_idx = _to_int(trial_idx, "trial_idx")
-        if qos_case_idx is not None:
-            qos_case_idx = _to_int(qos_case_idx, "qos_case_idx")
         if eval_time is not None:
             eval_time = _to_int(eval_time, "eval_time")
         if rmw not in ("fastdds", "cyclonedds", "zenoh"):
             raise ValueError("rmw must be one of: fastdds, cyclonedds, zenoh")
-        qos = _resolve_qos_context(body)
 
         ctx = _resolve_exec_context(body)
+        qos_case_idx, qos = _resolve_qos_case_request(
+            body, ctx["metadata_path"])
         resolved_host, script_path = _resolve_host_script(
             ctx["exec_dir"], ctx["hosts"], "exec_native.sh")
         run_timestamp = _resolve_active_timestamp(ctx, rmw)

@@ -347,7 +347,8 @@ Examples:
     print(f"Local raw logs dir: {local_raw_logs_dir}")
     print(f"Local analysis dir: {local_analysis_dir}")
     print(f"QoS case manifest: {qos_manifest_path}")
-    print(f"Local latest alias (updated on success): {local_latest_link} -> {run_timestamp}")
+    print(
+        f"Local latest alias (updated on success): {local_latest_link} -> {run_timestamp}")
     print(f"SSH user for remote ops: {args.ssh_user}")
     print(f"Strict analysis mode: {args.strict_analysis}")
 
