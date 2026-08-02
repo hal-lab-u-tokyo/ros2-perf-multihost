@@ -3,7 +3,11 @@
 from dataclasses import dataclass
 import os
 
-from .validation import normalize_intermediate_entries, normalize_qos_cases, require_positive_int
+from .validation import (
+    normalize_qos_cases,
+    require_positive_int,
+    resolve_hosts_with_nodes,
+)
 
 
 @dataclass(frozen=True)
@@ -61,54 +65,6 @@ def append_subscriber_block(lines, node_name, sub_list, qos_opts):
     )
 
 
-def collect_intermediate_pub_sub(intermediate_entries):
-    """Collect topic definitions while preserving order and de-duplicating by topic."""
-    pub_defs = []
-    sub_topics = []
-    for entry in intermediate_entries:
-        pub_defs.extend(entry.get("publisher", []))
-        sub_topics.extend(s["topic_name"] for s in entry.get("subscriber", []))
-    pub_defs_by_topic = {}
-    for pub in pub_defs:
-        topic_name = pub["topic_name"]
-        if topic_name not in pub_defs_by_topic:
-            pub_defs_by_topic[topic_name] = pub
-    pub_defs = list(pub_defs_by_topic.values())
-    sub_topics = list(dict.fromkeys(sub_topics))
-    return pub_defs, sub_topics
-
-
-def append_intermediate_block(lines, node_name, pub_defs, sub_topics, qos_opts):
-    pub_topics = [p["topic_name"] for p in pub_defs]
-    payload_sizes = [
-        require_positive_int(
-            p, "payload_size", f"node '{node_name}' intermediate publisher[{idx}]"
-        )
-        for idx, p in enumerate(pub_defs)
-    ]
-    period_mses = [
-        require_positive_int(
-            p, "period_ms", f"node '{node_name}' intermediate publisher[{idx}]"
-        )
-        for idx, p in enumerate(pub_defs)
-    ]
-    payload_args = " ".join(f"--size {int(v)}" for v in payload_sizes)
-    period_args = " ".join(f"--period {int(v)}" for v in period_mses)
-    topic_names_pub = ",".join(pub_topics)
-    topic_names_sub = ",".join(sub_topics)
-    lines.extend(
-        [
-            f"# {node_name} intermediate",
-            "( ros2 run ros2_perf_multihost_nodes intermediate_node \\",
-            f"  --node-name {node_name} --topic-names-pub {topic_names_pub} --topic-names-sub {topic_names_sub} \\",
-            f"  {payload_args} {period_args} --eval-time \"$EVAL_TIME\" \\",
-            f"  {qos_opts} --log-dir \"$LOG_DIR\" \\",
-            ") & node_pids+=($!)",
-            f'echo "Started {node_name} intermediate at $(date +%Y-%m-%dT%H:%M:%S.%3N%z)"',
-        ]
-    )
-
-
 def append_host_script_epilogue(lines, host_name):
     """Append the shared epilogue used by host*_exec_docker.sh."""
     lines.extend(
@@ -132,7 +88,9 @@ def generate_exec_scripts(json_content, output_dir, settings):
     eval_time_default = settings.default_eval_time
     default_qos = normalize_qos_cases(json_content.get("qos"))[0]
 
-    for host_dict in json_content["hosts"]:
+    host_entries = resolve_hosts_with_nodes(json_content)
+
+    for host_dict in host_entries:
         host_name = host_dict["host_name"]
         launch_path = os.path.join(output_dir, f"{host_name}.launch.py")
 
@@ -143,24 +101,79 @@ def generate_exec_scripts(json_content, output_dir, settings):
 
         for node in host_dict["nodes"]:
             node_name = node["node_name"]
+            publisher_entries = node.get("publisher", []) or []
+            subscriber_entries = node.get("subscriber", []) or []
 
-            if node.get("publisher"):
+            if publisher_entries and subscriber_entries:
+                var_name = f"_node_{node_idx}"
+                node_var_names.append(var_name)
+                node_idx += 1
+
+                pub_defs_by_topic = {}
+                for pub in publisher_entries:
+                    topic_name = pub["topic_name"]
+                    if topic_name not in pub_defs_by_topic:
+                        pub_defs_by_topic[topic_name] = pub
+                pub_defs = list(pub_defs_by_topic.values())
+                sub_topics = list(dict.fromkeys(
+                    s["topic_name"] for s in subscriber_entries))
+
+                payload_sizes = [
+                    require_positive_int(
+                        p, "payload_size",
+                        f"node '{node_name}' publishers[{idx}]",
+                    )
+                    for idx, p in enumerate(pub_defs)
+                ]
+                period_mses = [
+                    require_positive_int(
+                        p, "period_ms",
+                        f"node '{node_name}' publishers[{idx}]",
+                    )
+                    for idx, p in enumerate(pub_defs)
+                ]
+                args = [
+                    f'            "--node-name", "{node_name}",',
+                    f'            "--topic-names-pub", "{",".join(p["topic_name"] for p in pub_defs)}",',
+                    f'            "--topic-names-sub", "{",".join(sub_topics)}",',
+                    '            "--eval-time", eval_time,',
+                    '            "--qos-history", qos_history,',
+                    '            "--qos-depth", qos_depth,',
+                    '            "--qos-reliability", qos_reliability,',
+                ]
+                for v in payload_sizes:
+                    args.append(f'            "--size", "{int(v)}",')
+                for v in period_mses:
+                    args.append(f'            "--period", "{int(v)}",')
+                args.append('            "--log-dir", log_dir,')
+                node_var_lines.extend([
+                    f"    {var_name} = Node(",
+                    '        package="ros2_perf_multihost_nodes",',
+                    '        executable="intermediate_node",',
+                    '        output="screen",',
+                    "        arguments=[",
+                    *args,
+                    "        ],",
+                    "    )",
+                ])
+
+            elif publisher_entries:
                 var_name = f"_node_{node_idx}"
                 node_var_names.append(var_name)
                 node_idx += 1
                 topic_names = ",".join(p["topic_name"]
-                                       for p in node["publisher"])
+                                       for p in publisher_entries)
                 payload_sizes = [
                     require_positive_int(
                         p, "payload_size", f"node '{node_name}' publisher[{idx}]"
                     )
-                    for idx, p in enumerate(node["publisher"])
+                    for idx, p in enumerate(publisher_entries)
                 ]
                 period_mses = [
                     require_positive_int(
                         p, "period_ms", f"node '{node_name}' publisher[{idx}]"
                     )
-                    for idx, p in enumerate(node["publisher"])
+                    for idx, p in enumerate(publisher_entries)
                 ]
                 args = [
                     f'            "--node-name", "{node_name}",',
@@ -186,12 +199,12 @@ def generate_exec_scripts(json_content, output_dir, settings):
                     "    )",
                 ])
 
-            if node.get("subscriber"):
+            elif subscriber_entries:
                 var_name = f"_node_{node_idx}"
                 node_var_names.append(var_name)
                 node_idx += 1
                 topic_names = ",".join(s["topic_name"]
-                                       for s in node["subscriber"])
+                                       for s in subscriber_entries)
                 args = [
                     f'            "--node-name", "{node_name}",',
                     f'            "--topic-names", "{topic_names}",',
@@ -205,54 +218,6 @@ def generate_exec_scripts(json_content, output_dir, settings):
                     f"    {var_name} = Node(",
                     '        package="ros2_perf_multihost_nodes",',
                     '        executable="subscriber_node",',
-                    '        output="screen",',
-                    "        arguments=[",
-                    *args,
-                    "        ],",
-                    "    )",
-                ])
-
-            if "intermediate" in node:
-                var_name = f"_node_{node_idx}"
-                node_var_names.append(var_name)
-                node_idx += 1
-                intermediate_entries = normalize_intermediate_entries(
-                    node["intermediate"], node_name
-                )
-                pub_defs, sub_topics = collect_intermediate_pub_sub(
-                    intermediate_entries)
-                payload_sizes = [
-                    require_positive_int(
-                        p, "payload_size",
-                        f"node '{node_name}' intermediate publisher[{idx}]",
-                    )
-                    for idx, p in enumerate(pub_defs)
-                ]
-                period_mses = [
-                    require_positive_int(
-                        p, "period_ms",
-                        f"node '{node_name}' intermediate publisher[{idx}]",
-                    )
-                    for idx, p in enumerate(pub_defs)
-                ]
-                args = [
-                    f'            "--node-name", "{node_name}",',
-                    f'            "--topic-names-pub", "{",".join(p["topic_name"] for p in pub_defs)}",',
-                    f'            "--topic-names-sub", "{",".join(sub_topics)}",',
-                    '            "--eval-time", eval_time,',
-                    '            "--qos-history", qos_history,',
-                    '            "--qos-depth", qos_depth,',
-                    '            "--qos-reliability", qos_reliability,',
-                ]
-                for v in payload_sizes:
-                    args.append(f'            "--size", "{int(v)}",')
-                for v in period_mses:
-                    args.append(f'            "--period", "{int(v)}",')
-                args.append('            "--log-dir", log_dir,')
-                node_var_lines.extend([
-                    f"    {var_name} = Node(",
-                    '        package="ros2_perf_multihost_nodes",',
-                    '        executable="intermediate_node",',
                     '        output="screen",',
                     "        arguments=[",
                     *args,
@@ -437,7 +402,7 @@ def generate_compose(json_content, output_dir, project_root, settings):
     default_qos = normalize_qos_cases(json_content.get("qos"))[0]
     lines = ["services:"]
 
-    for host_dict in json_content["hosts"]:
+    for host_dict in resolve_hosts_with_nodes(json_content):
         host_name = host_dict["host_name"]
         service_name = f"service_{host_name}"
         append_common_service(
@@ -463,7 +428,7 @@ def generate_compose_per_host(json_content, output_dir, project_root, settings):
     """Generate one host-specific host*_compose.yaml file per host."""
     eval_time_default = settings.default_eval_time
     default_qos = normalize_qos_cases(json_content.get("qos"))[0]
-    for host_dict in json_content["hosts"]:
+    for host_dict in resolve_hosts_with_nodes(json_content):
         host_name = host_dict["host_name"]
         lines = ["services:"]
         append_common_service(
@@ -631,7 +596,7 @@ def generate_host_exec_scripts(json_content, output_dir, project_root, settings)
     rel_root = os.path.relpath(project_root, output_dir)
     eval_time_default = settings.default_eval_time
     default_qos = normalize_qos_cases(json_content.get("qos"))[0]
-    for host_dict in json_content["hosts"]:
+    for host_dict in resolve_hosts_with_nodes(json_content):
         host_name = host_dict["host_name"]
         script_path = os.path.join(output_dir, f"{host_name}_exec_docker.sh")
         compose_file = f"$SCRIPT_DIR/{host_name}_compose.yaml"
@@ -687,7 +652,7 @@ def generate_host_exec_native_scripts(json_content, output_dir, project_root, se
     rel_root = os.path.relpath(project_root, output_dir)
     eval_time_default = settings.default_eval_time
     default_qos = normalize_qos_cases(json_content.get("qos"))[0]
-    for host_dict in json_content["hosts"]:
+    for host_dict in resolve_hosts_with_nodes(json_content):
         host_name = host_dict["host_name"]
         script_path = os.path.join(output_dir, f"{host_name}_exec_native.sh")
         launch_file = f"$SCRIPT_DIR/{host_name}.launch.py"
@@ -718,7 +683,7 @@ def generate_host_exec_native_scripts(json_content, output_dir, project_root, se
 
 def generate_local_run_script(json_content, output_dir, project_root, settings):
     """Generate local_exec.sh to start all services using local_compose.yaml."""
-    hosts = json_content["hosts"]
+    hosts = resolve_hosts_with_nodes(json_content)
     host_services = " ".join(f"service_{h['host_name']}" for h in hosts)
     rel_root = os.path.relpath(project_root, output_dir)
     default_qos = normalize_qos_cases(json_content.get("qos"))[0]

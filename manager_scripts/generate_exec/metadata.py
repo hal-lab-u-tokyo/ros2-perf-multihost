@@ -6,7 +6,11 @@ import shlex
 import sys
 from datetime import datetime
 
-from .validation import normalize_intermediate_entries, normalize_qos_cases, require_positive_int
+from .validation import (
+    normalize_qos_cases,
+    require_positive_int,
+    resolve_hosts_with_nodes,
+)
 
 
 def collect_metadata_node_names(json_content):
@@ -17,28 +21,26 @@ def collect_metadata_node_names(json_content):
     intermediate_names = []
     topic_names = set()
 
-    for host_dict in json_content["hosts"]:
+    for host_dict in resolve_hosts_with_nodes(json_content):
         host_names.append(host_dict["host_name"])
-        for node in host_dict.get("nodes", []):
+        for node in host_dict["nodes"]:
             node_name = node["node_name"]
-            if node.get("publisher"):
-                publisher_names.append(node_name)
-                for publisher in node["publisher"]:
-                    topic_names.add(publisher["topic_name"])
-            if node.get("subscriber"):
-                subscriber_names.append(node_name)
-                for subscriber in node["subscriber"]:
-                    topic_names.add(subscriber["topic_name"])
-            if "intermediate" in node:
+            pub_entries = node.get("publisher")
+            sub_entries = node.get("subscriber")
+
+            if pub_entries and sub_entries:
                 intermediate_names.append(node_name)
-                intermediate_entries = normalize_intermediate_entries(
-                    node["intermediate"], node_name
-                )
-                for intermediate_entry in intermediate_entries:
-                    for publisher in intermediate_entry.get("publisher", []):
-                        topic_names.add(publisher["topic_name"])
-                    for subscriber in intermediate_entry.get("subscriber", []):
-                        topic_names.add(subscriber["topic_name"])
+            elif pub_entries:
+                publisher_names.append(node_name)
+            elif sub_entries:
+                subscriber_names.append(node_name)
+
+            if pub_entries:
+                for publisher in pub_entries:
+                    topic_names.add(publisher["topic_name"])
+            if sub_entries:
+                for subscriber in sub_entries:
+                    topic_names.add(subscriber["topic_name"])
 
     return host_names, publisher_names, subscriber_names, intermediate_names, topic_names
 
@@ -68,24 +70,13 @@ def collect_topic_runtime_config(json_content):
             )
         cfg["publisher_count"] += 1
 
-    for host in json_content.get("hosts", []):
-        for node in host.get("nodes", []):
+    for host in resolve_hosts_with_nodes(json_content):
+        for node in host["nodes"]:
             node_name = node.get("node_name", "?")
             for pub_idx, publisher in enumerate(node.get("publisher", []) or []):
                 add_publisher_topic(
                     publisher, f"node '{node_name}' publisher[{pub_idx}]"
                 )
-
-            if "intermediate" in node:
-                intermediate_entries = normalize_intermediate_entries(
-                    node["intermediate"], node_name
-                )
-                for entry_idx, inter in enumerate(intermediate_entries):
-                    for pub_idx, publisher in enumerate(inter.get("publisher", []) or []):
-                        add_publisher_topic(
-                            publisher,
-                            f"node '{node_name}' intermediate[{entry_idx}] publisher[{pub_idx}]",
-                        )
 
     return topic_cfg
 
@@ -117,14 +108,15 @@ def generate_metadata_file(
 
     all_nodes = [
         node
-        for host in json_content["hosts"]
-        for node in host.get("nodes", [])
+        for host in resolve_hosts_with_nodes(json_content)
+        for node in host["nodes"]
     ]
     node_count = len(all_nodes)
 
     qos_cases = normalize_qos_cases(json_content.get("qos"))
     default_qos = qos_cases[0]
-    qos_mode = "sweep" if isinstance(json_content.get("qos"), list) else "single"
+    qos_mode = "sweep" if isinstance(
+        json_content.get("qos"), list) else "single"
     timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
     sections = [
         [
