@@ -16,11 +16,14 @@ def get_metadata_value(key, metadata_path):
 
 def load_qos_cases(ws_dir, topology_name):
     metadata_path = os.path.join(ws_dir, topology_name, "metadata.txt")
+    if not os.path.exists(metadata_path):
+        raise FileNotFoundError(f"metadata.txt not found: {metadata_path}")
     qos_json = get_metadata_value("qos_json", metadata_path)
     if qos_json:
         loaded = json.loads(qos_json)
         if not isinstance(loaded, list) or not loaded:
-            raise ValueError(f"qos_json must be a non-empty array in {metadata_path}")
+            raise ValueError(
+                f"qos_json must be a non-empty array in {metadata_path}")
         return [_normalize_qos_case(qos, idx) for idx, qos in enumerate(loaded)]
 
     qos = {
@@ -37,7 +40,8 @@ def _normalize_qos_case(qos, idx):
 
     history = qos.get("history", "KEEP_LAST")
     if history not in ("KEEP_LAST", "KEEP_ALL"):
-        raise ValueError(f"qos case {idx}: history must be KEEP_LAST or KEEP_ALL")
+        raise ValueError(
+            f"qos case {idx}: history must be KEEP_LAST or KEEP_ALL")
 
     try:
         depth = int(qos.get("depth", 1))

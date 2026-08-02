@@ -75,7 +75,10 @@ def _resolve_qos_context(request_json):
 
     depth = raw_qos.get("depth")
     if depth is not None:
-        qos["depth"] = _to_int(depth, "qos.depth")
+        depth = _to_int(depth, "qos.depth")
+        if depth <= 0:
+            raise ValueError("qos.depth must be > 0")
+        qos["depth"] = depth
 
     reliability = raw_qos.get("reliability")
     if reliability is not None:
