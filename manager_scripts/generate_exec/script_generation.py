@@ -370,9 +370,11 @@ def append_common_service(
     lines.append(f"      - EVAL_TIME=${{EVAL_TIME:-{eval_time_default}}}")
     lines.append("      - LOG_DIR=${LOG_DIR:-}")
     lines.append("      - QOS_CASE_INDEX=${QOS_CASE_INDEX:-}")
-    lines.append(f"      - QOS_HISTORY=${{QOS_HISTORY:-{default_qos['history']}}}")
+    lines.append(
+        f"      - QOS_HISTORY=${{QOS_HISTORY:-{default_qos['history']}}}")
     lines.append(f"      - QOS_DEPTH=${{QOS_DEPTH:-{default_qos['depth']}}}")
-    lines.append(f"      - QOS_RELIABILITY=${{QOS_RELIABILITY:-{default_qos['reliability']}}}")
+    lines.append(
+        f"      - QOS_RELIABILITY=${{QOS_RELIABILITY:-{default_qos['reliability']}}}")
     lines.append(
         (
             '    command: [ "/bin/bash", "-lc", '
@@ -642,7 +644,7 @@ def generate_host_exec_scripts(json_content, output_dir, project_root, settings)
                 'echo "Using compose file: $COMPOSE_FILE"',
                 'echo "Cleaning up previous containers (including orphans)..."',
                 (
-                    f'LOCAL_UID="$LOCAL_UID" LOCAL_GID="$LOCAL_GID" '
+                    'LOCAL_UID="$LOCAL_UID" LOCAL_GID="$LOCAL_GID" '
                     'EVAL_TIME="$EVAL_TIME" '
                     'RMW_CHOICE="$RMW_CHOICE" '
                     'RMW_IMPLEMENTATION="$RMW_IMPLEMENTATION" '
@@ -701,7 +703,7 @@ def generate_host_exec_native_scripts(json_content, output_dir, project_root, se
                 "# Source ROS 2 environment",
                 "set +u",
                 ". /opt/ros/jazzy/setup.bash",
-                f'. "${{ROS2_NODE_IMPL_WS:-$PROJECT_ROOT/ros2_node_impl_ws}}/install/setup.bash"',
+                '. "${ROS2_NODE_IMPL_WS:-$PROJECT_ROOT/ros2_node_impl_ws}/install/setup.bash"',
                 "set -u",
                 "",
                 f'ros2 launch "{launch_file}" eval_time:="$EVAL_TIME" log_dir:="$LOG_DIR" qos_history:="$QOS_HISTORY" qos_depth:="$QOS_DEPTH" qos_reliability:="$QOS_RELIABILITY"',

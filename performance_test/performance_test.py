@@ -38,9 +38,9 @@ def _preflight_check_ssh_all_hosts(hosts, ssh_user):
             failures.append(f"- {host}: {detail}")
     if failures:
         raise RuntimeError(
-            "SSH preflight failed for one or more hosts:\n" +
-            "\n".join(failures)
+            f"SSH preflight failed for one or more hosts:\n{'\n'.join(failures)}"
         )
+
 
 def _preflight_check_rest_port_all_hosts(hosts, port=5000):
     failures = []
@@ -56,6 +56,7 @@ def _preflight_check_rest_port_all_hosts(hosts, port=5000):
             + "\n".join(failures)
             + "\nEnsure REST servers are running on all hosts before benchmark execution."
         )
+
 
 def _run_system_perf_preflight(repo_root, hosts, local_session_dir):
     """Run mandatory chrony and clock-skew checks before benchmark trials."""
@@ -119,6 +120,7 @@ def _run_system_perf_preflight(repo_root, hosts, local_session_dir):
 
     print(f"Preflight(system_perf) outputs: {system_perf_dir}")
 
+
 def _read_csv_total_row(path):
     if not os.path.exists(path):
         return None
@@ -129,6 +131,7 @@ def _read_csv_total_row(path):
             if row and row[0] == "total":
                 return row
     return None
+
 
 def _write_qos_sweep_summary(summary_path, case_results):
     os.makedirs(os.path.dirname(summary_path), exist_ok=True)
@@ -177,6 +180,7 @@ def _write_qos_sweep_summary(summary_path, case_results):
         writer.writerow(header)
         writer.writerows(rows)
     print(f"QoS sweep summary saved: {summary_path}")
+
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(
@@ -313,7 +317,8 @@ Examples:
     try:
         qos_cases = load_qos_cases(args.ws_dir, args.topology_name)
     except (FileNotFoundError, ValueError, json.JSONDecodeError) as e:
-        print(f"ERROR: Failed to load QoS cases from metadata: {e}", file=sys.stderr)
+        print(
+            f"ERROR: Failed to load QoS cases from metadata: {e}", file=sys.stderr)
         sys.exit(1)
     is_qos_sweep = len(qos_cases) > 1
 
@@ -325,7 +330,7 @@ Examples:
     print(f"Using QoS case(s): {len(qos_cases)}")
     for idx, qos_case in enumerate(qos_cases):
         print(f"  qos_case{idx}: {qos_case}")
-    print(f"Note: payload_size and period_ms are determined by topology JSON; eval_time can be overridden")
+    print("Note: payload_size and period_ms are determined by topology JSON; eval_time can be overridden")
     print(f"Local coordination logs dir: {local_coordination_logs_dir}")
     print(f"Local raw logs dir: {local_raw_logs_dir}")
     print(f"Local analysis dir: {local_analysis_dir}")
