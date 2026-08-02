@@ -62,6 +62,31 @@ def resolve_host_list(ws_dir, topology_name):
     return hosts
 
 
+def _parse_eval_time_env(raw_value):
+    if raw_value is None:
+        return None
+
+    value_str = str(raw_value).strip()
+    if not value_str:
+        raise ValueError(
+            "EVAL_TIME is set but empty. Use a positive integer number of seconds."
+        )
+
+    try:
+        value = int(value_str)
+    except (TypeError, ValueError) as exc:
+        raise ValueError(
+            f"EVAL_TIME must be an integer (seconds), got: '{raw_value}'"
+        ) from exc
+
+    if value <= 0:
+        raise ValueError(
+            f"EVAL_TIME must be > 0 (seconds), got: {value}"
+        )
+
+    return value
+
+
 def main():
     parser = argparse.ArgumentParser(
         description="Start test execution on all Hosts (Docker or native)",
@@ -164,7 +189,13 @@ Examples:
         sys.exit(1)
 
     # Read optional test parameters from environment.
-    eval_time = os.environ.get("EVAL_TIME")
+    eval_time_raw = os.environ.get("EVAL_TIME")
+    try:
+        eval_time_value = _parse_eval_time_env(eval_time_raw)
+    except ValueError as e:
+        print(f"ERROR: Invalid EVAL_TIME: {e}", file=sys.stderr)
+        sys.exit(1)
+    eval_time = str(eval_time_value) if eval_time_value is not None else None
     zenoh_config_override = os.environ.get("ZENOH_CONFIG_OVERRIDE")
 
     # Determine endpoint and timeout based on mode
@@ -179,8 +210,8 @@ Examples:
         print(f"Using Docker mode: {endpoint} endpoint with timeout {timeout}")
     else:
         endpoint = "/start_native"
-        _read_timeout = max(100, int(eval_time) +
-                            30) if eval_time is not None else 100
+        _read_timeout = max(100, eval_time_value +
+                            30) if eval_time_value is not None else 100
         timeout = (5, _read_timeout)  # (connect, read) in seconds
         print(
             f"Using native mode: {endpoint} endpoint with timeout {timeout}")
