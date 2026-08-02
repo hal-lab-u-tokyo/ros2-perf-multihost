@@ -73,6 +73,8 @@ results/
     │   ├── trial2/
     │   └── ...
     ├── analysis/
+    │   ├── all_latency.csv
+    │   ├── all_latency.txt
     │   ├── total_latency.csv
     │   ├── total_latency.txt
     │   ├── throughput.csv
@@ -104,6 +106,8 @@ results/
     │   │   ├── trial1/
     │   │   └── ...
     │   ├── analysis/
+    │   │   ├── all_latency.csv
+    │   │   ├── all_latency.txt
     │   │   ├── total_latency.csv
     │   │   ├── total_latency.txt
     │   │   ├── throughput.csv
@@ -125,50 +129,34 @@ layout is preserved.
 
 Human-readable `.txt` companions are also written for the artifacts most often inspected directly in an editor or terminal:
 
-- `analysis/trialN/all_latency.txt` alongside `analysis/trialN/all_latency.csv`
-- `analysis/trialN/total_latency.txt` alongside `analysis/trialN/total_latency.csv`
+- `analysis/all_latency.txt` alongside `analysis/all_latency.csv`
 - `analysis/total_latency.txt` alongside `analysis/total_latency.csv`
 - `analysis/throughput.txt` alongside `analysis/throughput.csv`
 - `analysis/host_usage_summary.txt` alongside `analysis/host_usage_summary.csv`
 - `analysis/qos_sweep_summary.txt` alongside `analysis/qos_sweep_summary.csv`
+- `analysis/trialN/all_latency.txt` alongside `analysis/trialN/all_latency.csv`
+- `analysis/trialN/total_latency.txt` alongside `analysis/trialN/total_latency.csv`
 
 Machine processing should prefer the `.csv` files. The `.txt` files are display-oriented views of the same rows.
 
-### analysis/trialN/all_latency.csv
+### analysis/all_latency.csv
 
-Per-trial latency summary for each observed Publisher -> Subscriber route.
-When the same topic is published by multiple nodes, one row is emitted per
-`topic` / `publisher` / `subscriber` combination.
+Aggregated route-level latency summary across all trials. One row corresponds to
+one `topic` / `publisher` / `subscriber` route across the run.
 
 | Column | Unit | Description |
 |---|---|---|
 | `topic` | — | Topic name |
-| `publisher` | — | Publisher node name that produced the message seen by the subscriber |
-| `subscriber` | — | Subscriber node name that received the message |
-| `lost[#]` | count | Number of indices that appear on only one side within the common measurement window for this route |
-| `mean[ms]` | ms | Mean latency for this route |
-| `sd[ms]` | ms | Standard deviation of route latency |
-| `min[ms]` | ms | Minimum route latency |
-| `q1[ms]` | ms | 25th percentile of route latency |
-| `mid[ms]` | ms | Median (50th percentile) of route latency |
-| `q3[ms]` | ms | 75th percentile of route latency |
-| `max[ms]` | ms | Maximum route latency |
-
-### analysis/trialN/total_latency.csv
-
-Per-trial total latency summary aggregated across all routes in that trial.
-This file contains a single data row for the trial.
-
-| Column | Unit | Description |
-|---|---|---|
-| `lost[#]` | count | Total number of lost messages across all routes in the trial |
-| `mean[ms]` | ms | Mean latency across all route samples in the trial |
-| `sd[ms]` | ms | Standard deviation across all route samples in the trial |
-| `min[ms]` | ms | Minimum latency observed in the trial |
-| `q1[ms]` | ms | 25th percentile across all route samples in the trial |
-| `mid[ms]` | ms | Median (50th percentile) across all route samples in the trial |
-| `q3[ms]` | ms | 75th percentile across all route samples in the trial |
-| `max[ms]` | ms | Maximum latency observed in the trial |
+| `publisher` | — | Publisher node name for the route |
+| `subscriber` | — | Subscriber node name for the route |
+| `lost[#]` | count | Total lost messages across all trials for this route |
+| `mean[ms]` | ms | Mean of per-trial route means |
+| `sd[ms]` | ms | Standard deviation of per-trial route means |
+| `min[ms]` | ms | Minimum route latency observed across all trials |
+| `q1[ms]` | ms | Mean of per-trial 25th percentiles for this route |
+| `mid[ms]` | ms | Mean of per-trial medians for this route |
+| `q3[ms]` | ms | Mean of per-trial 75th percentiles for this route |
+| `max[ms]` | ms | Maximum route latency observed across all trials |
 
 ### analysis/total_latency.csv
 
@@ -241,3 +229,39 @@ Created only for QoS sweep runs. One row summarizes one QoS case by copying the
 | `lost[#]` | count | Total lost messages across trials |
 | `mean[ms]` / `sd[ms]` / `min[ms]` / `q1[ms]` / `mid[ms]` / `q3[ms]` / `max[ms]` | ms | Aggregate latency summary |
 | `throughput[B/s]` / `throughput[MB/s]` | B/s, MB/s | Mean throughput summary |
+
+### analysis/trialN/all_latency.csv
+
+Per-trial latency summary for each observed Publisher -> Subscriber route.
+When the same topic is published by multiple nodes, one row is emitted per
+`topic` / `publisher` / `subscriber` combination.
+
+| Column | Unit | Description |
+|---|---|---|
+| `topic` | — | Topic name |
+| `publisher` | — | Publisher node name that produced the message seen by the subscriber |
+| `subscriber` | — | Subscriber node name that received the message |
+| `lost[#]` | count | Number of indices that appear on only one side within the common measurement window for this route |
+| `mean[ms]` | ms | Mean latency for this route |
+| `sd[ms]` | ms | Standard deviation of route latency |
+| `min[ms]` | ms | Minimum route latency |
+| `q1[ms]` | ms | 25th percentile of route latency |
+| `mid[ms]` | ms | Median (50th percentile) of route latency |
+| `q3[ms]` | ms | 75th percentile of route latency |
+| `max[ms]` | ms | Maximum route latency |
+
+### analysis/trialN/total_latency.csv
+
+Per-trial total latency summary aggregated across all routes in that trial.
+This file contains a single data row for the trial.
+
+| Column | Unit | Description |
+|---|---|---|
+| `lost[#]` | count | Total number of lost messages across all routes in the trial |
+| `mean[ms]` | ms | Mean latency across all route samples in the trial |
+| `sd[ms]` | ms | Standard deviation across all route samples in the trial |
+| `min[ms]` | ms | Minimum latency observed in the trial |
+| `q1[ms]` | ms | 25th percentile across all route samples in the trial |
+| `mid[ms]` | ms | Median (50th percentile) across all route samples in the trial |
+| `q3[ms]` | ms | 75th percentile across all route samples in the trial |
+| `max[ms]` | ms | Maximum latency observed in the trial |
