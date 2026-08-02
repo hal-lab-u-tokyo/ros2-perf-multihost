@@ -1,9 +1,4 @@
 {
-  "qos": {
-    "history": "KEEP_LAST",
-    "depth": 10,
-    "reliability": "BEST_EFFORT"
-  },
   "hosts": [
     {
       "host_name": "host1",
@@ -74,5 +69,10 @@
         }
       ]
     }
-  ]
+  ],
+  "qos": {
+    "history": "KEEP_LAST",
+    "depth": 10,
+    "reliability": "BEST_EFFORT"
+  }
 }

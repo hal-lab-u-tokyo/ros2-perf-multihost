@@ -1,20 +1,4 @@
 {
-  "qos": [
-    {
-      "history": "KEEP_LAST",
-      "depth": 1,
-      "reliability": "RELIABLE"
-    },
-    {
-      "history": "KEEP_LAST",
-      "depth": 1,
-      "reliability": "BEST_EFFORT"
-    },
-    {
-      "history": "KEEP_ALL",
-      "reliability": "RELIABLE"
-    }
-  ],
   "hosts": [
     {
       "host_name": "host1",
@@ -84,6 +68,22 @@
           "topic_name": "inazuma"
         }
       ]
+    }
+  ],
+  "qos": [
+    {
+      "history": "KEEP_LAST",
+      "depth": 1,
+      "reliability": "RELIABLE"
+    },
+    {
+      "history": "KEEP_LAST",
+      "depth": 1,
+      "reliability": "BEST_EFFORT"
+    },
+    {
+      "history": "KEEP_ALL",
+      "reliability": "RELIABLE"
     }
   ]
 }
