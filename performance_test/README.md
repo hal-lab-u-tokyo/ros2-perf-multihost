@@ -32,6 +32,9 @@ Use this mode for CI or formal evaluations where partially valid totals are not 
 
 `performance_test.py` creates run-scoped outputs under `<ws-dir>/<topology>/results/<timestamp>-<rmw>/`, and related tools may also manage shared runtime logs under `<ws-dir>/<topology>/results/runtime/`:
 
+`latest-<rmw>` is updated only after a run completes successfully (all trials, log collection, and aggregation).
+If a run fails before completion, the existing `latest-<rmw>` target is preserved.
+
 ```
 results/
 ├── latest-fastdds -> 2026-04-26_13-21-45-fastdds/   # symlink per RMW
