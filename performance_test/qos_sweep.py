@@ -35,25 +35,26 @@ def load_qos_cases(ws_dir, topology_name):
 
 
 def _normalize_qos_case(qos, idx):
+    label = qos_case_label(idx)
     if not isinstance(qos, dict):
-        raise ValueError(f"qos case {idx} must be an object")
+        raise ValueError(f"{label} must be an object")
 
     history = qos.get("history", "KEEP_LAST")
     if history not in ("KEEP_LAST", "KEEP_ALL"):
         raise ValueError(
-            f"qos case {idx}: history must be KEEP_LAST or KEEP_ALL")
+            f"{label}: history must be KEEP_LAST or KEEP_ALL")
 
     try:
         depth = int(qos.get("depth", 1))
     except (TypeError, ValueError) as exc:
-        raise ValueError(f"qos case {idx}: depth must be an integer") from exc
+        raise ValueError(f"{label}: depth must be an integer") from exc
     if depth <= 0:
-        raise ValueError(f"qos case {idx}: depth must be > 0")
+        raise ValueError(f"{label}: depth must be > 0")
 
     reliability = qos.get("reliability", "RELIABLE")
     if reliability not in ("RELIABLE", "BEST_EFFORT"):
         raise ValueError(
-            f"qos case {idx}: reliability must be RELIABLE or BEST_EFFORT"
+            f"{label}: reliability must be RELIABLE or BEST_EFFORT"
         )
 
     return {
