@@ -56,6 +56,8 @@ def run_test(
     run_timestamp=None,
     coordination_log_dir=None,
     zenoh_config_override=None,
+    qos_case_idx=None,
+    qos_case=None,
 ):
 
     if exec_policy == "local":
@@ -75,6 +77,7 @@ def run_test(
         ]
         if eval_time is not None:
             cmd.extend(["--eval-time", str(eval_time)])
+        _append_qos_args(cmd, qos_case_idx, qos_case)
 
         env = os.environ.copy()
         if run_timestamp:
@@ -82,11 +85,21 @@ def run_test(
         if zenoh_config_override is not None:
             env["ZENOH_CONFIG_OVERRIDE"] = str(zenoh_config_override)
 
-        result = subprocess.run(cmd, text=True, env=env)
-        print(result)
+        result = subprocess.run(
+            cmd,
+            text=True,
+            capture_output=True,
+            env=env,
+        )
+        if result.stdout:
+            print(result.stdout.strip())
         if result.returncode != 0:
+            if result.stderr:
+                print("--- local_exec.sh stderr ---", file=sys.stderr)
+                print(result.stderr.strip(), file=sys.stderr)
             raise RuntimeError(
-                f"run_test failed for local execution: rc={result.returncode}, cmd={cmd}"
+                "run_test failed for local execution: "
+                f"rc={result.returncode}, cmd={shlex.join(cmd)}"
             )
         return
 
@@ -106,6 +119,7 @@ def run_test(
         "--hosts-list",
         hosts_str,
     ]
+    _append_qos_args(cmd, qos_case_idx, qos_case)
 
     env = os.environ.copy()
     if eval_time is not None:
@@ -114,8 +128,13 @@ def run_test(
         env["ZENOH_CONFIG_OVERRIDE"] = str(zenoh_config_override)
 
     if coordination_log_dir is not None:
-        log_path = os.path.join(coordination_log_dir,
-                                f"exec_trial{trial_idx + 1}.log")
+        prefix = (
+            f"exec_qos_case{qos_case_idx}_"
+            if qos_case_idx is not None
+            else "exec_"
+        )
+        log_path = os.path.join(
+            coordination_log_dir, f"{prefix}trial{trial_idx + 1}.log")
         os.makedirs(coordination_log_dir, exist_ok=True)
     else:
         log_path = None
@@ -144,6 +163,16 @@ def run_test(
             f"run_test failed for exec_policy={exec_policy}: "
             f"rc={result.returncode}, cmd={cmd}"
         )
+
+
+def _append_qos_args(cmd, qos_case_idx=None, qos_case=None):
+    if qos_case_idx is not None:
+        cmd.extend(["--qos-case-idx", str(qos_case_idx)])
+    if not qos_case:
+        return
+    cmd.extend(["--qos-history", str(qos_case["history"])])
+    cmd.extend(["--qos-depth", str(qos_case["depth"])])
+    cmd.extend(["--qos-reliability", str(qos_case["reliability"])])
 
 
 def prepare_run(

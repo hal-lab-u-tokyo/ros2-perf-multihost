@@ -1,6 +1,4 @@
 {
-  "eval_time": 60,
-  "period_ms": 100,
   "qos": {
     "history": "KEEP_LAST",
     "depth": 1,
@@ -8,22 +6,30 @@
   },
   "hosts": [
     {
-      "host_name": "pi0",
+      "host_name": "host1",
       "nodes": [
         {
           "node_name": "montreal",
           "publisher": [
             {
-              "topic_name": "amazon"
+              "topic_name": "amazon",
+              "payload_size": 64,
+              "period_ms": 100
             },
             {
-              "topic_name": "nile"
+              "topic_name": "nile",
+              "payload_size": 64,
+              "period_ms": 100
             },
             {
-              "topic_name": "ganges"
+              "topic_name": "ganges",
+              "payload_size": 64,
+              "period_ms": 100
             },
             {
-              "topic_name": "danube"
+              "topic_name": "danube",
+              "payload_size": 64,
+              "period_ms": 100
             }
           ]
         },
@@ -38,12 +44,19 @@
               ],
               "publisher": [
                 {
-                  "topic_name": "tigris"
+                  "topic_name": "tigris",
+                  "payload_size": 64,
+                  "period_ms": 100
                 }
               ]
             }
           ]
-        },
+        }
+      ]
+    },
+    {
+      "host_name": "host2",
+      "nodes": [
         {
           "node_name": "hamburg",
           "intermediate": [
@@ -64,7 +77,9 @@
               ],
               "publisher": [
                 {
-                  "topic_name": "parana"
+                  "topic_name": "parana",
+                  "payload_size": 64,
+                  "period_ms": 100
                 }
               ]
             }
@@ -81,7 +96,9 @@
               ],
               "publisher": [
                 {
-                  "topic_name": "salween"
+                  "topic_name": "salween",
+                  "payload_size": 64,
+                  "period_ms": 100
                 }
               ]
             }
@@ -101,7 +118,9 @@
               ],
               "publisher": [
                 {
-                  "topic_name": "missouri"
+                  "topic_name": "missouri",
+                  "payload_size": 64,
+                  "period_ms": 100
                 }
               ]
             }
@@ -110,7 +129,7 @@
       ]
     },
     {
-      "host_name": "pi1",
+      "host_name": "host3",
       "nodes": [
         {
           "node_name": "ponce",
@@ -129,10 +148,14 @@
               ],
               "publisher": [
                 {
-                  "topic_name": "mekong"
+                  "topic_name": "mekong",
+                  "payload_size": 64,
+                  "period_ms": 100
                 },
                 {
-                  "topic_name": "congo"
+                  "topic_name": "congo",
+                  "payload_size": 64,
+                  "period_ms": 100
                 }
               ]
             }
@@ -149,7 +172,9 @@
               ],
               "publisher": [
                 {
-                  "topic_name": "lena"
+                  "topic_name": "lena",
+                  "payload_size": 64,
+                  "period_ms": 100
                 }
               ]
             }
@@ -166,12 +191,19 @@
               ],
               "publisher": [
                 {
-                  "topic_name": "volga"
+                  "topic_name": "volga",
+                  "payload_size": 64,
+                  "period_ms": 100
                 }
               ]
             }
           ]
-        },
+        }
+      ]
+    },
+    {
+      "host_name": "host4",
+      "nodes": [
         {
           "node_name": "geneva",
           "intermediate": [
@@ -189,7 +221,9 @@
               ],
               "publisher": [
                 {
-                  "topic_name": "arkansas"
+                  "topic_name": "arkansas",
+                  "payload_size": 64,
+                  "period_ms": 100
                 }
               ]
             }

@@ -65,6 +65,46 @@ Main options are shown below.
 | --qos-depth | - | QoS depth, effective only with KEEP_LAST | 1 |
 | --qos-reliability | - | QoS reliability: RELIABLE / BEST_EFFORT | RELIABLE |
 
+These node executables receive one QoS setting per process launch. When a
+topology JSON file defines `qos` as an array for QoS sweep experiments, the
+future converter or runner should iterate over that array and pass one QoS case
+at a time to these options.
+
+Example topology-side QoS sweep input:
+
+```json
+{
+  "qos": [
+    {
+      "history": "KEEP_LAST",
+      "depth": 1,
+      "reliability": "RELIABLE"
+    },
+    {
+      "history": "KEEP_LAST",
+      "depth": 1,
+      "reliability": "BEST_EFFORT"
+    },
+    {
+      "history": "KEEP_ALL",
+      "reliability": "RELIABLE"
+    }
+  ],
+  "hosts": []
+}
+```
+
+The runner is expected to translate each element as follows:
+
+| JSON key | Node option | Note |
+|---|---|---|
+| history | --qos-history | KEEP_LAST or KEEP_ALL |
+| depth | --qos-depth | Used only when `history` is KEEP_LAST |
+| reliability | --qos-reliability | RELIABLE or BEST_EFFORT |
+
+For `KEEP_ALL` cases, `depth` may be omitted from the JSON because the node
+ignores depth when `--qos-history KEEP_ALL` is used.
+
 ### Publisher / Subscriber
 
 | Option | Short | Description | Default |
@@ -131,7 +171,10 @@ ros2 run ros2_perf_multihost_nodes publisher_node \
     --node-name pub1 \
     --topic-names topic1 \
     --size 64 \
-    --period 100
+    --period 100 \
+    --qos-history KEEP_LAST \
+    --qos-depth 1 \
+    --qos-reliability RELIABLE
 ```
 
 Subscriber example:
@@ -139,7 +182,10 @@ Subscriber example:
 ```bash
 ros2 run ros2_perf_multihost_nodes subscriber_node \
     --node-name sub1 \
-    --topic-names topic1
+    --topic-names topic1 \
+    --qos-history KEEP_LAST \
+    --qos-depth 1 \
+    --qos-reliability RELIABLE
 ```
 
 Intermediate example:
@@ -150,7 +196,10 @@ ros2 run ros2_perf_multihost_nodes intermediate_node \
     --topic-names-pub topic_out \
     --topic-names-sub topic_in \
     --size 64 \
-    --period 100
+    --period 100 \
+    --qos-history KEEP_LAST \
+    --qos-depth 1 \
+    --qos-reliability RELIABLE
 ```
 
 Add `--log-dir` when you want to save logs.

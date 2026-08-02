@@ -52,6 +52,8 @@ All endpoints accept a JSON body. Common request fields:
 | `ws_dir` | string | Workspace directory (default: `performance_ws`) |
 | `trial_idx` | integer | Trial index, used by `/start_native` and `/start_docker` (default: `1`) |
 | `eval_time` | integer | Override evaluation duration in seconds (optional) |
+| `qos_case_idx` | integer | QoS sweep case index from the topology JSON `qos` array (optional) |
+| `qos` | object | One QoS case from the topology JSON `qos` array (optional) |
 | `zenoh_config_override` | string | Optional `ZENOH_CONFIG_OVERRIDE` value forwarded to the execution script environment |
 
 `/clock_probe` accepts an empty JSON body (`{}`) and returns:
@@ -61,6 +63,36 @@ All endpoints accept a JSON body. Common request fields:
 - `server_send_time_ns`
 
 These timestamps are used by `manager_scripts/system_perf/check_clock_skew_rest.py` on the Manager to estimate per-Host offset and uncertainty.
+
+For QoS sweep runs, the Manager-side runner should expand the topology JSON
+`qos` array and send one object per request:
+
+```json
+{
+  "topology": "five_hosts_qos_sweep",
+  "rmw": "zenoh",
+  "trial_idx": 1,
+  "qos_case_idx": 0,
+  "qos": {
+    "history": "KEEP_LAST",
+    "depth": 1,
+    "reliability": "RELIABLE"
+  }
+}
+```
+
+`rest_server.py` validates that single QoS case and forwards it to the
+host-specific execution script through environment variables:
+
+| Environment variable | Source |
+|---|---|
+| `QOS_CASE_INDEX` | `qos_case_idx` |
+| `QOS_HISTORY` | `qos.history` |
+| `QOS_DEPTH` | `qos.depth` |
+| `QOS_RELIABILITY` | `qos.reliability` |
+
+For `KEEP_ALL`, `qos.depth` may be omitted because depth is ignored by the ROS 2
+nodes when history is `KEEP_ALL`.
 
 ### Clock synchronization (chrony)
 
@@ -102,7 +134,11 @@ python3 remote_hosts_scripts/start_exec_scripts.py <topology> \
   [--trial-idx|-i N] \
   [--ws-dir|-w DIR] \
   [--prepare-run] \
-  [--hosts-list|-l HOSTS]
+  [--hosts-list|-l HOSTS] \
+  [--qos-case-idx N] \
+  [--qos-history {KEEP_LAST,KEEP_ALL}] \
+  [--qos-depth N] \
+  [--qos-reliability {RELIABLE,BEST_EFFORT}]
 ```
 
 | Option | Short | Description | Default |
@@ -114,6 +150,29 @@ python3 remote_hosts_scripts/start_exec_scripts.py <topology> \
 | `--ws-dir` | `-w` | Workspace directory | `performance_ws` |
 | `--prepare-run` | — | Send `/prepare_run` instead of a start request | — |
 | `--hosts-list` | `-l` | Comma-separated host list; if omitted, resolved from `metadata.txt` | — |
+| `--qos-case-idx` | — | QoS sweep case index from the topology JSON `qos` array | — |
+| `--qos-history` | — | QoS history for the current sweep case: `KEEP_LAST` or `KEEP_ALL` | — |
+| `--qos-depth` | — | QoS depth for the current sweep case; used only with `KEEP_LAST` | — |
+| `--qos-reliability` | — | QoS reliability for the current sweep case: `RELIABLE` or `BEST_EFFORT` | — |
+
+Example for one expanded QoS sweep case:
+
+```bash
+python3 remote_hosts_scripts/start_exec_scripts.py five_hosts_qos_sweep \
+  --rmw zenoh \
+  --exec-policy native \
+  --trial-idx 1 \
+  --ws-dir performance_ws \
+  --hosts-list host1,host2,host3,host4,host5 \
+  --qos-case-idx 0 \
+  --qos-history KEEP_LAST \
+  --qos-depth 1 \
+  --qos-reliability RELIABLE
+```
+
+`start_exec_scripts.py` does not parse the topology JSON directly. The future
+converter or runner should read the JSON `qos` array, call this script once per
+QoS case, and pass the current case through the QoS options above.
 
 ## monitor_psutil.py
 

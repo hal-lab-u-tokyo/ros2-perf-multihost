@@ -3,7 +3,7 @@
 from dataclasses import dataclass
 import os
 
-from .validation import normalize_intermediate_entries, require_positive_int
+from .validation import normalize_intermediate_entries, normalize_qos_cases, require_positive_int
 
 
 @dataclass(frozen=True)
@@ -130,15 +130,7 @@ def generate_exec_scripts(json_content, output_dir, settings):
     os.makedirs(output_dir, exist_ok=True)
 
     eval_time_default = settings.default_eval_time
-
-    qos_config = json_content.get("qos", {})
-    qos_history = qos_config.get("history", "KEEP_LAST")
-    qos_depth = qos_config.get("depth", 1)
-    qos_reliability = qos_config.get("reliability", "RELIABLE")
-    qos_opts = (
-        f"--qos-history {qos_history} --qos-depth {qos_depth} "
-        f"--qos-reliability {qos_reliability}"
-    )
+    default_qos = normalize_qos_cases(json_content.get("qos"))[0]
 
     for host_dict in json_content["hosts"]:
         host_name = host_dict["host_name"]
@@ -174,9 +166,9 @@ def generate_exec_scripts(json_content, output_dir, settings):
                     f'            "--node-name", "{node_name}",',
                     f'            "--topic-names", "{topic_names}",',
                     '            "--eval-time", eval_time,',
-                    f'            "--qos-history", "{qos_history}",',
-                    f'            "--qos-depth", "{qos_depth}",',
-                    f'            "--qos-reliability", "{qos_reliability}",',
+                    '            "--qos-history", qos_history,',
+                    '            "--qos-depth", qos_depth,',
+                    '            "--qos-reliability", qos_reliability,',
                 ]
                 for v in payload_sizes:
                     args.append(f'            "--size", "{int(v)}",')
@@ -204,9 +196,9 @@ def generate_exec_scripts(json_content, output_dir, settings):
                     f'            "--node-name", "{node_name}",',
                     f'            "--topic-names", "{topic_names}",',
                     '            "--eval-time", eval_time,',
-                    f'            "--qos-history", "{qos_history}",',
-                    f'            "--qos-depth", "{qos_depth}",',
-                    f'            "--qos-reliability", "{qos_reliability}",',
+                    '            "--qos-history", qos_history,',
+                    '            "--qos-depth", qos_depth,',
+                    '            "--qos-reliability", qos_reliability,',
                     '            "--log-dir", log_dir,',
                 ]
                 node_var_lines.extend([
@@ -248,9 +240,9 @@ def generate_exec_scripts(json_content, output_dir, settings):
                     f'            "--topic-names-pub", "{",".join(p["topic_name"] for p in pub_defs)}",',
                     f'            "--topic-names-sub", "{",".join(sub_topics)}",',
                     '            "--eval-time", eval_time,',
-                    f'            "--qos-history", "{qos_history}",',
-                    f'            "--qos-depth", "{qos_depth}",',
-                    f'            "--qos-reliability", "{qos_reliability}",',
+                    '            "--qos-history", qos_history,',
+                    '            "--qos-depth", qos_depth,',
+                    '            "--qos-reliability", qos_reliability,',
                 ]
                 for v in payload_sizes:
                     args.append(f'            "--size", "{int(v)}",')
@@ -281,6 +273,9 @@ def generate_exec_scripts(json_content, output_dir, settings):
             "def generate_launch_description():",
             '    eval_time = LaunchConfiguration("eval_time")',
             '    log_dir = LaunchConfiguration("log_dir")',
+            '    qos_history = LaunchConfiguration("qos_history")',
+            '    qos_depth = LaunchConfiguration("qos_depth")',
+            '    qos_reliability = LaunchConfiguration("qos_reliability")',
             '    project_root = EnvironmentVariable("ROS2_PERF_REPO_ROOT", default_value=EnvironmentVariable("ROS2_PERF_WS", default_value="/workdir/ros2-perf-multihost"))',
             "",
             *node_var_lines,
@@ -307,6 +302,9 @@ def generate_exec_scripts(json_content, output_dir, settings):
             "        [",
             f'            DeclareLaunchArgument("eval_time", default_value=EnvironmentVariable("EVAL_TIME", default_value="{eval_time_default}")),',
             '            DeclareLaunchArgument("log_dir", default_value=EnvironmentVariable("LOG_DIR", default_value="")),',
+            f'            DeclareLaunchArgument("qos_history", default_value=EnvironmentVariable("QOS_HISTORY", default_value="{default_qos["history"]}")),',
+            f'            DeclareLaunchArgument("qos_depth", default_value=EnvironmentVariable("QOS_DEPTH", default_value="{default_qos["depth"]}")),',
+            f'            DeclareLaunchArgument("qos_reliability", default_value=EnvironmentVariable("QOS_RELIABILITY", default_value="{default_qos["reliability"]}")),',
             "            ExecuteProcess(",
             "                cmd=[",
             '                    "python3",',
@@ -345,6 +343,7 @@ def append_common_service(
     output_dir,
     eval_time_default,
     settings,
+    default_qos,
     ipc_host=False,
 ):
     lines.append(f"  {service_name}:")
@@ -370,10 +369,16 @@ def append_common_service(
     lines.append("      - RUST_LOG=${RUST_LOG:-}")
     lines.append(f"      - EVAL_TIME=${{EVAL_TIME:-{eval_time_default}}}")
     lines.append("      - LOG_DIR=${LOG_DIR:-}")
+    lines.append("      - QOS_CASE_INDEX=${QOS_CASE_INDEX:-}")
+    lines.append(
+        f"      - QOS_HISTORY=${{QOS_HISTORY:-{default_qos['history']}}}")
+    lines.append(f"      - QOS_DEPTH=${{QOS_DEPTH:-{default_qos['depth']}}}")
+    lines.append(
+        f"      - QOS_RELIABILITY=${{QOS_RELIABILITY:-{default_qos['reliability']}}}")
     lines.append(
         (
             '    command: [ "/bin/bash", "-lc", '
-            f'"set +u; . \\\"$$ROS2_NODE_IMPL_WS/install/setup.sh\\\"; set -u; ros2 launch /exec_scripts/{host_name}.launch.py eval_time:=\\\"$$EVAL_TIME\\\" log_dir:=\\\"$$LOG_DIR\\\"" ]'
+            f'"set +u; . \\\"$$ROS2_NODE_IMPL_WS/install/setup.sh\\\"; set -u; ros2 launch /exec_scripts/{host_name}.launch.py eval_time:=\\\"$$EVAL_TIME\\\" log_dir:=\\\"$$LOG_DIR\\\" qos_history:=\\\"$$QOS_HISTORY\\\" qos_depth:=\\\"$$QOS_DEPTH\\\" qos_reliability:=\\\"$$QOS_RELIABILITY\\\"" ]'
         )
     )
 
@@ -429,6 +434,7 @@ def generate_zenohd_compose(output_dir, settings):
 def generate_compose(json_content, output_dir, project_root, settings):
     """Generate local_compose.yaml for validation on a development machine."""
     eval_time_default = settings.default_eval_time
+    default_qos = normalize_qos_cases(json_content.get("qos"))[0]
     lines = ["services:"]
 
     for host_dict in json_content["hosts"]:
@@ -442,6 +448,7 @@ def generate_compose(json_content, output_dir, project_root, settings):
             output_dir,
             eval_time_default,
             settings,
+            default_qos,
             ipc_host=True,
         )
 
@@ -455,6 +462,7 @@ def generate_compose(json_content, output_dir, project_root, settings):
 def generate_compose_per_host(json_content, output_dir, project_root, settings):
     """Generate one host-specific host*_compose.yaml file per host."""
     eval_time_default = settings.default_eval_time
+    default_qos = normalize_qos_cases(json_content.get("qos"))[0]
     for host_dict in json_content["hosts"]:
         host_name = host_dict["host_name"]
         lines = ["services:"]
@@ -466,6 +474,7 @@ def generate_compose_per_host(json_content, output_dir, project_root, settings):
             output_dir,
             eval_time_default,
             settings,
+            default_qos,
         )
 
         compose_path = os.path.join(output_dir, f"{host_name}_compose.yaml")
@@ -473,8 +482,14 @@ def generate_compose_per_host(json_content, output_dir, project_root, settings):
             f.write("\n".join(lines) + "\n")
 
 
-def run_script_common_prefix(lines, rel_root, eval_time_default, settings):
+def run_script_common_prefix(lines, rel_root, eval_time_default, settings, default_qos=None):
     """Append the shared prelude used by run scripts."""
+    if default_qos is None:
+        default_qos = {
+            "history": "KEEP_LAST",
+            "depth": 1,
+            "reliability": "RELIABLE",
+        }
     lines.extend(
         [
             "#!/usr/bin/env bash",
@@ -490,6 +505,10 @@ def run_script_common_prefix(lines, rel_root, eval_time_default, settings):
             f'EVAL_TIME="${{EVAL_TIME:-{eval_time_default}}}"',
             'RMW_CHOICE="${RMW_CHOICE:-${RMW:-}}"',
             'TRIAL_IDX="${TRIAL_IDX:-1}"',
+            'QOS_CASE_INDEX="${QOS_CASE_INDEX:-}"',
+            f'QOS_HISTORY="${{QOS_HISTORY:-{default_qos["history"]}}}"',
+            f'QOS_DEPTH="${{QOS_DEPTH:-{default_qos["depth"]}}}"',
+            f'QOS_RELIABILITY="${{QOS_RELIABILITY:-{default_qos["reliability"]}}}"',
             "",
             'print_help() {',
             '  cat <<EOF',
@@ -499,6 +518,10 @@ def run_script_common_prefix(lines, rel_root, eval_time_default, settings):
             '  -t, --eval-time SEC       Evaluation duration in seconds (default: $EVAL_TIME)',
             '  -i, --trial-idx N         Trial index (default: $TRIAL_IDX)',
             '  -m, --rmw NAME            RMW implementation: fastdds|cyclonedds|zenoh',
+            '      --qos-case-idx N      QoS sweep case index',
+            '      --qos-history NAME    QoS history: KEEP_LAST|KEEP_ALL',
+            '      --qos-depth N         QoS depth, used only with KEEP_LAST',
+            '      --qos-reliability NAME QoS reliability: RELIABLE|BEST_EFFORT',
             '  -h, --help                Show this help message and exit',
             '',
             'Notes:',
@@ -516,6 +539,14 @@ def run_script_common_prefix(lines, rel_root, eval_time_default, settings):
             '      TRIAL_IDX="$2"; shift 2;;',
             '    --rmw|-m)',
             '      RMW_CHOICE="$2"; shift 2;;',
+            '    --qos-case-idx)',
+            '      QOS_CASE_INDEX="$2"; shift 2;;',
+            '    --qos-history)',
+            '      QOS_HISTORY="$2"; shift 2;;',
+            '    --qos-depth)',
+            '      QOS_DEPTH="$2"; shift 2;;',
+            '    --qos-reliability)',
+            '      QOS_RELIABILITY="$2"; shift 2;;',
             '    --help|-h)',
             '      print_help; exit 0;;',
             '    --)',
@@ -528,6 +559,18 @@ def run_script_common_prefix(lines, rel_root, eval_time_default, settings):
             '  echo "ERROR: EVAL_TIME must be a positive integer." >&2',
             '  exit 2',
             'fi',
+            'case "$QOS_HISTORY" in',
+            '  KEEP_LAST|KEEP_ALL) ;;',
+            '  *) echo "ERROR: QOS_HISTORY must be KEEP_LAST or KEEP_ALL." >&2; exit 2;;',
+            'esac',
+            'if ! [[ "$QOS_DEPTH" =~ ^[0-9]+$ ]] || [[ "$QOS_DEPTH" -le 0 ]]; then',
+            '  echo "ERROR: QOS_DEPTH must be a positive integer." >&2',
+            '  exit 2',
+            'fi',
+            'case "$QOS_RELIABILITY" in',
+            '  RELIABLE|BEST_EFFORT) ;;',
+            '  *) echo "ERROR: QOS_RELIABILITY must be RELIABLE or BEST_EFFORT." >&2; exit 2;;',
+            'esac',
             'if [[ -z "$RMW_CHOICE" ]]; then',
             '  echo "ERROR: --rmw is required (fastdds|cyclonedds|zenoh)." >&2',
             '  exit 2',
@@ -574,6 +617,10 @@ def run_script_common_prefix(lines, rel_root, eval_time_default, settings):
             'echo "LOG_DIR (in container): $LOG_DIR"',
             'echo "EVAL_TIME=$EVAL_TIME"',
             'echo "RMW_CHOICE=$RMW_CHOICE"',
+            'echo "QOS_CASE_INDEX=${QOS_CASE_INDEX:-N/A}"',
+            'echo "QOS_HISTORY=$QOS_HISTORY"',
+            'echo "QOS_DEPTH=$QOS_DEPTH"',
+            'echo "QOS_RELIABILITY=$QOS_RELIABILITY"',
             "",
         ]
     )
@@ -583,22 +630,28 @@ def generate_host_exec_scripts(json_content, output_dir, project_root, settings)
     """Generate host*_exec_docker.sh wrapper scripts for host-specific Compose files."""
     rel_root = os.path.relpath(project_root, output_dir)
     eval_time_default = settings.default_eval_time
+    default_qos = normalize_qos_cases(json_content.get("qos"))[0]
     for host_dict in json_content["hosts"]:
         host_name = host_dict["host_name"]
         script_path = os.path.join(output_dir, f"{host_name}_exec_docker.sh")
         compose_file = f"$SCRIPT_DIR/{host_name}_compose.yaml"
         lines = []
-        run_script_common_prefix(lines, rel_root, eval_time_default, settings)
+        run_script_common_prefix(
+            lines, rel_root, eval_time_default, settings, default_qos)
         lines.extend(
             [
                 f'COMPOSE_FILE="{compose_file}"',
                 'echo "Using compose file: $COMPOSE_FILE"',
                 'echo "Cleaning up previous containers (including orphans)..."',
                 (
-                    f'LOCAL_UID="$LOCAL_UID" LOCAL_GID="$LOCAL_GID" '
+                    'LOCAL_UID="$LOCAL_UID" LOCAL_GID="$LOCAL_GID" '
                     'EVAL_TIME="$EVAL_TIME" '
                     'RMW_CHOICE="$RMW_CHOICE" '
                     'RMW_IMPLEMENTATION="$RMW_IMPLEMENTATION" '
+                    'QOS_CASE_INDEX="${QOS_CASE_INDEX:-}" '
+                    'QOS_HISTORY="$QOS_HISTORY" '
+                    'QOS_DEPTH="$QOS_DEPTH" '
+                    'QOS_RELIABILITY="$QOS_RELIABILITY" '
                     'ZENOH_CONFIG_OVERRIDE="${ZENOH_CONFIG_OVERRIDE:-}" '
                     'ZENOH_ROUTER_CHECK_ATTEMPTS="${ZENOH_ROUTER_CHECK_ATTEMPTS:-}" '
                     'RUST_LOG="${RUST_LOG:-}" '
@@ -610,6 +663,10 @@ def generate_host_exec_scripts(json_content, output_dir, project_root, settings)
                     'EVAL_TIME="$EVAL_TIME" '
                     'RMW_CHOICE="$RMW_CHOICE" '
                     'RMW_IMPLEMENTATION="$RMW_IMPLEMENTATION" '
+                    'QOS_CASE_INDEX="${QOS_CASE_INDEX:-}" '
+                    'QOS_HISTORY="$QOS_HISTORY" '
+                    'QOS_DEPTH="$QOS_DEPTH" '
+                    'QOS_RELIABILITY="$QOS_RELIABILITY" '
                     'ZENOH_CONFIG_OVERRIDE="${ZENOH_CONFIG_OVERRIDE:-}" '
                     'ZENOH_ROUTER_CHECK_ATTEMPTS="${ZENOH_ROUTER_CHECK_ATTEMPTS:-}" '
                     'RUST_LOG="${RUST_LOG:-}" '
@@ -629,12 +686,14 @@ def generate_host_exec_native_scripts(json_content, output_dir, project_root, se
     """Generate host*_exec_native.sh wrapper scripts for native ROS 2 execution."""
     rel_root = os.path.relpath(project_root, output_dir)
     eval_time_default = settings.default_eval_time
+    default_qos = normalize_qos_cases(json_content.get("qos"))[0]
     for host_dict in json_content["hosts"]:
         host_name = host_dict["host_name"]
         script_path = os.path.join(output_dir, f"{host_name}_exec_native.sh")
         launch_file = f"$SCRIPT_DIR/{host_name}.launch.py"
         lines = []
-        run_script_common_prefix(lines, rel_root, eval_time_default, settings)
+        run_script_common_prefix(
+            lines, rel_root, eval_time_default, settings, default_qos)
         lines.extend(
             [
                 "# --- Native mode: LOG_DIR is the host filesystem path ---",
@@ -644,10 +703,10 @@ def generate_host_exec_native_scripts(json_content, output_dir, project_root, se
                 "# Source ROS 2 environment",
                 "set +u",
                 ". /opt/ros/jazzy/setup.bash",
-                f'. "${{ROS2_NODE_IMPL_WS:-$PROJECT_ROOT/ros2_node_impl_ws}}/install/setup.bash"',
+                '. "${ROS2_NODE_IMPL_WS:-$PROJECT_ROOT/ros2_node_impl_ws}/install/setup.bash"',
                 "set -u",
                 "",
-                f'ros2 launch "{launch_file}" eval_time:="$EVAL_TIME" log_dir:="$LOG_DIR"',
+                f'ros2 launch "{launch_file}" eval_time:="$EVAL_TIME" log_dir:="$LOG_DIR" qos_history:="$QOS_HISTORY" qos_depth:="$QOS_DEPTH" qos_reliability:="$QOS_RELIABILITY"',
             ]
         )
 
@@ -662,11 +721,12 @@ def generate_local_run_script(json_content, output_dir, project_root, settings):
     hosts = json_content["hosts"]
     host_services = " ".join(f"service_{h['host_name']}" for h in hosts)
     rel_root = os.path.relpath(project_root, output_dir)
+    default_qos = normalize_qos_cases(json_content.get("qos"))[0]
 
     script_path = os.path.join(output_dir, "local_exec.sh")
     lines = []
     run_script_common_prefix(
-        lines, rel_root, settings.default_eval_time, settings)
+        lines, rel_root, settings.default_eval_time, settings, default_qos)
     lines.extend(
         [
             'COORD_LOGS_HOST_DIR="$RUN_RESULTS_HOST_DIR/coordination_logs"',
@@ -682,6 +742,10 @@ def generate_local_run_script(json_content, output_dir, project_root, settings):
                 'EVAL_TIME="$EVAL_TIME" '
                 'RMW_CHOICE="$RMW_CHOICE" '
                 'RMW_IMPLEMENTATION="$RMW_IMPLEMENTATION" '
+                'QOS_CASE_INDEX="${QOS_CASE_INDEX:-}" '
+                'QOS_HISTORY="$QOS_HISTORY" '
+                'QOS_DEPTH="$QOS_DEPTH" '
+                'QOS_RELIABILITY="$QOS_RELIABILITY" '
                 'ZENOH_CONFIG_OVERRIDE="${ZENOH_CONFIG_OVERRIDE:-}" '
                 'ZENOH_ROUTER_CHECK_ATTEMPTS="${ZENOH_ROUTER_CHECK_ATTEMPTS:-}" '
                 'RUST_LOG="${RUST_LOG:-}" '
@@ -689,7 +753,7 @@ def generate_local_run_script(json_content, output_dir, project_root, settings):
                 'docker compose -f "$COMPOSE_FILE" down --remove-orphans >/dev/null 2>&1 || true'
             ),
             'cleanup_compose() {',
-            '  LOCAL_UID="$LOCAL_UID" LOCAL_GID="$LOCAL_GID" EVAL_TIME="$EVAL_TIME" RMW_CHOICE="$RMW_CHOICE" RMW_IMPLEMENTATION="$RMW_IMPLEMENTATION" ZENOH_CONFIG_OVERRIDE="${ZENOH_CONFIG_OVERRIDE:-}" ZENOH_ROUTER_CHECK_ATTEMPTS="${ZENOH_ROUTER_CHECK_ATTEMPTS:-}" RUST_LOG="${RUST_LOG:-}" LOG_DIR="$LOG_DIR" docker compose -f "$COMPOSE_FILE" down --remove-orphans >/dev/null 2>&1 || true',
+            '  LOCAL_UID="$LOCAL_UID" LOCAL_GID="$LOCAL_GID" EVAL_TIME="$EVAL_TIME" RMW_CHOICE="$RMW_CHOICE" RMW_IMPLEMENTATION="$RMW_IMPLEMENTATION" QOS_CASE_INDEX="${QOS_CASE_INDEX:-}" QOS_HISTORY="$QOS_HISTORY" QOS_DEPTH="$QOS_DEPTH" QOS_RELIABILITY="$QOS_RELIABILITY" ZENOH_CONFIG_OVERRIDE="${ZENOH_CONFIG_OVERRIDE:-}" ZENOH_ROUTER_CHECK_ATTEMPTS="${ZENOH_ROUTER_CHECK_ATTEMPTS:-}" RUST_LOG="${RUST_LOG:-}" LOG_DIR="$LOG_DIR" docker compose -f "$COMPOSE_FILE" down --remove-orphans >/dev/null 2>&1 || true',
             '}',
             'trap cleanup_compose EXIT',
             "",
@@ -714,6 +778,10 @@ def generate_local_run_script(json_content, output_dir, project_root, settings):
                 'EVAL_TIME="$EVAL_TIME" '
                 'RMW_CHOICE="$RMW_CHOICE" '
                 'RMW_IMPLEMENTATION="$RMW_IMPLEMENTATION" '
+                'QOS_CASE_INDEX="${QOS_CASE_INDEX:-}" '
+                'QOS_HISTORY="$QOS_HISTORY" '
+                'QOS_DEPTH="$QOS_DEPTH" '
+                'QOS_RELIABILITY="$QOS_RELIABILITY" '
                 'ZENOH_CONFIG_OVERRIDE="${ZENOH_CONFIG_OVERRIDE:-}" '
                 'ZENOH_ROUTER_CHECK_ATTEMPTS="${ZENOH_ROUTER_CHECK_ATTEMPTS:-}" '
                 'RUST_LOG="${RUST_LOG:-}" '
@@ -728,6 +796,10 @@ def generate_local_run_script(json_content, output_dir, project_root, settings):
                 'EVAL_TIME="$EVAL_TIME" '
                 'RMW_CHOICE="$RMW_CHOICE" '
                 'RMW_IMPLEMENTATION="$RMW_IMPLEMENTATION" '
+                'QOS_CASE_INDEX="${QOS_CASE_INDEX:-}" '
+                'QOS_HISTORY="$QOS_HISTORY" '
+                'QOS_DEPTH="$QOS_DEPTH" '
+                'QOS_RELIABILITY="$QOS_RELIABILITY" '
                 'ZENOH_CONFIG_OVERRIDE="${ZENOH_CONFIG_OVERRIDE:-}" '
                 'ZENOH_ROUTER_CHECK_ATTEMPTS="${ZENOH_ROUTER_CHECK_ATTEMPTS:-}" '
                 'RUST_LOG="${RUST_LOG:-}" '
@@ -740,6 +812,10 @@ def generate_local_run_script(json_content, output_dir, project_root, settings):
                 'EVAL_TIME="$EVAL_TIME" '
                 'RMW_CHOICE="$RMW_CHOICE" '
                 'RMW_IMPLEMENTATION="$RMW_IMPLEMENTATION" '
+                'QOS_CASE_INDEX="${QOS_CASE_INDEX:-}" '
+                'QOS_HISTORY="$QOS_HISTORY" '
+                'QOS_DEPTH="$QOS_DEPTH" '
+                'QOS_RELIABILITY="$QOS_RELIABILITY" '
                 'ZENOH_CONFIG_OVERRIDE="${ZENOH_CONFIG_OVERRIDE:-}" '
                 'ZENOH_ROUTER_CHECK_ATTEMPTS="${ZENOH_ROUTER_CHECK_ATTEMPTS:-}" '
                 'RUST_LOG="${RUST_LOG:-}" '
@@ -754,6 +830,10 @@ def generate_local_run_script(json_content, output_dir, project_root, settings):
                 'EVAL_TIME="$EVAL_TIME" '
                 'RMW_CHOICE="$RMW_CHOICE" '
                 'RMW_IMPLEMENTATION="$RMW_IMPLEMENTATION" '
+                'QOS_CASE_INDEX="${QOS_CASE_INDEX:-}" '
+                'QOS_HISTORY="$QOS_HISTORY" '
+                'QOS_DEPTH="$QOS_DEPTH" '
+                'QOS_RELIABILITY="$QOS_RELIABILITY" '
                 'ZENOH_CONFIG_OVERRIDE="${ZENOH_CONFIG_OVERRIDE:-}" '
                 'ZENOH_ROUTER_CHECK_ATTEMPTS="${ZENOH_ROUTER_CHECK_ATTEMPTS:-}" '
                 'RUST_LOG="${RUST_LOG:-}" '

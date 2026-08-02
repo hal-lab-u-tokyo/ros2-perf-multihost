@@ -20,7 +20,7 @@ from generate_exec.script_generation import (
     generate_local_run_script,
     generate_zenohd_compose,
 )
-from generate_exec.validation import normalize_ws_dir, validate_topology_json_schema
+from generate_exec.validation import normalize_qos_cases, normalize_ws_dir, validate_topology_json_schema
 
 
 PROJECT_ROOT_IN_CONTAINER = "/workdir/ros2-perf-multihost"
@@ -117,5 +117,6 @@ Examples:
         f"Generated host*.launch.py, host*_exec_docker.sh, host*_exec_native.sh, host*_compose.yaml, "
         f"local_exec.sh, local_compose.yaml, zenohd_compose.yaml "
         f"in {settings.perf_ws_dir}/{topology_dir}/exec_scripts "
-        f"for {len(json_content['hosts'])} host(s)"
+        f"for {len(json_content['hosts'])} host(s) "
+        f"and {len(normalize_qos_cases(json_content.get('qos')))} QoS case(s)"
     )

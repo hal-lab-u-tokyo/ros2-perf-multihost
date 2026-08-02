@@ -1,5 +1,7 @@
 import argparse
+import csv
 from datetime import datetime
+import json
 import os
 import socket
 import subprocess
@@ -7,6 +9,7 @@ import sys
 import time
 
 from analyzer import aggregate_total_latency
+from qos_sweep import load_qos_cases, qos_case_label
 from runner import collect_logs, collect_runtime_logs, prepare_run, resolve_host_list, run_test
 from zenoh_runtime import build_config_override, resolve_router_target, start_router, stop_router
 
@@ -34,9 +37,9 @@ def _preflight_check_ssh_all_hosts(hosts, ssh_user):
                       or f"return code {result.returncode}").strip()
             failures.append(f"- {host}: {detail}")
     if failures:
+        failure_lines = "\n".join(failures)
         raise RuntimeError(
-            "SSH preflight failed for one or more hosts:\n" +
-            "\n".join(failures)
+            f"SSH preflight failed for one or more hosts:\n{failure_lines}"
         )
 
 
@@ -117,6 +120,82 @@ def _run_system_perf_preflight(repo_root, hosts, local_session_dir):
             )
 
     print(f"Preflight(system_perf) outputs: {system_perf_dir}")
+
+
+def _read_csv_total_row(path):
+    if not os.path.exists(path):
+        return None
+    with open(path, "r", newline="") as f:
+        reader = csv.reader(f)
+        next(reader, None)
+        for row in reader:
+            if row and row[0] == "total":
+                return row
+    return None
+
+
+def _write_qos_sweep_summary(summary_path, case_results):
+    os.makedirs(os.path.dirname(summary_path), exist_ok=True)
+    header = [
+        "qos_case",
+        "history",
+        "depth",
+        "reliability",
+        "lost[#]",
+        "mean[ms]",
+        "sd[ms]",
+        "min[ms]",
+        "q1[ms]",
+        "mid[ms]",
+        "q3[ms]",
+        "max[ms]",
+        "throughput[B/s]",
+        "throughput[MB/s]",
+    ]
+    rows = []
+    for item in case_results:
+        qos_case = item["qos"]
+        latency_total = _read_csv_total_row(
+            os.path.join(item["analysis_dir"], "total_latency.csv"))
+        throughput_total = _read_csv_total_row(
+            os.path.join(item["analysis_dir"], "throughput.csv"))
+
+        latency_values = latency_total[1:9] if latency_total else ["N/A"] * 8
+        throughput_values = (
+            throughput_total[1:3] if throughput_total and len(throughput_total) >= 3
+            else ["N/A", "N/A"]
+        )
+        rows.append(
+            [
+                item["label"],
+                qos_case["history"],
+                qos_case["depth"],
+                qos_case["reliability"],
+                *latency_values,
+                *throughput_values,
+            ]
+        )
+
+    with open(summary_path, "w", newline="") as f:
+        writer = csv.writer(f)
+        writer.writerow(header)
+        writer.writerows(rows)
+    print(f"QoS sweep summary saved: {summary_path}")
+
+
+def _update_latest_alias(results_root, rmw, run_timestamp):
+    latest_link = os.path.join(results_root, f"latest-{rmw}")
+    if os.path.lexists(latest_link):
+        if os.path.isdir(latest_link) and not os.path.islink(latest_link):
+            raise RuntimeError(
+                (
+                    f"Cannot update latest alias because '{latest_link}' exists "
+                    "as a directory. Remove or rename this directory and rerun."
+                )
+            )
+        os.remove(latest_link)
+    os.symlink(run_timestamp, latest_link)
+    return latest_link
 
 
 if __name__ == "__main__":
@@ -229,18 +308,15 @@ Examples:
     os.makedirs(local_analysis_dir, exist_ok=True)
 
     local_latest_link = os.path.join(local_results_root, f"latest-{args.rmw}")
-    if os.path.lexists(local_latest_link):
-        if os.path.isdir(local_latest_link) and not os.path.islink(local_latest_link):
-            print(
-                (
-                    f"ERROR: Cannot update latest alias because '{local_latest_link}' exists "
-                    "as a directory. Remove or rename this directory and rerun."
-                ),
-                file=sys.stderr,
-            )
-            sys.exit(1)
-        os.remove(local_latest_link)
-    os.symlink(run_timestamp, local_latest_link)
+    if os.path.lexists(local_latest_link) and os.path.isdir(local_latest_link) and not os.path.islink(local_latest_link):
+        print(
+            (
+                f"ERROR: Cannot update latest alias because '{local_latest_link}' exists "
+                "as a directory. Remove or rename this directory and rerun."
+            ),
+            file=sys.stderr,
+        )
+        sys.exit(1)
 
     # Resolve actual host list from metadata (metadata.txt is authoritative)
     try:
@@ -250,12 +326,30 @@ Examples:
     except (FileNotFoundError, ValueError) as e:
         print(f"ERROR: {e}", file=sys.stderr)
         sys.exit(1)
+
+    try:
+        qos_cases = load_qos_cases(args.ws_dir, args.topology_name)
+    except (FileNotFoundError, ValueError, json.JSONDecodeError) as e:
+        print(
+            f"ERROR: Failed to load QoS cases from metadata: {e}", file=sys.stderr)
+        sys.exit(1)
+    is_qos_sweep = len(qos_cases) > 1
+
+    qos_manifest_path = os.path.join(local_session_dir, "qos_cases.json")
+    with open(qos_manifest_path, "w", encoding="utf-8") as f:
+        json.dump(qos_cases, f, indent=2)
+
     print(f"Using hosts: {hosts}")
-    print(f"Note: payload_size and period_ms are determined by topology JSON; eval_time can be overridden")
+    print(f"Using QoS case(s): {len(qos_cases)}")
+    for idx, qos_case in enumerate(qos_cases):
+        print(f"  qos_case{idx}: {qos_case}")
+    print("Note: payload_size and period_ms are determined by topology JSON; eval_time can be overridden")
     print(f"Local coordination logs dir: {local_coordination_logs_dir}")
     print(f"Local raw logs dir: {local_raw_logs_dir}")
     print(f"Local analysis dir: {local_analysis_dir}")
-    print(f"Local latest alias: {local_latest_link} -> {run_timestamp}")
+    print(f"QoS case manifest: {qos_manifest_path}")
+    print(
+        f"Local latest alias (updated on success): {local_latest_link} -> {run_timestamp}")
     print(f"SSH user for remote ops: {args.ssh_user}")
     print(f"Strict analysis mode: {args.strict_analysis}")
 
@@ -375,56 +469,95 @@ Examples:
             except RuntimeError as exc:
                 print(f"ERROR: {exc}", file=sys.stderr)
                 sys.exit(1)
+    case_results = []
     try:
-        prepare_run(
-            start_exec_scripts_py,
-            hosts,
-            args.ws_dir,
-            args.topology_name,
-            rmw=args.rmw,
-            exec_policy=args.exec_policy,
-            run_timestamp=run_timestamp,
-            coordination_log_dir=local_coordination_logs_dir,
-        )
+        for qos_case_idx, qos_case in enumerate(qos_cases):
+            if is_qos_sweep:
+                label = qos_case_label(qos_case_idx)
+                case_session_dir = os.path.join(local_session_dir, label)
+                case_coordination_logs_dir = os.path.join(
+                    case_session_dir, "coordination_logs")
+                case_raw_logs_dir = os.path.join(case_session_dir, "raw_logs")
+                case_analysis_dir = os.path.join(case_session_dir, "analysis")
+                case_run_timestamp = os.path.join(run_timestamp, label)
+                active_qos_case_idx = qos_case_idx
+                active_qos_case = qos_case
+            else:
+                label = None
+                case_session_dir = local_session_dir
+                case_coordination_logs_dir = local_coordination_logs_dir
+                case_raw_logs_dir = local_raw_logs_dir
+                case_analysis_dir = local_analysis_dir
+                case_run_timestamp = run_timestamp
+                active_qos_case_idx = None
+                active_qos_case = None
 
-        for trial_idx in range(args.trials):
-            run_test(
-                trial_idx,
+            if args.exec_policy != "local":
+                os.makedirs(case_coordination_logs_dir, exist_ok=True)
+            os.makedirs(case_raw_logs_dir, exist_ok=True)
+            os.makedirs(case_analysis_dir, exist_ok=True)
+
+            if is_qos_sweep:
+                print(f"=== Running {label}: {qos_case} ===")
+
+            prepare_run(
                 start_exec_scripts_py,
                 hosts,
                 args.ws_dir,
                 args.topology_name,
                 rmw=args.rmw,
                 exec_policy=args.exec_policy,
-                eval_time=eval_time,
-                run_timestamp=run_timestamp,
-                coordination_log_dir=local_coordination_logs_dir,
-                zenoh_config_override=zenoh_config_override,
+                run_timestamp=case_run_timestamp,
+                coordination_log_dir=case_coordination_logs_dir,
             )
-            time.sleep(10)
 
-        collect_logs(
-            local_raw_logs_dir,
-            args.trials,
-            hosts,
-            ws_dir=args.ws_dir,
-            topology_name=args.topology_name,
-            rmw=args.rmw,
-            exec_policy=args.exec_policy,
-            run_timestamp=run_timestamp,
-            ssh_user=args.ssh_user,
-        )
+            for trial_idx in range(args.trials):
+                run_test(
+                    trial_idx,
+                    start_exec_scripts_py,
+                    hosts,
+                    args.ws_dir,
+                    args.topology_name,
+                    rmw=args.rmw,
+                    exec_policy=args.exec_policy,
+                    eval_time=eval_time,
+                    run_timestamp=case_run_timestamp,
+                    coordination_log_dir=case_coordination_logs_dir,
+                    zenoh_config_override=zenoh_config_override,
+                    qos_case_idx=active_qos_case_idx,
+                    qos_case=active_qos_case,
+                )
+                time.sleep(10)
 
-        aggregate_total_latency(
-            local_raw_logs_dir,
-            local_analysis_dir,
-            args.trials,
-            hosts,
-            eval_time=eval_time,
-            ws_dir=args.ws_dir,
-            topology_name=args.topology_name,
-            strict_analysis=args.strict_analysis,
-        )
+            collect_logs(
+                case_raw_logs_dir,
+                args.trials,
+                hosts,
+                ws_dir=args.ws_dir,
+                topology_name=args.topology_name,
+                rmw=args.rmw,
+                exec_policy=args.exec_policy,
+                run_timestamp=case_run_timestamp,
+                ssh_user=args.ssh_user,
+            )
+
+            aggregate_total_latency(
+                case_raw_logs_dir,
+                case_analysis_dir,
+                args.trials,
+                hosts,
+                eval_time=eval_time,
+                ws_dir=args.ws_dir,
+                topology_name=args.topology_name,
+                strict_analysis=args.strict_analysis,
+            )
+            case_results.append(
+                {
+                    "label": label or qos_case_label(qos_case_idx),
+                    "qos": qos_case,
+                    "analysis_dir": case_analysis_dir,
+                }
+            )
     finally:
         if args.exec_policy in ("docker", "native"):
             print("Collecting runtime logs (rest_server, zenohd router)...")
@@ -457,5 +590,17 @@ Examples:
             except RuntimeError as exc:
                 print(
                     f"WARNING: Failed to stop Zenoh router cleanly: {exc}", file=sys.stderr)
+
+    if is_qos_sweep:
+        _write_qos_sweep_summary(
+            os.path.join(local_analysis_dir, "qos_sweep_summary.csv"),
+            case_results,
+        )
+
+    try:
+        _update_latest_alias(local_results_root, args.rmw, run_timestamp)
+    except RuntimeError as exc:
+        print(f"ERROR: {exc}", file=sys.stderr)
+        sys.exit(1)
 
     print("All tests and aggregation complete.")

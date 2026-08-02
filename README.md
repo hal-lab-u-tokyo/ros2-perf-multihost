@@ -35,7 +35,7 @@ Our purpose is to provide a "scientific scale" for optimizing distributed system
 ### Key Features 🚀
 
 - **Manager-Host Coordination**: Deploy nodes in bulk to multiple target Hosts (Raspberry Pi, Jetson, servers, etc.) via REST API and remotely manage their lifecycle from a central Manager.
-- **Flexible Topology Configuration**: Define node relationships and QoS settings to the Host assignments declaratively via JSON. Iterate complex topologies for multiple RMWs efficiently.
+- **Flexible Topology Configuration**: Define node relationships, Host assignments, and QoS settings declaratively via JSON. Iterate complex topologies for multiple RMWs efficiently.
 - **RMW Neutrality**: Evaluate multiple RMW implementations (FastDDS, CycloneDDS, Zenoh) while using QoS and topology definitions for cross-RMW comparisons.
 - **Dual Execution Modes**: Support both Docker containerized and native ROS 2 environments for seamless evaluation across development as well as production-like setups.
 - **Precision Telemetry & Monitoring**: Record CPU and memory load on each Host with trial-aligned timestamps, enabling time-correlated analysis with end-to-end communication metrics.
@@ -49,7 +49,7 @@ This framework employs a two-tier architecture:
 
 The workflow proceeds as follows:
 
-1. **Topology Definition**: Users define node placement, topic relationships, and QoS configuration in a topology JSON file.
+1. **Topology Definition**: Users define node placement, topic relationships, and QoS settings in a topology JSON file.
 2. **Coordination**: The Manager generates execution scripts for the selected RMW and distributes them to each Host for execution.
 3. **Execution**: All Hosts begin operation tests simultaneously while collecting system metrics in the background.
 4. **Data Aggregation**: After experiment completion, the Manager collates logs from all Hosts and outputs analysis-ready CSV files.
@@ -136,7 +136,7 @@ This runs 3 trials, each lasting 10 seconds, using Fast DDS (default RMW).
 
 #### Step4: Results and Analysis
 
-As a quick check, confirm that the following outputs are generated:
+As a quick check for this single-QoS example, confirm that the following outputs are generated:
 
 - Raw trial logs: `<ws-dir>/<topology>/results/latest-<rmw>/raw_logs/trial<N>/`
 - Analysis CSV: `<ws-dir>/<topology>/results/latest-<rmw>/analysis/`
@@ -173,7 +173,6 @@ For Manager/Host requirements, SSH setup, Docker and ROS 2 preparation, and chro
 
 - [SETUP.md](./SETUP.md)
 
-
 ## Usage in Details
 
 Once you have completed the [Preliminaries](#preliminaries), you are ready to start here.
@@ -183,11 +182,18 @@ This section walks you through the full usage of the framework in detail, from g
 ### Step1: Define Topology
 
 Define node placement, topic relationships, and QoS configuration in a JSON topology file.
-See [topology_example/README.md](./topology_example/README.md) for the JSON schema and definition guidance.
+The top-level `qos` field supports both a normal single-QoS configuration and a QoS sweep configuration.
+For QoS sweep, define `qos` as an array so the same topology can be executed once per QoS case.
+See [topology_example/README.md](./topology_example/README.md) for the JSON schema, examples, and QoS sweep input format.
 
 ### Step2: Generate Execution Scripts
 
 Generate execution scripts and Docker Compose files from a JSON topology file into `<ws-dir>/<json-file-name>/exec_scripts/`.
+If the topology JSON contains a QoS array, the generator validates all cases and
+records the normalized list in `<ws-dir>/<topology>/metadata.txt` as `qos_json`.
+Generated launch and execution scripts receive the active case at runtime via
+`--qos-history`, `--qos-depth`, `--qos-reliability`, or the corresponding
+`QOS_*` environment variables.
 
 
 ```bash
@@ -297,6 +303,7 @@ python3 remote_hosts_scripts/rest_server.py
 Then, run the benchmark script on the Manager.
 For `docker` and `native` modes, `performance_test.py` automatically distributes the generated host-specific execution files to each Host.
 It then prepares the run and executes each trial via the REST APIs, collects logs from each Host, and aggregates the CSV outputs.
+
 It also runs `system_perf` preflight checks (`check_chrony_manager_sync.py` and `check_clock_skew_rest.py`) before trials on every run.
 These preflight outputs are saved under `<ws-dir>/<topology>/results/<timestamp>-<rmw>/system_perf/`.
 
@@ -329,6 +336,13 @@ Arguments:
   - `<host-name>` / `<ipv4>`: explicit host name or IPv4 address (e.g., `host2` / `192.168.1.10`)
   - `Manager`: the manager machine running `performance_test.py`
 - `--strict-analysis` (`-s`): Fail analysis when any trial summary contains malformed, `N/A`, `NaN`, or `inf` values (default: disabled)
+
+QoS sweep execution does not require an extra command-line option. It is driven
+by the topology JSON used during `generate_exec_scripts.py`.
+
+If `metadata.txt` contains multiple QoS cases, `performance_test.py`
+automatically expands the sweep: for each QoS case, it runs the requested number
+of trials with the same topology and passes that case to the generated scripts
 
 Example:
 
@@ -392,13 +406,37 @@ The table below summarizes how zenohd is placed and managed for each exec-policy
 
 `performance_test.py` launches node groups via REST for each trial, then collects logs from each Host with `scp`.
 
-On prepare, the Manager creates `<ws-dir>/<topology>/results/<session_timestamp>-<rmw>/` and updates `<ws-dir>/<topology>/results/latest-<rmw>` to point to it.
+On prepare, the Manager creates `<ws-dir>/<topology>/results/<session_timestamp>-<rmw>/`.
+After all trials, log collection, and aggregation succeed, `performance_test.py` updates `<ws-dir>/<topology>/results/latest-<rmw>` to point to that completed run directory.
+If execution fails before completion, `latest-<rmw>` is left unchanged.
+
+For a single QoS case, the result layout is the original flat layout:
 
 - In `docker`/`native` modes, coordination logs are written under `<ws-dir>/<topology>/results/latest-<rmw>/coordination_logs/`.
 - Trial logs are collected under `<ws-dir>/<topology>/results/latest-<rmw>/raw_logs/trial<N>/`.
 - Aggregated outputs such as `total_latency.csv`, `throughput.csv`, `host_trials_usage.csv`, and `host_usage_summary.csv` are written under `<ws-dir>/<topology>/results/latest-<rmw>/analysis/`.
 - In `docker`/`native` modes, runtime service logs are collected under `<ws-dir>/<topology>/results/latest-<rmw>/runtime_logs/` (for example, `<host>_rest_server.log`; and `zenohd_router.log` for Zenoh router runs).
   - Note: `<host>_rest_server.log` is copied from the long-lived REST service log (`<ws-dir>/<topology>/runtime_logs/rest_server.log`), so it may include entries from earlier benchmark runs unless the REST server was restarted.
+
+For QoS sweep runs, `performance_test.py` stores each case in its own directory:
+
+```text
+<ws-dir>/<topology>/results/latest-<rmw>/
+  qos_cases.json
+  qos_case0/
+    raw_logs/trial<N>/
+    analysis/
+    coordination_logs/
+  qos_case1/
+    raw_logs/trial<N>/
+    analysis/
+    coordination_logs/
+  analysis/qos_sweep_summary.csv
+```
+
+`qos_cases.json` records the exact QoS cases used in the run.
+`analysis/qos_sweep_summary.csv` summarizes latency and throughput across all
+QoS cases for quick comparison.
 
 For details on output directory structure and CSV column definitions, see [performance_test/README.md](./performance_test/README.md).
 
@@ -407,10 +445,10 @@ For details on output directory structure and CSV column definitions, see [perfo
 For detailed usage in subdomains, see the following documents:
 
 - [SETUP.md](./SETUP.md): One-time Manager/Host setup, SSH, Docker/ROS2, and chrony configuration.
-- [topology_example/README.md](./topology_example/README.md): Topology JSON format and modeling guidance.
-- [manager_scripts/README.md](./manager_scripts/README.md): Script usage, generated file details, `metadata.txt` format, and runtime options.
-- [remote_hosts_scripts/README.md](./remote_hosts_scripts/README.md): REST server endpoints, environment variables, and monitor CSV format.
-- [performance_test/README.md](./performance_test/README.md): Output directory structure, CSV formats, and analysis script descriptions.
+- [topology_example/README.md](./topology_example/README.md): Topology JSON format, including single QoS and QoS sweep array guidance.
+- [manager_scripts/README.md](./manager_scripts/README.md): Script usage, generated file details, `metadata.txt` QoS fields, and runtime QoS options.
+- [remote_hosts_scripts/README.md](./remote_hosts_scripts/README.md): REST server endpoints, QoS case forwarding, environment variables, and monitor CSV format.
+- [performance_test/README.md](./performance_test/README.md): Output directory structure, QoS sweep result layout, CSV formats, and analysis script descriptions.
 - [docker/README.md](./docker/README.md): Docker image build/push details and container workflow notes.
 - [ros2_node_impl_ws/README.md](./ros2_node_impl_ws/README.md): ROS 2 node workspace usage and build instructions.
 
@@ -425,6 +463,8 @@ Common issues and fixes:
 - Docker mode fails on remote Hosts: pull `ghcr.io/hal-lab-u-tokyo/ros2-perf-multihost:latest` and confirm Docker permissions on each Host.
 - Native mode cannot find workspace paths: set `ROS2_PERF_WS` to the project root before running `<host_name>_exec_native.sh`.
 - Expected CSV outputs are missing: check `<ws-dir>/<topology>/results/latest-<rmw>/raw_logs/trial<N>/` for trial logs and analyzer error output from the CSV-generation step; `coordination_logs/` only covers the REST prepare/start phases.
+- For QoS sweep runs, expected CSV outputs are under `<ws-dir>/<topology>/results/latest-<rmw>/qos_case<N>/analysis/`; the cross-case summary is `<ws-dir>/<topology>/results/latest-<rmw>/analysis/qos_sweep_summary.csv`.
+- QoS sweep does not run all cases: regenerate scripts with the updated JSON and confirm that `<ws-dir>/<topology>/metadata.txt` contains `qos_mode: sweep`, `qos_case_count`, and `qos_json`.
 - REST server logs a chrony startup sync error (or fails to start when strict mode is enabled): confirm `chronyd` is running (`systemctl status chrony`) and that the sudoers entry for `chronyc` is in place (see [Clock synchronization for REST benchmark (chrony)](#clock-synchronization-for-rest-benchmark-chrony)).
 - `python3 remote_hosts_scripts/rest_server.py` exits at startup with a chrony sudo permission error: clear cached credentials with `sudo -k` and verify with `sudo -n chronyc -a makestep`; if it fails, configure the `chronyc` sudoers entry as described in [Clock synchronization for REST benchmark (chrony)](#clock-synchronization-for-rest-benchmark-chrony).
 - `prepare_run` returns `chrony check/sync failed` or `timed out`: check that `sudo -n chronyc -a makestep` runs without a password as the REST server user; if the NTP source is unreachable, verify network connectivity or adjust `ROS2_PERF_CHRONY_WAITSYNC_TRIES` and `ROS2_PERF_CHRONY_CMD_TIMEOUT_SEC`.

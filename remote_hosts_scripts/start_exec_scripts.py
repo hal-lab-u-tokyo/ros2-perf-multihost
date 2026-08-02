@@ -3,7 +3,7 @@ Unified script to start test execution on all hosts.
 Supports both Docker and native execution modes.
 
 Usage:
-    python3 start_exec_scripts.py <topology> [--rmw|-m {fastdds,cyclonedds,zenoh}] [--exec-policy|-p {docker,native}] [--trial-idx|-i N] [--ws-dir|-w DIR] [--prepare-run] [--hosts-list|-l HOSTS] [--help|-h]
+    python3 start_exec_scripts.py <topology> [--rmw|-m {fastdds,cyclonedds,zenoh}] [--exec-policy|-p {docker,native}] [--trial-idx|-i N] [--ws-dir|-w DIR] [--prepare-run] [--hosts-list|-l HOSTS] [--qos-case-idx N] [--qos-history {KEEP_LAST,KEEP_ALL}] [--qos-depth N] [--qos-reliability {RELIABLE,BEST_EFFORT}] [--help|-h]
 
     # Docker mode (sends /start_docker requests)
     python3 start_exec_scripts.py simple --exec-policy docker --trial-idx 1 --ws-dir performance_ws --hosts-list host1,host2,host3
@@ -62,6 +62,31 @@ def resolve_host_list(ws_dir, topology_name):
     return hosts
 
 
+def _parse_eval_time_env(raw_value):
+    if raw_value is None:
+        return None
+
+    value_str = str(raw_value).strip()
+    if not value_str:
+        raise ValueError(
+            "EVAL_TIME is set but empty. Use a positive integer number of seconds."
+        )
+
+    try:
+        value = int(value_str)
+    except (TypeError, ValueError) as exc:
+        raise ValueError(
+            f"EVAL_TIME must be an integer (seconds), got: '{raw_value}'"
+        ) from exc
+
+    if value <= 0:
+        raise ValueError(
+            f"EVAL_TIME must be > 0 (seconds), got: {value}"
+        )
+
+    return value
+
+
 def main():
     parser = argparse.ArgumentParser(
         description="Start test execution on all Hosts (Docker or native)",
@@ -69,7 +94,9 @@ def main():
         usage=(
             "%(prog)s <topology> [--rmw|-m {fastdds,cyclonedds,zenoh}] "
             "[--exec-policy|-p {docker,native}] [--trial-idx|-i N] "
-            "[--ws-dir|-w DIR] [--prepare-run] [--hosts-list|-l HOSTS] [--help|-h]"
+            "[--ws-dir|-w DIR] [--prepare-run] [--hosts-list|-l HOSTS] "
+            "[--qos-case-idx N] [--qos-history {KEEP_LAST,KEEP_ALL}] "
+            "[--qos-depth N] [--qos-reliability {RELIABLE,BEST_EFFORT}] [--help|-h]"
         ),
         epilog="""
 Examples:
@@ -109,6 +136,14 @@ Examples:
     )
     parser.add_argument("-l", "--hosts-list", default=None,
                         help="Comma-separated list of hosts (optional; if not provided, resolved from metadata)")
+    parser.add_argument("--qos-case-idx", type=int, default=None,
+                        help="QoS sweep case index from topology JSON qos array")
+    parser.add_argument("--qos-history", choices=["KEEP_LAST", "KEEP_ALL"], default=None,
+                        help="QoS history for the current sweep case")
+    parser.add_argument("--qos-depth", type=int, default=None,
+                        help="QoS depth for the current sweep case; used only with KEEP_LAST")
+    parser.add_argument("--qos-reliability", choices=["RELIABLE", "BEST_EFFORT"], default=None,
+                        help="QoS reliability for the current sweep case")
 
     args = parser.parse_args()
 
@@ -117,6 +152,25 @@ Examples:
     topology_name = args.topology
     rmw = args.rmw
     hosts_list = args.hosts_list
+    qos_fields = {
+        "history": args.qos_history,
+        "depth": args.qos_depth,
+        "reliability": args.qos_reliability,
+    }
+    qos = {key: value for key, value in qos_fields.items() if value is not None}
+
+    provided_qos_keys = [k for k, v in qos_fields.items() if v is not None]
+
+    if args.qos_case_idx is not None:
+        if args.qos_case_idx < 0:
+            print("ERROR: --qos-case-idx must be >= 0", file=sys.stderr)
+            sys.exit(1)
+    elif provided_qos_keys:
+        print(
+            "ERROR: QoS fields require --qos-case-idx to preserve case traceability",
+            file=sys.stderr,
+        )
+        sys.exit(1)
 
     # Support host list from parameter or resolve from metadata
     if hosts_list:
@@ -135,7 +189,13 @@ Examples:
         sys.exit(1)
 
     # Read optional test parameters from environment.
-    eval_time = os.environ.get("EVAL_TIME")
+    eval_time_raw = os.environ.get("EVAL_TIME")
+    try:
+        eval_time_value = _parse_eval_time_env(eval_time_raw)
+    except ValueError as e:
+        print(f"ERROR: Invalid EVAL_TIME: {e}", file=sys.stderr)
+        sys.exit(1)
+    eval_time = str(eval_time_value) if eval_time_value is not None else None
     zenoh_config_override = os.environ.get("ZENOH_CONFIG_OVERRIDE")
 
     # Determine endpoint and timeout based on mode
@@ -150,8 +210,8 @@ Examples:
         print(f"Using Docker mode: {endpoint} endpoint with timeout {timeout}")
     else:
         endpoint = "/start_native"
-        _read_timeout = max(100, int(eval_time) +
-                            30) if eval_time is not None else 100
+        _read_timeout = max(100, eval_time_value +
+                            30) if eval_time_value is not None else 100
         timeout = (5, _read_timeout)  # (connect, read) in seconds
         print(
             f"Using native mode: {endpoint} endpoint with timeout {timeout}")
@@ -181,6 +241,10 @@ Examples:
                 request_body["eval_time"] = eval_time
             if zenoh_config_override is not None and not args.prepare_run:
                 request_body["zenoh_config_override"] = zenoh_config_override
+            if args.qos_case_idx is not None and not args.prepare_run:
+                request_body["qos_case_idx"] = args.qos_case_idx
+            if qos and not args.prepare_run:
+                request_body["qos"] = qos
 
             r = requests.post(
                 f"http://{host}:5000{endpoint}",
