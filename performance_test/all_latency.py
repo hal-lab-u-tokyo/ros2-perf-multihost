@@ -1,8 +1,8 @@
 """
-irobot_benchmark -> latency_all.txt
+irobot_benchmark -> all_latency.txt/csv
 
 input: logs folder
-output: latency_all.txt/csv, latency_total.txt/csv
+output: all_latency.txt/csv, total_latency.txt/csv
 """
 
 import argparse
@@ -11,35 +11,17 @@ import os
 
 import numpy as np
 
+try:
+    from table_utils import write_text_table
+except ImportError:  # pragma: no cover - fallback for package-style imports
+    from .table_utils import write_text_table
+
 
 def _write_csv_table(path, header, rows):
     with open(path, "w", newline="") as f:
         writer = csv.writer(f)
         writer.writerow(header)
         writer.writerows(rows)
-
-
-def _write_text_table(path, header, rows, col_widths=None):
-    if col_widths is None:
-        col_widths = [
-            max(len(str(item))
-                for item in [header[idx], *[row[idx] for row in rows]]) + 2
-            for idx in range(len(header))
-        ]
-
-    with open(path, "w") as f:
-        header_line = "".join(
-            f"{str(header[idx]):<{col_widths[idx]}}" for idx in range(len(header))
-        )
-        f.write(f"{header_line}\n")
-        f.write("-" * len(header_line))
-        f.write("\n")
-
-        for row in rows:
-            line = "".join(
-                f"{str(row[idx]):<{col_widths[idx]}}" for idx in range(len(row))
-            )
-            f.write(f"{line}\n")
 
 
 # all_node_info = [{"name": lyon, "type": Publisher, "pub_topics": ["amazon", "inazuma", ...], "sub_topics": [] }, {}]
@@ -340,7 +322,7 @@ def write_all_latency(sub_all_node_statics, results_dir):
             )
 
     _write_csv_table(f"{results_dir}/all_latency.csv", header, rows)
-    _write_text_table(
+    write_text_table(
         f"{results_dir}/all_latency.txt",
         header,
         rows,
@@ -380,7 +362,7 @@ def write_total_latency(sub_all_node_statics, all_latency_results, result_dir):
              total_q1, total_mid, total_q3, total_max]]
 
     _write_csv_table(f"{result_dir}/total_latency.csv", header, rows)
-    _write_text_table(
+    write_text_table(
         f"{result_dir}/total_latency.txt",
         header,
         rows,

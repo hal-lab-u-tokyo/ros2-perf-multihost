@@ -13,25 +13,10 @@ from qos_sweep import load_qos_cases, qos_case_label
 from runner import collect_logs, collect_runtime_logs, prepare_run, resolve_host_list, run_test
 from zenoh_runtime import build_config_override, resolve_router_target, start_router, stop_router
 
-
-def _write_text_table(path, header, rows):
-    col_widths = [
-        max(len(str(item))
-            for item in [header[idx], *[row[idx] for row in rows]]) + 2
-        for idx in range(len(header))
-    ]
-    with open(path, "w") as f:
-        header_line = "".join(
-            f"{str(header[idx]):<{col_widths[idx]}}" for idx in range(len(header))
-        )
-        f.write(f"{header_line}\n")
-        f.write("-" * len(header_line))
-        f.write("\n")
-        for row in rows:
-            line = "".join(
-                f"{str(row[idx]):<{col_widths[idx]}}" for idx in range(len(row))
-            )
-            f.write(f"{line}\n")
+try:
+    from table_utils import write_text_table
+except ImportError:  # pragma: no cover - fallback for package-style imports
+    from .table_utils import write_text_table
 
 
 def _preflight_check_ssh_all_hosts(hosts, ssh_user):
@@ -203,7 +188,7 @@ def _write_qos_sweep_summary(summary_path, case_results):
     print(f"QoS sweep summary saved: {summary_path}")
 
     summary_txt_path = os.path.splitext(summary_path)[0] + ".txt"
-    _write_text_table(summary_txt_path, header, rows)
+    write_text_table(summary_txt_path, header, rows)
     print(f"QoS sweep summary TXT saved: {summary_txt_path}")
 
 

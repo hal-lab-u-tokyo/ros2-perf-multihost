@@ -7,32 +7,17 @@ import sys
 
 import numpy as np
 
+try:
+    from table_utils import write_text_table
+except ImportError:  # pragma: no cover - fallback for package-style imports
+    from .table_utils import write_text_table
+
 
 def _write_csv(path, header, rows):
     with open(path, "w", newline="") as f:
         writer = csv.writer(f)
         writer.writerow(header)
         writer.writerows(rows)
-
-
-def _write_text_table(path, header, rows):
-    col_widths = [
-        max(len(str(item))
-            for item in [header[idx], *[row[idx] for row in rows]]) + 2
-        for idx in range(len(header))
-    ]
-    with open(path, "w") as f:
-        header_line = "".join(
-            f"{str(header[idx]):<{col_widths[idx]}}" for idx in range(len(header))
-        )
-        f.write(f"{header_line}\n")
-        f.write("-" * len(header_line))
-        f.write("\n")
-        for row in rows:
-            line = "".join(
-                f"{str(row[idx]):<{col_widths[idx]}}" for idx in range(len(row))
-            )
-            f.write(f"{line}\n")
 
 
 def _read_trial_total_latency_row(results_dir):
@@ -544,8 +529,8 @@ def aggregate_total_latency(
     print(f"  Aggregated all_latency CSV saved: {all_latency_csv_path}")
 
     all_latency_txt_path = os.path.join(trial_dir, "all_latency.txt")
-    _write_text_table(all_latency_txt_path,
-                      all_latency_header, all_latency_rows)
+    write_text_table(all_latency_txt_path,
+                     all_latency_header, all_latency_rows)
     print(f"  Aggregated all_latency TXT saved: {all_latency_txt_path}")
 
     latency_csv_path = os.path.join(trial_dir, "total_latency.csv")
@@ -553,7 +538,7 @@ def aggregate_total_latency(
     print(f"  Aggregated CSV saved: {latency_csv_path}")
 
     latency_txt_path = os.path.join(trial_dir, "total_latency.txt")
-    _write_text_table(latency_txt_path, latency_header, rows)
+    write_text_table(latency_txt_path, latency_header, rows)
     print(f"  Aggregated TXT saved: {latency_txt_path}")
 
     throughput_csv_path = os.path.join(trial_dir, "throughput.csv")
@@ -565,7 +550,7 @@ def aggregate_total_latency(
     print(f"  Aggregated throughput CSV saved: {throughput_csv_path}")
 
     throughput_txt_path = os.path.join(trial_dir, "throughput.txt")
-    _write_text_table(
+    write_text_table(
         throughput_txt_path,
         ["trial", "throughput[B/s]", "throughput[MB/s]"],
         throughput_rows,
@@ -664,8 +649,8 @@ def aggregate_total_latency(
         print(f"  Per-host summary CSV saved: {host_summary_csv}")
 
         host_summary_txt = os.path.join(trial_dir, "host_usage_summary.txt")
-        _write_text_table(host_summary_txt,
-                          host_summary_header, host_summary_rows)
+        write_text_table(host_summary_txt,
+                         host_summary_header, host_summary_rows)
         print(f"  Per-host summary TXT saved: {host_summary_txt}")
 
 
