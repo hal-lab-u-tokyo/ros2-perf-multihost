@@ -71,7 +71,7 @@ def build_config_override(connect_host):
 
 
 def _zenoh_router_runtime_dir(base_dir, ws_dir, topology_name):
-    return os.path.join(base_dir, ws_dir, topology_name, "results", "runtime")
+    return os.path.join(base_dir, ws_dir, topology_name, "runtime_logs")
 
 
 def _find_local_pid_by_port(port):

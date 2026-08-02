@@ -251,7 +251,7 @@ Example:
 ```
 
 If SSH startup or readiness check fails on any Host, this command exits with a non-zero status.
-The REST server log is stored on each Host under `<remote-repo-base>/<ws-dir>/<topology>/results/runtime/rest_server.log`.
+The REST server log is stored on each Host under `<remote-repo-base>/<ws-dir>/<topology>/runtime_logs/rest_server.log`.
 For full subcommand and option details (including `wait`, `monitor`, `logs`, and related options), see [manager_scripts/README.md](./manager_scripts/README.md#manage_rest_serverssh).
 
 If the server exits at startup with a chrony sudo permission error, check the chrony sudo setup in [Clock synchronization for REST benchmark (chrony)](#clock-synchronization-for-rest-benchmark-chrony).
@@ -398,7 +398,7 @@ On prepare, the Manager creates `<ws-dir>/<topology>/results/<session_timestamp>
 - Trial logs are collected under `<ws-dir>/<topology>/results/latest-<rmw>/raw_logs/trial<N>/`.
 - Aggregated outputs such as `total_latency.csv`, `throughput.csv`, `host_trials_usage.csv`, and `host_usage_summary.csv` are written under `<ws-dir>/<topology>/results/latest-<rmw>/analysis/`.
 - In `docker`/`native` modes, runtime service logs are collected under `<ws-dir>/<topology>/results/latest-<rmw>/runtime_logs/` (for example, `<host>_rest_server.log`; and `zenohd_router.log` for Zenoh router runs).
-  - Note: `<host>_rest_server.log` is copied from the long-lived REST service log (`results/runtime/rest_server.log`), so it may include entries from earlier benchmark runs unless the REST server was restarted.
+  - Note: `<host>_rest_server.log` is copied from the long-lived REST service log (`<ws-dir>/<topology>/runtime_logs/rest_server.log`), so it may include entries from earlier benchmark runs unless the REST server was restarted.
 
 For details on output directory structure and CSV column definitions, see [performance_test/README.md](./performance_test/README.md).
 

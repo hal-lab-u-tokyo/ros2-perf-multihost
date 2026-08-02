@@ -30,15 +30,16 @@ Use this mode for CI or formal evaluations where partially valid totals are not 
 
 ## Output Structure
 
-`performance_test.py` creates run-scoped outputs under `<ws-dir>/<topology>/results/<timestamp>-<rmw>/`, and related tools may also manage shared runtime logs under `<ws-dir>/<topology>/results/runtime/`:
+`performance_test.py` creates run-scoped outputs under `<ws-dir>/<topology>/results/<timestamp>-<rmw>/`, and related tools may also manage shared runtime logs under `<ws-dir>/<topology>/runtime_logs/`:
 
 ```
+runtime_logs/
+├── rest_server.log                  # managed by manage_rest_servers.sh
+└── zenohd_router.log                # created when rmw_zenohd is started natively
+
 results/
 ├── latest-fastdds -> 2026-04-26_13-21-45-fastdds/   # symlink per RMW
 ├── latest-zenoh   -> 2026-04-26_14-02-10-zenoh/
-├── runtime/
-│   ├── rest_server.log              # managed by manage_rest_servers.sh
-│   └── zenohd_router.log            # created when rmw_zenohd is started natively
 └── 2026-04-26_13-21-45-fastdds/
     ├── system_perf/
     │   ├── chrony_check/
@@ -81,7 +82,7 @@ results/
 ```
 
 `runtime_logs/<host>_rest_server.log` is a snapshot copy of each Host's long-lived
-`results/runtime/rest_server.log`, so it may include entries from previous runs
+`<ws-dir>/<topology>/runtime_logs/rest_server.log`, so it may include entries from previous runs
 unless the REST server was restarted before benchmarking.
 
 ## CSV Formats

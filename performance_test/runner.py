@@ -292,7 +292,7 @@ def collect_runtime_logs(
 
     remote_repo_root = os.environ.get("ROS2_PERF_REPO_ROOT", remote_repo_base)
     remote_runtime_dir = (
-        f"{remote_repo_root}/{ws_dir}/{topology_name}/results/runtime"
+        f"{remote_repo_root}/{ws_dir}/{topology_name}/runtime_logs"
     )
 
     for host in hosts:
@@ -359,7 +359,7 @@ def collect_runtime_logs(
         dst = os.path.join(runtime_logs_dir, "zenohd_router.log")
         if exec_policy == "native":
             src = os.path.join(
-                local_repo_root, ws_dir, topology_name, "results", "runtime", "zenohd_router.log"
+                local_repo_root, ws_dir, topology_name, "runtime_logs", "zenohd_router.log"
             )
             if os.path.exists(src):
                 shutil.copy2(src, dst)

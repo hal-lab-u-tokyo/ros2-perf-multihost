@@ -120,7 +120,7 @@ If command execution or readiness check fails on any Host, the script exits with
 
 Runtime log files created by this script are stored on each Host under:
 
-- `<remote-repo-base>/<ws-dir>/<topology>/results/runtime/rest_server.log`
+- `<remote-repo-base>/<ws-dir>/<topology>/runtime_logs/rest_server.log`
 
 The `logs` subcommand reads `rest_server.log`.
 `start` / `stop` / `status` operate on the process listening on fixed REST port `5000` (no PID file management).

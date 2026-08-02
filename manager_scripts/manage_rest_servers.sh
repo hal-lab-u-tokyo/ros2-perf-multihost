@@ -221,7 +221,7 @@ if [[ -z "${HOSTS_LINE}" ]]; then
     exit 1
 fi
 
-REMOTE_RUNTIME_DIR="${REMOTE_REPO_BASE}/${WS_DIR}/${TOPOLOGY_DIR}/results/runtime"
+REMOTE_RUNTIME_DIR="${REMOTE_REPO_BASE}/${WS_DIR}/${TOPOLOGY_DIR}/runtime_logs"
 
 IFS=',' read -r -a HOSTS_RAW <<< "${HOSTS_LINE}"
 HOSTS=()
