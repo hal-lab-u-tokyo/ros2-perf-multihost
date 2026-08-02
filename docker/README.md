@@ -15,14 +15,15 @@ docker login ghcr.io -u <YOUR_GITHUB_USERNAME>
 
 ## Build
 
-`compose.yaml` in this directory targets both `linux/amd64` and `linux/arm64`. The `Dockerfile` expects the build context to be copied into `/workdir/ros2-perf-multihost/`, so the build context must be the repository root (`..`).
+`compose.yaml` in this directory targets both `linux/amd64` and `linux/arm64`.
+The `Dockerfile` expects the build context to be copied into `/workdir/ros2-perf-multihost/`, so the build context must be the repository root (`..`).
 
 ```bash
 cd docker
 docker buildx bake --load
 ```
 
-##Push
+## Push
 
 ```bash
 cd docker
