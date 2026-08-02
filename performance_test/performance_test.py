@@ -13,6 +13,11 @@ from qos_sweep import load_qos_cases, qos_case_label
 from runner import collect_logs, collect_runtime_logs, prepare_run, resolve_host_list, run_test
 from zenoh_runtime import build_config_override, resolve_router_target, start_router, stop_router
 
+try:
+    from table_utils import write_text_table
+except ImportError:  # pragma: no cover - fallback for package-style imports
+    from .table_utils import write_text_table
+
 
 def _preflight_check_ssh_all_hosts(hosts, ssh_user):
     failures = []
@@ -181,6 +186,10 @@ def _write_qos_sweep_summary(summary_path, case_results):
         writer.writerow(header)
         writer.writerows(rows)
     print(f"QoS sweep summary saved: {summary_path}")
+
+    summary_txt_path = os.path.splitext(summary_path)[0] + ".txt"
+    write_text_table(summary_txt_path, header, rows)
+    print(f"QoS sweep summary TXT saved: {summary_txt_path}")
 
 
 def _update_latest_alias(results_root, rmw, run_timestamp):

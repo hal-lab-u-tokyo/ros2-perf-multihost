@@ -1,13 +1,27 @@
 """
-irobot_benchmark -> latency_all.txt
+irobot_benchmark -> all_latency.txt/csv
 
 input: logs folder
-output: latency_all.txt, latency_total.txt
+output: all_latency.txt/csv, total_latency.txt/csv
 """
 
-import os
-import numpy as np
 import argparse
+import csv
+import os
+
+import numpy as np
+
+try:
+    from table_utils import write_text_table
+except ImportError:  # pragma: no cover - fallback for package-style imports
+    from .table_utils import write_text_table
+
+
+def _write_csv_table(path, header, rows):
+    with open(path, "w", newline="") as f:
+        writer = csv.writer(f)
+        writer.writerow(header)
+        writer.writerows(rows)
 
 
 # all_node_info = [{"name": lyon, "type": Publisher, "pub_topics": ["amazon", "inazuma", ...], "sub_topics": [] }, {}]
@@ -94,9 +108,10 @@ def cal_all_latency(all_node_info, logs_folder_path):
                         timestamp = int(parts[1].split(":")[1].strip())
                         logdata_list.append((index, timestamp))
                     else:  # Other log / Pub_Node_name: Index: Timestamp:
+                        pub_node_name = parts[0].split(":", 1)[1].strip()
                         index = int(parts[1].split(":")[1].strip())
                         timestamp = int(parts[2].split(":")[1].strip())
-                        logdata_list.append((index, timestamp))
+                        logdata_list.append((pub_node_name, index, timestamp))
 
         return logdata_list
 
@@ -124,7 +139,7 @@ def cal_all_latency(all_node_info, logs_folder_path):
             continue
 
         else:
-            # {"node": lyon, "topics": [{"topic": amazon, "loss": 0, "latency": [0.110, 0.223, ...]}, {"topic": inazuma, }...] }
+            # {"node": sub1, "topics": [{"topic": amazon, "publisher": pub1, ...}, ...]}
             sub_node_statics = {}
             sub_node_name = sub_node_info["name"]
             sub_node_type = sub_node_info["type"]
@@ -133,17 +148,20 @@ def cal_all_latency(all_node_info, logs_folder_path):
             sub_node_statics["topics"] = []
 
             for sub_topic in sub_topic_list:
-                sub_topic_statics = {}
-                sub_topic_statics["topic"] = sub_topic
-                loss = 0
-                latency_results = []
-
                 for pub_node_info in all_node_info:
                     pub_node_name = pub_node_info["name"]
                     pub_node_type = pub_node_info["type"]
                     pub_topic_list = pub_node_info["pub_topics"]
 
                     if sub_topic in pub_topic_list:
+                        sub_topic_statics = {
+                            "topic": sub_topic,
+                            "publisher": pub_node_name,
+                            "subscriber": sub_node_name,
+                        }
+                        loss = 0
+                        latency_results = []
+
                         pub_logdata_path = ""
                         if pub_node_type == "Publisher":
                             pub_logdata_path = os.path.join(
@@ -211,16 +229,21 @@ def cal_all_latency(all_node_info, logs_folder_path):
                             continue
 
                         # Exclude indices that fall outside the overlapping time window.
-                        pub_indices = {
-                            item[0]
+                        pub_entries = {
+                            item[0] if len(item) == 2 else item[1]: item[1] if len(item) == 2 else item[2]
                             for item in pub_logdata_list
-                            if int(item[1]) >= common_start_time and int(item[1]) <= common_end_time
+                            if int(item[1] if len(item) == 2 else item[2]) >= common_start_time
+                            and int(item[1] if len(item) == 2 else item[2]) <= common_end_time
                         }
-                        sub_indices = {
-                            item[0]
+                        pub_indices = set(pub_entries.keys())
+                        sub_entries = {
+                            item[1]: item[2]
                             for item in sub_logdata_list
-                            if int(item[1]) >= common_start_time and int(item[1]) <= common_end_time
+                            if item[0] == pub_node_name
+                            and int(item[2]) >= common_start_time
+                            and int(item[2]) <= common_end_time
                         }
+                        sub_indices = set(sub_entries.keys())
 
                         # Count indices present on only one side as losses.
                         loss_index_count = len(
@@ -229,8 +252,8 @@ def cal_all_latency(all_node_info, logs_folder_path):
                         common_indices = pub_indices.intersection(
                             sub_indices)  # [0, 1, 3, ...]
 
-                        pub_dict = dict(pub_logdata_list)  # {index: timestamp}
-                        sub_dict = dict(sub_logdata_list)
+                        pub_dict = pub_entries
+                        sub_dict = sub_entries
 
                         for index in common_indices:
                             latency_results.append(
@@ -241,87 +264,70 @@ def cal_all_latency(all_node_info, logs_folder_path):
 
                         #     latency_results.append((timestamp_sub - timestamp_pub) / 1_000_000)  # [0.120, 0.321, ...]
 
-                sub_topic_statics["loss"] = loss
-                if latency_results:
-                    sub_topic_statics["mean"] = round(
-                        np.mean(latency_results), 6)
-                    sub_topic_statics["sd"] = round(np.std(latency_results), 6)
-                    sub_topic_statics["min"] = round(
-                        np.min(latency_results), 6)
-                    sub_topic_statics["max"] = round(
-                        np.max(latency_results), 6)
-                    sub_topic_statics["q1"] = round(
-                        np.percentile(latency_results, 25), 6)
-                    sub_topic_statics["mid"] = round(
-                        np.percentile(latency_results, 50), 6)
-                    sub_topic_statics["q3"] = round(
-                        np.percentile(latency_results, 75), 6)
-                else:
-                    print(
-                        f"[WARN] No latency samples in common window: node={sub_node_name}, topic={sub_topic}"
-                    )
-                    sub_topic_statics["mean"] = "N/A"
-                    sub_topic_statics["sd"] = "N/A"
-                    sub_topic_statics["min"] = "N/A"
-                    sub_topic_statics["max"] = "N/A"
-                    sub_topic_statics["q1"] = "N/A"
-                    sub_topic_statics["mid"] = "N/A"
-                    sub_topic_statics["q3"] = "N/A"
+                        sub_topic_statics["loss"] = loss
+                        if latency_results:
+                            sub_topic_statics["mean"] = round(
+                                np.mean(latency_results), 6)
+                            sub_topic_statics["sd"] = round(
+                                np.std(latency_results), 6)
+                            sub_topic_statics["min"] = round(
+                                np.min(latency_results), 6)
+                            sub_topic_statics["max"] = round(
+                                np.max(latency_results), 6)
+                            sub_topic_statics["q1"] = round(
+                                np.percentile(latency_results, 25), 6)
+                            sub_topic_statics["mid"] = round(
+                                np.percentile(latency_results, 50), 6)
+                            sub_topic_statics["q3"] = round(
+                                np.percentile(latency_results, 75), 6)
+                        else:
+                            print(
+                                f"[WARN] No latency samples in common window: subscriber={sub_node_name}, topic={sub_topic}, publisher={pub_node_name}"
+                            )
+                            sub_topic_statics["mean"] = "N/A"
+                            sub_topic_statics["sd"] = "N/A"
+                            sub_topic_statics["min"] = "N/A"
+                            sub_topic_statics["max"] = "N/A"
+                            sub_topic_statics["q1"] = "N/A"
+                            sub_topic_statics["mid"] = "N/A"
+                            sub_topic_statics["q3"] = "N/A"
 
-                sub_node_statics["topics"].append(
-                    sub_topic_statics
-                    # {"node": lyon, "topics": [{"topic": amazon, "loss": 0, "mean": 0.220, ...}, {"topic": inazuma, }...] }
-                )
-
-                all_latency_results.append(latency_results)
+                        sub_node_statics["topics"].append(sub_topic_statics)
+                        all_latency_results.append(latency_results)
         sub_all_node_statics.append(sub_node_statics)
 
     return sub_all_node_statics, all_latency_results
 
 
 def write_all_latency(sub_all_node_statics, results_dir):
-    data = []
-    data.append(["node", "topic", "lost[#]", "mean[ms]", "sd[ms]",
-                "min[ms]", "q1[ms]", "mid[ms]", "q3[ms]", "max[ms]"])
-    with open(f"{results_dir}/all_latency.txt", "w") as f:
-        for node_statics in sub_all_node_statics:
-            node_name = node_statics["node"]
-            for topic_statics in node_statics["topics"]:
-                topic_name = topic_statics["topic"]
-                topic_loss = topic_statics["loss"]
-                topic_mean = topic_statics["mean"]
-                topic_sd = topic_statics["sd"]
-                topic_min = topic_statics["min"]
-                topic_q1 = topic_statics["q1"]
-                topic_mid = topic_statics["mid"]
-                topic_q3 = topic_statics["q3"]
-                topic_max = topic_statics["max"]
-                data.append(
-                    [
-                        node_name,
-                        topic_name,
-                        topic_loss,
-                        topic_mean,
-                        topic_sd,
-                        topic_min,
-                        topic_q1,
-                        topic_mid,
-                        topic_q3,
-                        topic_max,
-                    ]
-                )
+    header = ["topic", "publisher", "subscriber", "lost[#]", "mean[ms]", "sd[ms]",
+              "min[ms]", "q1[ms]", "mid[ms]", "q3[ms]", "max[ms]"]
+    rows = []
+    for node_statics in sub_all_node_statics:
+        for topic_statics in node_statics["topics"]:
+            rows.append(
+                [
+                    topic_statics["topic"],
+                    topic_statics["publisher"],
+                    topic_statics["subscriber"],
+                    topic_statics["loss"],
+                    topic_statics["mean"],
+                    topic_statics["sd"],
+                    topic_statics["min"],
+                    topic_statics["q1"],
+                    topic_statics["mid"],
+                    topic_statics["q3"],
+                    topic_statics["max"],
+                ]
+            )
 
-        col_widths = [12, 12, 12, 12, 12, 12, 12, 12, 12, 12]
-        header = "".join(
-            f"{data[0][i]:<{col_widths[i]}}" for i in range(len(data[0])))
-        f.write(f"{header}\n")
-        f.write("-" * len(header))
-        f.write("\n")
-
-        for row in data[1:]:
-            row = "".join(
-                f"{row[i]:<{col_widths[i]}}" for i in range(len(row)))
-            f.write(f"{row}\n")
+    _write_csv_table(f"{results_dir}/all_latency.csv", header, rows)
+    write_text_table(
+        f"{results_dir}/all_latency.txt",
+        header,
+        rows,
+        col_widths=[12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12],
+    )
 
 
 def write_total_latency(sub_all_node_statics, all_latency_results, result_dir):
@@ -350,24 +356,18 @@ def write_total_latency(sub_all_node_statics, all_latency_results, result_dir):
         total_q3 = "N/A"
         total_max = "N/A"
 
-    data = []
-    data.append(["lost[#]", "mean[ms]", "sd[ms]", "min[ms]",
-                "q1[ms]", "mid[ms]", "q3[ms]", "max[ms]"])
-    with open(f"{result_dir}/total_latency.txt", "w") as f:
-        data.append([total_loss, total_mean, total_sd, total_min,
-                    total_q1, total_mid, total_q3, total_max])
+    header = ["lost[#]", "mean[ms]", "sd[ms]", "min[ms]",
+              "q1[ms]", "mid[ms]", "q3[ms]", "max[ms]"]
+    rows = [[total_loss, total_mean, total_sd, total_min,
+             total_q1, total_mid, total_q3, total_max]]
 
-        col_widths = [12, 12, 12, 12, 12, 12, 12, 12]
-        header = "".join(
-            f"{data[0][i]:<{col_widths[i]}}" for i in range(len(data[0])))
-        f.write(f"{header}\n")
-        f.write("-" * len(header))
-        f.write("\n")
-
-        for row in data[1:]:
-            row = "".join(
-                f"{row[i]:<{col_widths[i]}}" for i in range(len(row)))
-            f.write(f"{row}\n")
+    _write_csv_table(f"{result_dir}/total_latency.csv", header, rows)
+    write_text_table(
+        f"{result_dir}/total_latency.txt",
+        header,
+        rows,
+        col_widths=[12, 12, 12, 12, 12, 12, 12, 12],
+    )
 
 
 def process_log_directory(log_dir_name, logs_base_path, results_base_path):

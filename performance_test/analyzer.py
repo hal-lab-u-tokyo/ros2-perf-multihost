@@ -7,6 +7,175 @@ import sys
 
 import numpy as np
 
+try:
+    from table_utils import write_text_table
+except ImportError:  # pragma: no cover - fallback for package-style imports
+    from .table_utils import write_text_table
+
+
+def _write_csv(path, header, rows):
+    with open(path, "w", newline="") as f:
+        writer = csv.writer(f)
+        writer.writerow(header)
+        writer.writerows(rows)
+
+
+def _read_trial_total_latency_row(results_dir):
+    csv_path = os.path.join(results_dir, "total_latency.csv")
+    if os.path.exists(csv_path):
+        with open(csv_path, "r", newline="") as f:
+            reader = csv.reader(f)
+            header = next(reader, None)
+            row = next(reader, None)
+        if header and row:
+            return row, csv_path
+
+    txt_path = os.path.join(results_dir, "total_latency.txt")
+    if not os.path.exists(txt_path):
+        return None, txt_path
+
+    with open(txt_path) as f:
+        lines = f.readlines()
+        if len(lines) < 3:
+            return None, txt_path
+        return lines[2].strip().split(), txt_path
+
+
+def _parse_all_latency_losses(all_latency_path):
+    """Parse all_latency rows into (topic, publisher, loss_count), preferring CSV when available."""
+    rows = []
+
+    csv_path = os.path.splitext(all_latency_path)[0] + ".csv"
+    if os.path.exists(csv_path):
+        with open(csv_path, "r", newline="") as f:
+            reader = csv.DictReader(f)
+            for row in reader:
+                topic = row.get("topic")
+                publisher = row.get("publisher")
+                raw_loss = row.get("lost[#]")
+                if topic is None or raw_loss is None:
+                    continue
+                try:
+                    loss_count = float(raw_loss)
+                except ValueError:
+                    continue
+                rows.append((topic, publisher, loss_count))
+        return rows
+
+    if not os.path.exists(all_latency_path):
+        return rows
+    with open(all_latency_path, "r") as f:
+        lines = f.readlines()
+    for line in lines[2:]:
+        parts = line.strip().split()
+        if len(parts) < 3:
+            continue
+        if len(parts) >= 11:
+            topic = parts[0]
+            publisher = parts[1]
+            raw_loss = parts[3]
+        else:
+            topic = parts[1]
+            publisher = None
+            raw_loss = parts[2]
+        try:
+            loss_count = float(raw_loss)
+        except ValueError:
+            continue
+        rows.append((topic, publisher, loss_count))
+    return rows
+
+
+def _read_trial_all_latency_rows(results_dir):
+    rows = []
+
+    csv_path = os.path.join(results_dir, "all_latency.csv")
+    if os.path.exists(csv_path):
+        with open(csv_path, "r", newline="") as f:
+            reader = csv.DictReader(f)
+            rows.extend(reader)
+        return rows
+
+    txt_path = os.path.join(results_dir, "all_latency.txt")
+    if not os.path.exists(txt_path):
+        return rows
+
+    with open(txt_path, "r") as f:
+        lines = f.readlines()
+
+    for line in lines[2:]:
+        parts = line.strip().split()
+        if len(parts) >= 11:
+            rows.append(
+                {
+                    "topic": parts[0],
+                    "publisher": parts[1],
+                    "subscriber": parts[2],
+                    "lost[#]": parts[3],
+                    "mean[ms]": parts[4],
+                    "sd[ms]": parts[5],
+                    "min[ms]": parts[6],
+                    "q1[ms]": parts[7],
+                    "mid[ms]": parts[8],
+                    "q3[ms]": parts[9],
+                    "max[ms]": parts[10],
+                }
+            )
+        elif len(parts) >= 10:
+            rows.append(
+                {
+                    "topic": parts[1],
+                    "publisher": None,
+                    "subscriber": parts[0],
+                    "lost[#]": parts[2],
+                    "mean[ms]": parts[3],
+                    "sd[ms]": parts[4],
+                    "min[ms]": parts[5],
+                    "q1[ms]": parts[6],
+                    "mid[ms]": parts[7],
+                    "q3[ms]": parts[8],
+                    "max[ms]": parts[9],
+                }
+            )
+    return rows
+
+
+def _build_all_latency_summary_rows(route_groups):
+    rows = []
+    for topic, publisher, subscriber in sorted(route_groups.keys()):
+        group = route_groups[(topic, publisher, subscriber)]
+        mean_values = group["mean"]
+        if mean_values:
+            row = [
+                topic,
+                publisher,
+                subscriber,
+                group["lost"],
+                round(float(np.mean(mean_values)), 6),
+                round(float(np.std(mean_values)), 6),
+                round(float(np.min(group["min"])), 6),
+                round(float(np.mean(group["q1"])), 6),
+                round(float(np.mean(group["mid"])), 6),
+                round(float(np.mean(group["q3"])), 6),
+                round(float(np.max(group["max"])), 6),
+            ]
+        else:
+            row = [
+                topic,
+                publisher,
+                subscriber,
+                group["lost"],
+                "N/A",
+                "N/A",
+                "N/A",
+                "N/A",
+                "N/A",
+                "N/A",
+                "N/A",
+            ]
+        rows.append(row)
+    return rows
+
 
 def _read_metadata_value(metadata_path, key):
     """Return the raw value for `key:` from metadata.txt, or None."""
@@ -17,26 +186,6 @@ def _read_metadata_value(metadata_path, key):
             if line.startswith(f"{key}:"):
                 return line.split(":", 1)[1].strip()
     return None
-
-
-def _parse_all_latency_losses(all_latency_path):
-    """Parse all_latency.txt rows into (topic, loss_count)."""
-    rows = []
-    if not os.path.exists(all_latency_path):
-        return rows
-    with open(all_latency_path, "r") as f:
-        lines = f.readlines()
-    for line in lines[2:]:
-        parts = line.strip().split()
-        if len(parts) < 3:
-            continue
-        topic = parts[1]
-        try:
-            loss_count = float(parts[2])
-        except ValueError:
-            continue
-        rows.append((topic, loss_count))
-    return rows
 
 
 def _collect_topic_runtime_config(ws_dir, topology_name):
@@ -217,18 +366,13 @@ def aggregate_total_latency(
     all_throughputs_mbps = []
     total_lost_all_trials = 0
     invalid_trial_issues = []
+    route_groups = {}
 
     for trial_idx in range(num_trials):
         trial_results_dir = os.path.join(trial_dir, f"trial{trial_idx + 1}")
-        total_path = os.path.join(trial_results_dir, "total_latency.txt")
-        if not os.path.exists(total_path):
+        values, total_path = _read_trial_total_latency_row(trial_results_dir)
+        if values is None:
             continue
-
-        with open(total_path) as f:
-            lines = f.readlines()
-            if len(lines) < 3:
-                continue
-            values = lines[2].strip().split()
 
         if len(values) < 8:
             print(
@@ -273,15 +417,65 @@ def aggregate_total_latency(
 
         all_latency_path = os.path.join(trial_results_dir, "all_latency.txt")
 
+        for route_row in _read_trial_all_latency_rows(trial_results_dir):
+            topic_name = route_row.get("topic")
+            subscriber_name = route_row.get("subscriber")
+            publisher_name = route_row.get("publisher")
+            if topic_name is None or subscriber_name is None:
+                continue
+
+            route_key = (topic_name, publisher_name or "", subscriber_name)
+            route_group = route_groups.setdefault(
+                route_key,
+                {
+                    "lost": 0,
+                    "mean": [],
+                    "min": [],
+                    "q1": [],
+                    "mid": [],
+                    "q3": [],
+                    "max": [],
+                },
+            )
+
+            lost_count = _try_parse_lost_count(
+                str(route_row.get("lost[#]", "")),
+                os.path.join(trial_results_dir, "all_latency"),
+            )
+            if lost_count is not None:
+                route_group["lost"] += lost_count
+
+            numeric_values = _try_parse_total_latency_values(
+                [
+                    str(route_row.get("lost[#]", "")),
+                    str(route_row.get("mean[ms]", "")),
+                    str(route_row.get("sd[ms]", "")),
+                    str(route_row.get("min[ms]", "")),
+                    str(route_row.get("q1[ms]", "")),
+                    str(route_row.get("mid[ms]", "")),
+                    str(route_row.get("q3[ms]", "")),
+                    str(route_row.get("max[ms]", "")),
+                ],
+                os.path.join(trial_results_dir, "all_latency"),
+            )
+            if numeric_values is not None:
+                route_group["mean"].append(numeric_values[1])
+                route_group["min"].append(numeric_values[3])
+                route_group["q1"].append(numeric_values[4])
+                route_group["mid"].append(numeric_values[5])
+                route_group["q3"].append(numeric_values[6])
+                route_group["max"].append(numeric_values[7])
+
         total_received_bytes = 0.0
-        for topic_name, topic_loss in _parse_all_latency_losses(all_latency_path):
+        for topic_name, publisher_name, topic_loss in _parse_all_latency_losses(all_latency_path):
             cfg = topic_runtime_cfg.get(topic_name)
             if not cfg:
                 raise ValueError(
                     f"Topic '{topic_name}' in {all_latency_path} is missing from topic_runtime_json"
                 )
             sent_per_pub = int(eval_time * 1000 / cfg["period_ms"])
-            sent = sent_per_pub * cfg["publisher_count"]
+            sent = sent_per_pub if publisher_name else sent_per_pub * \
+                cfg["publisher_count"]
             received = max(sent - topic_loss, 0)
             total_received_bytes += received * cfg["payload_size"]
 
@@ -324,20 +518,44 @@ def aggregate_total_latency(
         max_mbps = round(np.max(all_throughputs_mbps), 6)
         throughput_rows.append(["total", mean_bps, mean_mbps])
 
+    latency_header = ["trial", "lost[#]", "mean[ms]", "sd[ms]",
+                      "min[ms]", "q1[ms]", "mid[ms]", "q3[ms]", "max[ms]"]
+
+    all_latency_header = ["topic", "publisher", "subscriber", "lost[#]", "mean[ms]", "sd[ms]",
+                          "min[ms]", "q1[ms]", "mid[ms]", "q3[ms]", "max[ms]"]
+    all_latency_rows = _build_all_latency_summary_rows(route_groups)
+    all_latency_csv_path = os.path.join(trial_dir, "all_latency.csv")
+    _write_csv(all_latency_csv_path, all_latency_header, all_latency_rows)
+    print(f"  Aggregated all_latency CSV saved: {all_latency_csv_path}")
+
+    all_latency_txt_path = os.path.join(trial_dir, "all_latency.txt")
+    write_text_table(all_latency_txt_path,
+                     all_latency_header, all_latency_rows)
+    print(f"  Aggregated all_latency TXT saved: {all_latency_txt_path}")
+
     latency_csv_path = os.path.join(trial_dir, "total_latency.csv")
-    with open(latency_csv_path, "w", newline="") as f:
-        writer = csv.writer(f)
-        writer.writerow(["trial", "lost[#]", "mean[ms]", "sd[ms]",
-                        "min[ms]", "q1[ms]", "mid[ms]", "q3[ms]", "max[ms]"])
-        writer.writerows(rows)
+    _write_csv(latency_csv_path, latency_header, rows)
     print(f"  Aggregated CSV saved: {latency_csv_path}")
 
+    latency_txt_path = os.path.join(trial_dir, "total_latency.txt")
+    write_text_table(latency_txt_path, latency_header, rows)
+    print(f"  Aggregated TXT saved: {latency_txt_path}")
+
     throughput_csv_path = os.path.join(trial_dir, "throughput.csv")
-    with open(throughput_csv_path, "w", newline="") as f:
-        writer = csv.writer(f)
-        writer.writerow(["trial", "throughput[B/s]", "throughput[MB/s]"])
-        writer.writerows(throughput_rows)
+    _write_csv(
+        throughput_csv_path,
+        ["trial", "throughput[B/s]", "throughput[MB/s]"],
+        throughput_rows,
+    )
     print(f"  Aggregated throughput CSV saved: {throughput_csv_path}")
+
+    throughput_txt_path = os.path.join(trial_dir, "throughput.txt")
+    write_text_table(
+        throughput_txt_path,
+        ["trial", "throughput[B/s]", "throughput[MB/s]"],
+        throughput_rows,
+    )
+    print(f"  Aggregated throughput TXT saved: {throughput_txt_path}")
 
     host_trials_usage_rows = []
     src_log_dir = os.path.abspath(log_dir)
@@ -367,23 +585,22 @@ def aggregate_total_latency(
     if host_trials_usage_rows:
         host_trials_usage_csv = os.path.join(
             trial_dir, "host_trials_usage.csv")
-        with open(host_trials_usage_csv, "w", newline="") as f:
-            writer = csv.writer(f)
-            writer.writerow(
-                [
-                    "host",
-                    "trial",
-                    "cpu_mean[%]",
-                    "cpu_max[%]",
-                    "mem_mean[%]",
-                    "mem_max[%]",
-                    "load1_mean",
-                    "swap_mean[%]",
-                    "swap_max[%]",
-                    "samples",
-                ]
-            )
-            writer.writerows(host_trials_usage_rows)
+        _write_csv(
+            host_trials_usage_csv,
+            [
+                "host",
+                "trial",
+                "cpu_mean[%]",
+                "cpu_max[%]",
+                "mem_mean[%]",
+                "mem_max[%]",
+                "load1_mean",
+                "swap_mean[%]",
+                "swap_max[%]",
+                "samples",
+            ],
+            host_trials_usage_rows,
+        )
         print(f"  Per-host trial usage CSV saved: {host_trials_usage_csv}")
 
     host_summary_rows = []
@@ -416,24 +633,25 @@ def aggregate_total_latency(
         )
 
     if host_summary_rows:
+        host_summary_header = [
+            "host",
+            "cpu_mean_mean[%]",
+            "cpu_max_max[%]",
+            "mem_mean_mean[%]",
+            "mem_max_max[%]",
+            "load1_mean_mean",
+            "swap_mean_mean[%]",
+            "swap_max_max[%]",
+            "trials_covered",
+        ]
         host_summary_csv = os.path.join(trial_dir, "host_usage_summary.csv")
-        with open(host_summary_csv, "w", newline="") as f:
-            writer = csv.writer(f)
-            writer.writerow(
-                [
-                    "host",
-                    "cpu_mean_mean[%]",
-                    "cpu_max_max[%]",
-                    "mem_mean_mean[%]",
-                    "mem_max_max[%]",
-                    "load1_mean_mean",
-                    "swap_mean_mean[%]",
-                    "swap_max_max[%]",
-                    "trials_covered",
-                ]
-            )
-            writer.writerows(host_summary_rows)
+        _write_csv(host_summary_csv, host_summary_header, host_summary_rows)
         print(f"  Per-host summary CSV saved: {host_summary_csv}")
+
+        host_summary_txt = os.path.join(trial_dir, "host_usage_summary.txt")
+        write_text_table(host_summary_txt,
+                         host_summary_header, host_summary_rows)
+        print(f"  Per-host summary TXT saved: {host_summary_txt}")
 
 
 def summarize_all_payloads(base_result_dir, prefix, payload_sizes):

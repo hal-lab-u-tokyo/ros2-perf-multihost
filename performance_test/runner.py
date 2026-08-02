@@ -4,6 +4,11 @@ import shutil
 import subprocess
 import sys
 
+try:
+    from qos_sweep import qos_case_label
+except ImportError:  # pragma: no cover - fallback for package-style imports
+    from .qos_sweep import qos_case_label
+
 
 def get_metadata_value(key, metadata_path):
     """Extract a value from metadata.txt by key."""
@@ -129,7 +134,7 @@ def run_test(
 
     if coordination_log_dir is not None:
         prefix = (
-            f"exec_qos_case{qos_case_idx}_"
+            f"exec_{qos_case_label(qos_case_idx)}_"
             if qos_case_idx is not None
             else "exec_"
         )

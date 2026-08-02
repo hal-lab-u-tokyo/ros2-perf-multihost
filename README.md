@@ -424,11 +424,11 @@ For QoS sweep runs, `performance_test.py` stores each case in its own directory:
 ```text
 <ws-dir>/<topology>/results/latest-<rmw>/
   qos_cases.json
-  qos_case0/
+  qos_case1/
     raw_logs/trial<N>/
     analysis/
     coordination_logs/
-  qos_case1/
+  qos_case2/
     raw_logs/trial<N>/
     analysis/
     coordination_logs/
