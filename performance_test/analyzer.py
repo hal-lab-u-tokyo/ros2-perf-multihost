@@ -322,10 +322,7 @@ def aggregate_total_latency(
         sd_mbps = round(np.std(all_throughputs_mbps), 6)
         min_mbps = round(np.min(all_throughputs_mbps), 6)
         max_mbps = round(np.max(all_throughputs_mbps), 6)
-        throughput_rows.append(
-            ["total", mean_bps, mean_mbps, sd_bps, sd_mbps,
-                min_bps, min_mbps, max_bps, max_mbps]
-        )
+        throughput_rows.append(["total", mean_bps, mean_mbps])
 
     latency_csv_path = os.path.join(trial_dir, "total_latency.csv")
     with open(latency_csv_path, "w", newline="") as f:

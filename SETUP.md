@@ -208,6 +208,7 @@ python3 manager_scripts/system_perf/check_chrony_manager_sync.py \
 ```
 
 `--hosts` is the primary input. `--topology` is optional and can be used when you want to resolve host names from a topology JSON.
+With the current topology schema, host names are resolved from `hosts[].host_name`.
 
 `--manager-ip` is optional. If omitted, the script auto-detects the Manager local IP from the route to target Hosts.
 If your Manager has multiple NICs/routes and auto-detection becomes ambiguous, specify `--manager-ip` explicitly.

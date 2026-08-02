@@ -31,7 +31,7 @@ def require_non_empty_string(entry, key, context):
 
 def _is_valid_identifier(value):
     """Check if value is a valid ROS-compatible identifier.
-    
+
     Allows alphanumerics, underscores, and hyphens; no spaces or shell metacharacters.
     """
     import re
@@ -40,7 +40,7 @@ def _is_valid_identifier(value):
 
 def _is_valid_host_name(value):
     """Check if value is a safe hostname (subset of identifier).
-    
+
     Allows alphanumerics, underscores, and hyphens; prevents path traversal and shell injection.
     """
     return _is_valid_identifier(value)
@@ -132,7 +132,8 @@ def validate_publisher_entries(pub_entries, context):
             {"topic_name", "payload_size", "period_ms"},
             pub_context,
         )
-        topic_name_str = require_non_empty_string(pub, "topic_name", pub_context)
+        topic_name_str = require_non_empty_string(
+            pub, "topic_name", pub_context)
         if not _is_valid_identifier(topic_name_str):
             raise ValueError(
                 f"{pub_context}: 'topic_name' must be a valid ROS identifier (alphanumerics, underscores, hyphens; no spaces or special characters)"
@@ -151,7 +152,8 @@ def validate_subscriber_entries(sub_entries, context):
         if not isinstance(sub, dict):
             raise ValueError(f"{sub_context}: must be an object")
         ensure_only_allowed_keys(sub, {"topic_name"}, sub_context)
-        topic_name_str = require_non_empty_string(sub, "topic_name", sub_context)
+        topic_name_str = require_non_empty_string(
+            sub, "topic_name", sub_context)
         if not _is_valid_identifier(topic_name_str):
             raise ValueError(
                 f"{sub_context}: 'topic_name' must be a valid ROS identifier (alphanumerics, underscores, hyphens; no spaces or special characters)"
@@ -182,6 +184,135 @@ def normalize_intermediate_entries(intermediate_value, node_name):
     return intermediate_value
 
 
+def _normalize_node_roles(node, node_context):
+    """Normalize one node entry to internal role keys.
+
+    Internal keys are: node_name, publisher, subscriber.
+    """
+    if not isinstance(node, dict):
+        raise ValueError(f"{node_context}: must be an object")
+
+    ensure_only_allowed_keys(
+        node,
+        {
+            "node_name",
+            "publishers",
+            "subscribers",
+        },
+        node_context,
+    )
+
+    node_name_str = require_non_empty_string(node, "node_name", node_context)
+    if not _is_valid_identifier(node_name_str):
+        raise ValueError(
+            f"{node_context}: 'node_name' must be a valid ROS identifier (alphanumerics, underscores, hyphens; no spaces or special characters)"
+        )
+
+    publisher_entries = node.get("publishers")
+    subscriber_entries = node.get("subscribers")
+
+    has_role = publisher_entries is not None or subscriber_entries is not None
+    if not has_role:
+        raise ValueError(
+            f"{node_context}: at least one of publishers/subscribers is required"
+        )
+
+    normalized = {"node_name": node_name_str}
+
+    if publisher_entries is not None:
+        validate_publisher_entries(
+            publisher_entries,
+            f"{node_context}.publishers",
+        )
+        normalized["publisher"] = publisher_entries
+
+    if subscriber_entries is not None:
+        validate_subscriber_entries(
+            subscriber_entries,
+            f"{node_context}.subscribers",
+        )
+        normalized["subscriber"] = subscriber_entries
+
+    return normalized
+
+
+def resolve_hosts_with_nodes(json_content):
+    """Resolve host->node assignments for the current topology schema.
+
+    Returns a list of host dicts with shape:
+      [{"host_name": <name>, "nodes": [<normalized node>, ...]}, ...]
+    """
+    hosts = json_content.get("hosts")
+    if not isinstance(hosts, list):
+        return []
+
+    nodes = json_content.get("nodes")
+    if not isinstance(nodes, list):
+        return []
+
+    node_by_name = {}
+    for idx, node in enumerate(nodes):
+        node_context = f"root.nodes[{idx}]"
+        normalized = _normalize_node_roles(node, node_context)
+        node_name = normalized["node_name"]
+        if node_name in node_by_name:
+            raise ValueError(
+                f"{node_context}: duplicate node_name '{node_name}' in root.nodes"
+            )
+        node_by_name[node_name] = normalized
+
+    resolved_hosts = []
+    assigned_node_host = {}
+    for host_idx, host in enumerate(hosts):
+        host_context = f"root.hosts[{host_idx}]"
+        if not isinstance(host, dict):
+            raise ValueError(f"{host_context}: must be an object")
+        host_name = require_non_empty_string(host, "host_name", host_context)
+        node_names = host.get("node_names")
+        if not isinstance(node_names, list) or not node_names:
+            raise ValueError(
+                f"{host_context}.node_names: must be a non-empty array")
+
+        resolved_nodes = []
+        seen_node_names = set()
+        for node_name_idx, node_name in enumerate(node_names):
+            item_context = f"{host_context}.node_names[{node_name_idx}]"
+            if not isinstance(node_name, str) or not node_name.strip():
+                raise ValueError(f"{item_context}: must be a non-empty string")
+            stripped_name = node_name.strip()
+            if not _is_valid_identifier(stripped_name):
+                raise ValueError(
+                    f"{item_context}: must be a valid ROS identifier (alphanumerics, underscores, hyphens; no spaces or special characters)"
+                )
+            if stripped_name not in node_by_name:
+                raise ValueError(
+                    f"{item_context}: unknown node_name '{stripped_name}' (not found in root.nodes)"
+                )
+            if stripped_name in seen_node_names:
+                raise ValueError(
+                    f"{item_context}: duplicate node_name '{stripped_name}' within the same host"
+                )
+            seen_node_names.add(stripped_name)
+
+            existing_host = assigned_node_host.get(stripped_name)
+            if existing_host is not None and existing_host != host_name:
+                raise ValueError(
+                    f"{item_context}: node_name '{stripped_name}' is already assigned to host '{existing_host}'"
+                )
+            assigned_node_host[stripped_name] = host_name
+
+            resolved_nodes.append(node_by_name[stripped_name])
+
+        resolved_hosts.append(
+            {
+                "host_name": host_name,
+                "nodes": resolved_nodes,
+            }
+        )
+
+    return resolved_hosts
+
+
 def validate_topology_json_schema(json_content):
     """Validate topology JSON against topology_example/README.md."""
     root_context = "root"
@@ -190,8 +321,11 @@ def validate_topology_json_schema(json_content):
 
     if "hosts" not in json_content:
         raise ValueError("root: 'hosts' is required")
+    if "nodes" not in json_content:
+        raise ValueError("root: 'nodes' is required")
 
-    ensure_only_allowed_keys(json_content, {"qos", "hosts"}, root_context)
+    ensure_only_allowed_keys(
+        json_content, {"qos", "hosts", "nodes"}, root_context)
 
     if "qos" in json_content:
         validate_qos_schema(json_content["qos"])
@@ -200,83 +334,27 @@ def validate_topology_json_schema(json_content):
     if not isinstance(hosts, list) or not hosts:
         raise ValueError("root.hosts: must be a non-empty array")
 
+    nodes = json_content.get("nodes")
+    if not isinstance(nodes, list) or not nodes:
+        raise ValueError("root.nodes: must be a non-empty array")
+
     for host_idx, host in enumerate(hosts):
         host_context = f"root.hosts[{host_idx}]"
         if not isinstance(host, dict):
             raise ValueError(f"{host_context}: must be an object")
-        ensure_only_allowed_keys(host, {"host_name", "nodes"}, host_context)
-        host_name_str = require_non_empty_string(host, "host_name", host_context)
+        ensure_only_allowed_keys(
+            host, {"host_name", "node_names"}, host_context)
+        host_name_str = require_non_empty_string(
+            host, "host_name", host_context)
         if not _is_valid_host_name(host_name_str):
             raise ValueError(
                 f"{host_context}: 'host_name' must contain only alphanumerics, underscores, and hyphens (no spaces, slashes, or special characters)"
             )
+        if "node_names" not in host:
+            raise ValueError(f"{host_context}: 'node_names' is required")
 
-        if "nodes" not in host:
-            raise ValueError(f"{host_context}: 'nodes' is required")
-        nodes = host["nodes"]
-        if not isinstance(nodes, list) or not nodes:
-            raise ValueError(
-                f"{host_context}.nodes: must be a non-empty array")
-
-        for node_idx, node in enumerate(nodes):
-            node_context = f"{host_context}.nodes[{node_idx}]"
-            if not isinstance(node, dict):
-                raise ValueError(f"{node_context}: must be an object")
-
-            ensure_only_allowed_keys(
-                node,
-                {"node_name", "publisher", "subscriber", "intermediate"},
-                node_context,
-            )
-            node_name_str = require_non_empty_string(node, "node_name", node_context)
-            if not _is_valid_identifier(node_name_str):
-                raise ValueError(
-                    f"{node_context}: 'node_name' must be a valid ROS identifier (alphanumerics, underscores, hyphens; no spaces or special characters)"
-                )
-
-            has_role = any(
-                role in node for role in ("publisher", "subscriber", "intermediate")
-            )
-            if not has_role:
-                raise ValueError(
-                    f"{node_context}: at least one of publisher/subscriber/intermediate is required"
-                )
-
-            if "publisher" in node:
-                validate_publisher_entries(
-                    node["publisher"], f"{node_context}.publisher"
-                )
-
-            if "subscriber" in node:
-                validate_subscriber_entries(
-                    node["subscriber"], f"{node_context}.subscriber"
-                )
-
-            if "intermediate" in node:
-                intermediate = node["intermediate"]
-                if not isinstance(intermediate, list) or not intermediate:
-                    raise ValueError(
-                        f"{node_context}.intermediate: must be a non-empty array"
-                    )
-                for inter_idx, inter in enumerate(intermediate):
-                    inter_context = f"{node_context}.intermediate[{inter_idx}]"
-                    if not isinstance(inter, dict):
-                        raise ValueError(f"{inter_context}: must be an object")
-                    ensure_only_allowed_keys(
-                        inter,
-                        {"publisher", "subscriber"},
-                        inter_context,
-                    )
-                    if "publisher" not in inter or "subscriber" not in inter:
-                        raise ValueError(
-                            f"{inter_context}: both 'publisher' and 'subscriber' are required"
-                        )
-                    validate_publisher_entries(
-                        inter["publisher"], f"{inter_context}.publisher"
-                    )
-                    validate_subscriber_entries(
-                        inter["subscriber"], f"{inter_context}.subscriber"
-                    )
+    # resolve_hosts_with_nodes validates nodes[] and host node references.
+    resolve_hosts_with_nodes(json_content)
 
 
 def normalize_ws_dir(ws_dir):

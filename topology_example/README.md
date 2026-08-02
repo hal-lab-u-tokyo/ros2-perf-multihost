@@ -8,8 +8,48 @@ JSON files in this directory are converted into execution scripts by the followi
 
 | Key | Required | Type | Default | Description |
 |---|---|---|---|---|
+| hosts | Required | array | - | Array of host definitions. Each host contains only node allocation (node names). |
+| nodes | Required | array | - | Node behavior definitions (publishers/subscribers) shared across hosts. |
 | qos | Optional | object or array | - | QoS configuration. Use an object for one QoS case, or an array for QoS sweep execution. If omitted, each field uses its default value. |
-| hosts | Required | array | - | Array of host definitions. |
+
+## 2. Under `hosts`
+
+### Host Entry
+
+| Key | Required | Type | Description |
+|---|---|---|---|
+| host_name | Required | string | Hostname of each Host machine. Must match the DNS name (or `/etc/hosts` entry) used to reach that machine. Used as the base name of all generated files (`<host_name>.launch.py`, `<host_name>_exec_docker.sh`, `<host_name>_exec_native.sh`, `<host_name>_compose.yaml`). |
+| node_names | Required | array | List of node names assigned to this host. Each name must match one `nodes[].node_name`. |
+
+## 3. Under `nodes`
+
+### Node Definition
+
+| Key | Required | Type | Description |
+|---|---|---|---|
+| node_name | Required | string | ROS node name. Must be unique in root `nodes`, and each `node_name` can be assigned to only one host across all `hosts[].node_names`. |
+| publishers | Conditionally required | array | Publisher definitions for this node. |
+| subscribers | Conditionally required | array | Subscriber definitions for this node. |
+
+Notes:
+- A single node definition can include both `publishers` and `subscribers`.
+- `hosts` only decides placement. Topic behavior is always defined in root `nodes`.
+
+### Elements of the `publishers` Array
+
+| Key | Required | Type | Description |
+|---|---|---|---|
+| topic_name | Required | string | Topic name to publish. |
+| payload_size | Required | number | Payload size (bytes). Must be a positive integer. |
+| period_ms | Required | number | Publish period (ms). Must be a positive integer. |
+
+### Elements of the `subscribers` Array
+
+| Key | Required | Type | Description |
+|---|---|---|---|
+| topic_name | Required | string | Topic name to subscribe to. |
+
+## 4. `qos` (Optional)
 
 ### `qos` Object
 
@@ -24,122 +64,11 @@ JSON files in this directory are converted into execution scripts by the followi
 You can also specify `qos` as an array of QoS objects.
 In that form, the framework treats the topology as a QoS sweep and runs the same host/node assignment once per QoS case.
 
-Example:
+`hosts` and `nodes` are still required in the same format as Sections 2 and 3.
 
-```json
-{
-  "qos": [
-    {
-      "history": "KEEP_LAST",
-      "depth": 1,
-      "reliability": "RELIABLE"
-    },
-    {
-      "history": "KEEP_LAST",
-      "depth": 1,
-      "reliability": "BEST_EFFORT"
-    },
-    {
-      "history": "KEEP_ALL",
-      "reliability": "RELIABLE"
-    }
-  ],
-  "hosts": []
-}
-```
-
+If `qos` is omitted, the framework uses default QoS values.
 For `KEEP_ALL`, `depth` may be omitted because ROS 2 ignores it for that history policy.
-The generator stores the normalized QoS case list in `metadata.txt`, and the benchmark runner executes one full trial set per case.
-
-## 2. Under `hosts`
-
-### Host Entry
-
-| Key | Required | Type | Description |
-|---|---|---|---|
-| host_name | Required | string | Hostname of each Host machine. Must match the DNS name (or `/etc/hosts` entry) used to reach that machine. Used as the base name of all generated files (`<host_name>.launch.py`, `<host_name>_exec_docker.sh`, `<host_name>_exec_native.sh`, `<host_name>_compose.yaml`). |
-| nodes | Required | array | Array of node definitions. |
-
-### Node Entry
-
-| Key | Required | Type | Description |
-|---|---|---|---|
-| node_name | Required | string | ROS node name. |
-| publisher | Conditionally required | array | Set this when the node should act as a Publisher. |
-| subscriber | Conditionally required | array | Set this when the node should act as a Subscriber. |
-| intermediate | Conditionally required | array | Set this when the node should act as an Intermediate node. |
-
-Notes:
-- A single `node` entry can combine `publisher`, `subscriber`, and `intermediate` roles.
-- `intermediate` can be defined as an array, but all elements in the same `node` entry share one `node_name`, so they are merged into a single `intermediate_node` process.
-- If you want to run multiple Intermediate nodes as separate ROS nodes or separate processes, do not add more elements to the `intermediate` array. Instead, define separate `nodes` entries with unique `node_name` values.
-
-### Elements of the `publisher` Array
-
-| Key | Required | Type | Description |
-|---|---|---|---|
-| topic_name | Required | string | Topic name to publish. |
-| payload_size | Required | number | Payload size (bytes). Must be a positive integer. |
-| period_ms | Required | number | Publish period (ms). Must be a positive integer. |
-
-### Elements of the `subscriber` Array
-
-| Key | Required | Type | Description |
-|---|---|---|---|
-| topic_name | Required | string | Topic name to subscribe to. |
-
-### `intermediate`
-
-| Key | Required | Type | Description |
-|---|---|---|---|
-| publisher | Required | array | Topic definitions for republished output topics. |
-| subscriber | Required | array | Topic definitions for subscribed input topics. |
-
-Each element of the `intermediate` array is an object that contains the `publisher` and `subscriber` arrays shown above. Elements inside those arrays use the same `topic_name` field described above.
-For `intermediate[].publisher[]`, `payload_size` and `period_ms` are also required.
-
-## 3. Notes
-
-The RMW implementation is selected at runtime (for example via `performance_test.py --rmw ...` or generated `*_exec.sh --rmw ...`). Defining RMW information in this JSON file has no effect.
-
-## 4. Minimal Template
-
-This template shows the smallest topology that satisfies the current JSON schema.
-Use it when you want to understand the required structure only.
-If `qos` is omitted, the framework uses the default QoS values.
-
-```json
-{
-  "hosts": [
-    {
-      "host_name": "host1",
-      "nodes": [
-        {
-          "node_name": "pub1",
-          "publisher": [
-            {
-              "topic_name": "topic_a",
-              "payload_size": 64,
-              "period_ms": 100
-            }
-          ]
-        }
-      ]
-    },
-    {
-      "host_name": "host2",
-      "nodes": [
-        {
-          "node_name": "sub1",
-          "subscriber": [
-            { "topic_name": "topic_a" }
-          ]
-        }
-      ]
-    }
-  ]
-}
-```
+For a complete topology example with QoS sweep, see [simple_qos_sweep.json](./simple_qos_sweep.json).
 
 ## 5. Recommended Template
 
@@ -149,76 +78,43 @@ so the intended behavior is visible in the JSON itself.
 
 ```json
 {
+  "hosts": [
+    {
+      "host_name": "host1",
+      "node_names": ["pub1"]
+    },
+    {
+      "host_name": "host2",
+      "node_names": ["sub1"]
+    }
+  ],
+  "nodes": [
+    {
+      "node_name": "pub1",
+      "publishers": [
+        {
+          "topic_name": "topic_a",
+          "payload_size": 64,
+          "period_ms": 100
+        }
+      ]
+    },
+    {
+      "node_name": "sub1",
+      "subscribers": [
+        { "topic_name": "topic_a" }
+      ]
+    }
+  ],
   "qos": {
     "history": "KEEP_LAST",
     "depth": 1,
     "reliability": "RELIABLE"
-  },
-  "hosts": [
-    {
-      "host_name": "host1",
-      "nodes": [
-        {
-          "node_name": "pub1",
-          "publisher": [
-            {
-              "topic_name": "topic_a",
-              "payload_size": 64,
-              "period_ms": 100
-            }
-          ]
-        }
-      ]
-    },
-    {
-      "host_name": "host2",
-      "nodes": [
-        {
-          "node_name": "sub1",
-          "subscriber": [
-            { "topic_name": "topic_a" }
-          ]
-        }
-      ]
-    }
-  ]
+  }
 }
 ```
 
-## 6. QoS Sweep Example
-
-To run QoS sweep, represent `qos` as an array.
-Each element is one QoS case to run with the same host and node allocation.
-The current `manager_scripts/generate_exec_scripts.py` and `performance_test.py`
-flow supports this format directly.
-
-This section focuses only on how to express QoS sweep in topology JSON.
-For generated metadata fields, runtime behavior, and output directory layout,
-see [manager_scripts/README.md](../manager_scripts/README.md) and [performance_test/README.md](../performance_test/README.md).
-
-```json
-{
-  "qos": [
-    {
-      "history": "KEEP_LAST",
-      "depth": 1,
-      "reliability": "RELIABLE"
-    },
-    {
-      "history": "KEEP_LAST",
-      "depth": 1,
-      "reliability": "BEST_EFFORT"
-    },
-    {
-      "history": "KEEP_ALL",
-      "reliability": "RELIABLE"
-    }
-  ],
-  "hosts": []
-}
-```
-
-## 7. Example Files In This Directory
+## 6. Example Files In This Directory
 
 The following files are currently maintained as primary examples in this directory.
 Additional examples may be added incrementally.

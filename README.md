@@ -182,6 +182,7 @@ This section walks you through the full usage of the framework in detail, from g
 ### Step1: Define Topology
 
 Define node placement, topic relationships, and QoS configuration in a JSON topology file.
+Use root `hosts` for Host assignment and root `nodes` for node behavior definitions.
 The top-level `qos` field supports both a normal single-QoS configuration and a QoS sweep configuration.
 For QoS sweep, define `qos` as an array so the same topology can be executed once per QoS case.
 See [topology_example/README.md](./topology_example/README.md) for the JSON schema, examples, and QoS sweep input format.
