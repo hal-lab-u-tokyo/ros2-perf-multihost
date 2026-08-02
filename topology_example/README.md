@@ -104,6 +104,10 @@ The RMW implementation is selected at runtime (for example via `performance_test
 
 ## 4. Minimal Template
 
+This template shows the smallest topology that satisfies the current JSON schema.
+Use it when you want to understand the required structure only.
+If `qos` is omitted, the framework uses the default QoS values.
+
 ```json
 {
   "hosts": [
@@ -138,6 +142,10 @@ The RMW implementation is selected at runtime (for example via `performance_test
 ```
 
 ## 5. Recommended Template
+
+This template shows the recommended form for practical use.
+Unlike the minimal template, it explicitly records `qos` in the topology file,
+so the intended behavior is visible in the JSON itself.
 
 ```json
 {
@@ -184,6 +192,10 @@ Each element is one QoS case to run with the same host and node allocation.
 The current `manager_scripts/generate_exec_scripts.py` and `performance_test.py`
 flow supports this format directly.
 
+This section focuses only on how to express QoS sweep in topology JSON.
+For generated metadata fields, runtime behavior, and output directory layout,
+see [manager_scripts/README.md](../manager_scripts/README.md) and [performance_test/README.md](../performance_test/README.md).
+
 ```json
 {
   "qos": [
@@ -205,3 +217,13 @@ flow supports this format directly.
   "hosts": []
 }
 ```
+
+## 7. Example Files In This Directory
+
+The following files are currently maintained as primary examples in this directory.
+Additional examples may be added incrementally.
+
+| File | Role |
+|---|---|
+| `simple.json` | Single-QoS example for the basic 3-Host topology |
+| `simple_qos_sweep.json` | QoS sweep example for the same basic 3-Host topology |
