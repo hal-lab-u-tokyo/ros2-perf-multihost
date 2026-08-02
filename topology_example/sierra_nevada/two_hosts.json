@@ -1,12 +1,9 @@
 {
-  "qos": [
-    {
+  "qos": {
     "history": "KEEP_LAST",
     "depth": 1,
     "reliability": "RELIABLE"
-    }
-  ],
-
+  },
   "hosts": [
     {
       "host_name": "host1",
@@ -54,12 +51,7 @@
               ]
             }
           ]
-        }
-      ]
-    },
-    {
-      "host_name": "host2",
-      "nodes": [
+        },
         {
           "node_name": "hamburg",
           "intermediate": [
@@ -87,98 +79,83 @@
               ]
             }
           ]
-        }  
-      ]
-    },
-    {
-      "host_name": "host3",
-      "nodes": [
+        },
         {
           "node_name": "osaka",
           "intermediate": [
             {
-                "subscriber": [
-                    {
-                        "topic_name": "parana"
-                    }
-                ],
-                "publisher": [
-                    {
-                        "topic_name": "salween",
-                        "payload_size": 64,
-                        "period_ms": 100
-                    }
-                ]
+              "subscriber": [
+                {
+                  "topic_name": "parana"
+                }
+              ],
+              "publisher": [
+                {
+                  "topic_name": "salween",
+                  "payload_size": 64,
+                  "period_ms": 100
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "node_name": "mandalay",
+          "intermediate": [
+            {
+              "subscriber": [
+                {
+                  "topic_name": "salween"
+                },
+                {
+                  "topic_name": "danube"
+                }
+              ],
+              "publisher": [
+                {
+                  "topic_name": "missouri",
+                  "payload_size": 64,
+                  "period_ms": 100
+                }
+              ]
             }
           ]
         }
       ]
     },
     {
-      "host_name": "host4",
+      "host_name": "host2",
       "nodes": [
         {
-            "node_name": "mandalay",
-            "intermediate": [
+          "node_name": "ponce",
+          "intermediate": [
+            {
+              "subscriber": [
                 {
-                    "subscriber": [
-                        {
-                            "topic_name": "salween"
-                        },
-                        {
-                            "topic_name": "danube"
-                        }
-                    ],
-                    "publisher": [
-                        {
-                            "topic_name": "missouri",
-                            "payload_size": 64,
-                            "period_ms": 100
-                        }
-                    ]
+                  "topic_name": "missouri"
+                },
+                {
+                  "topic_name": "danube"
+                },
+                {
+                  "topic_name": "volga"
+                }
+              ],
+              "publisher": [
+                {
+                  "topic_name": "mekong",
+                  "payload_size": 64,
+                  "period_ms": 100
+                },
+                {
+                  "topic_name": "congo",
+                  "payload_size": 64,
+                  "period_ms": 100
                 }
               ]
             }
-        ]
-    },
-    {
-        "host_name": "host5",
-        "nodes": [
-            {
-                "node_name": "ponce",
-                "intermediate": [
-                    {
-                        "subscriber": [
-                            {
-                                "topic_name": "missouri"
-                            },
-                            {
-                                "topic_name": "danube"
-                            },
-                            {
-                                "topic_name": "volga"
-                            }
-                        ],
-                        "publisher": [
-                            {
-                                "topic_name": "mekong",
-                                "payload_size": 64,
-                                "period_ms": 100
-                            },
-                            {
-                                "topic_name": "congo",
-                                "payload_size": 64,
-                                "period_ms": 100
-                            }
-                        ]
-                    }
-                ]
-            }
-        ]
-    },
-    {
-      "host_name": "host6",
-      "nodes": [
+          ]
+        },
         {
           "node_name": "barcelona",
           "intermediate": [
@@ -216,12 +193,7 @@
               ]
             }
           ]
-        }
-      ]
-    },
-    {
-      "host_name": "host7",
-      "nodes": [
+        },
         {
           "node_name": "geneva",
           "intermediate": [

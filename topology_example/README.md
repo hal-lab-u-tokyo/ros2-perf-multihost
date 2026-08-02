@@ -223,7 +223,20 @@ see [manager_scripts/README.md](../manager_scripts/README.md) and [performance_t
 The following files are currently maintained as primary examples in this directory.
 Additional examples may be added incrementally.
 
-| File | Role |
-|---|---|
-| `simple.json` | Single-QoS example for the basic 3-Host topology |
-| `simple_qos_sweep.json` | QoS sweep example for the same basic 3-Host topology |
+| File | Hosts | Node allocation difference |
+|---|---:|---|
+| [simple.json](./simple.json) | 3 | Basic quick-start topology |
+| [simple_qos_sweep.json](./simple_qos_sweep.json) | 3 | Same topology as `simple.json` with sweep `qos` array |
+| [sierra_nevada/one_host.json](./sierra_nevada/one_host.json) | 1 | Sierra Nevada-derived allocation |
+| [sierra_nevada/two_hosts.json](./sierra_nevada/two_hosts.json) | 2 | Sierra Nevada-derived allocation |
+| [sierra_nevada/three_hosts.json](./sierra_nevada/three_hosts.json) | 3 | Sierra Nevada-derived allocation |
+| [sierra_nevada/four_hosts.json](./sierra_nevada/four_hosts.json) | 4 | Sierra Nevada-derived allocation |
+| [sierra_nevada/five_hosts.json](./sierra_nevada/five_hosts.json) | 5 | Sierra Nevada-derived allocation |
+| [sierra_nevada/five_hosts_qos_sweep.json](./sierra_nevada/five_hosts_qos_sweep.json) | 5 | Same host allocation as `five_hosts.json` with sweep `qos` array |
+| [sierra_nevada/six_hosts.json](./sierra_nevada/six_hosts.json) | 6 | Sierra Nevada-derived allocation |
+| [sierra_nevada/seven_hosts.json](./sierra_nevada/seven_hosts.json) | 7 | Sierra Nevada-derived allocation |
+
+Notes:
+- `simple.json` and `simple_qos_sweep.json` use the same 3-host topology. The difference is QoS mode: object for single case vs array for sweep.
+- `sierra_nevada/*` examples are based on [iRobot's Sierra Nevada topology](https://github.com/irobot-ros/ros2-performance/tree/rolling/irobot_benchmark/topology). Theses differences are host-count allocation variants (1-7 hosts) and an explicit QoS sweep variant for `five_hosts_qos_sweep.json`.
+
