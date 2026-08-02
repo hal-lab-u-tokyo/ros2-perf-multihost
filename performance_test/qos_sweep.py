@@ -64,4 +64,4 @@ def _normalize_qos_case(qos, idx):
 
 
 def qos_case_label(qos_case_idx):
-    return f"qos_case{qos_case_idx}"
+    return f"qos_case{qos_case_idx + 1}"
