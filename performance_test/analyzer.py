@@ -57,7 +57,7 @@ def _read_trial_total_latency_row(results_dir):
 
 
 def _parse_all_latency_losses(all_latency_path):
-    """Parse all_latency rows into (topic, loss_count), preferring CSV when available."""
+    """Parse all_latency rows into (topic, publisher, loss_count), preferring CSV when available."""
     rows = []
 
     csv_path = os.path.splitext(all_latency_path)[0] + ".csv"
@@ -66,6 +66,7 @@ def _parse_all_latency_losses(all_latency_path):
             reader = csv.DictReader(f)
             for row in reader:
                 topic = row.get("topic")
+                publisher = row.get("publisher")
                 raw_loss = row.get("lost[#]")
                 if topic is None or raw_loss is None:
                     continue
@@ -73,7 +74,7 @@ def _parse_all_latency_losses(all_latency_path):
                     loss_count = float(raw_loss)
                 except ValueError:
                     continue
-                rows.append((topic, loss_count))
+                rows.append((topic, publisher, loss_count))
         return rows
 
     if not os.path.exists(all_latency_path):
@@ -84,12 +85,19 @@ def _parse_all_latency_losses(all_latency_path):
         parts = line.strip().split()
         if len(parts) < 3:
             continue
-        topic = parts[1]
+        if len(parts) >= 11:
+            topic = parts[0]
+            publisher = parts[1]
+            raw_loss = parts[3]
+        else:
+            topic = parts[1]
+            publisher = None
+            raw_loss = parts[2]
         try:
-            loss_count = float(parts[2])
+            loss_count = float(raw_loss)
         except ValueError:
             continue
-        rows.append((topic, loss_count))
+        rows.append((topic, publisher, loss_count))
     return rows
 
 
@@ -333,14 +341,15 @@ def aggregate_total_latency(
         all_latency_path = os.path.join(trial_results_dir, "all_latency.txt")
 
         total_received_bytes = 0.0
-        for topic_name, topic_loss in _parse_all_latency_losses(all_latency_path):
+        for topic_name, publisher_name, topic_loss in _parse_all_latency_losses(all_latency_path):
             cfg = topic_runtime_cfg.get(topic_name)
             if not cfg:
                 raise ValueError(
                     f"Topic '{topic_name}' in {all_latency_path} is missing from topic_runtime_json"
                 )
             sent_per_pub = int(eval_time * 1000 / cfg["period_ms"])
-            sent = sent_per_pub * cfg["publisher_count"]
+            sent = sent_per_pub if publisher_name else sent_per_pub * \
+                cfg["publisher_count"]
             received = max(sent - topic_loss, 0)
             total_received_bytes += received * cfg["payload_size"]
 
