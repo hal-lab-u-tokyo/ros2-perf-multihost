@@ -27,7 +27,7 @@ JSON files in this directory are converted into execution scripts by the followi
 
 | Key | Required | Type | Description |
 |---|---|---|---|
-| node_name | Required | string | ROS node name. Must be unique in root `nodes`. |
+| node_name | Required | string | ROS node name. Must be unique in root `nodes`, and each `node_name` can be assigned to only one host across all `hosts[].node_names`. |
 | publishers | Conditionally required | array | Publisher definitions for this node. |
 | subscribers | Conditionally required | array | Subscriber definitions for this node. |
 

@@ -262,6 +262,7 @@ def resolve_hosts_with_nodes(json_content):
         node_by_name[node_name] = normalized
 
     resolved_hosts = []
+    assigned_node_host = {}
     for host_idx, host in enumerate(hosts):
         host_context = f"root.hosts[{host_idx}]"
         if not isinstance(host, dict):
@@ -292,6 +293,14 @@ def resolve_hosts_with_nodes(json_content):
                     f"{item_context}: duplicate node_name '{stripped_name}' within the same host"
                 )
             seen_node_names.add(stripped_name)
+
+            existing_host = assigned_node_host.get(stripped_name)
+            if existing_host is not None and existing_host != host_name:
+                raise ValueError(
+                    f"{item_context}: node_name '{stripped_name}' is already assigned to host '{existing_host}'"
+                )
+            assigned_node_host[stripped_name] = host_name
+
             resolved_nodes.append(node_by_name[stripped_name])
 
         resolved_hosts.append(
