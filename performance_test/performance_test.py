@@ -182,6 +182,21 @@ def _write_qos_sweep_summary(summary_path, case_results):
     print(f"QoS sweep summary saved: {summary_path}")
 
 
+def _update_latest_alias(results_root, rmw, run_timestamp):
+    latest_link = os.path.join(results_root, f"latest-{rmw}")
+    if os.path.lexists(latest_link):
+        if os.path.isdir(latest_link) and not os.path.islink(latest_link):
+            raise RuntimeError(
+                (
+                    f"Cannot update latest alias because '{latest_link}' exists "
+                    "as a directory. Remove or rename this directory and rerun."
+                )
+            )
+        os.remove(latest_link)
+    os.symlink(run_timestamp, latest_link)
+    return latest_link
+
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(
         description="Run performance tests using generated exec script defaults",
@@ -292,18 +307,15 @@ Examples:
     os.makedirs(local_analysis_dir, exist_ok=True)
 
     local_latest_link = os.path.join(local_results_root, f"latest-{args.rmw}")
-    if os.path.lexists(local_latest_link):
-        if os.path.isdir(local_latest_link) and not os.path.islink(local_latest_link):
-            print(
-                (
-                    f"ERROR: Cannot update latest alias because '{local_latest_link}' exists "
-                    "as a directory. Remove or rename this directory and rerun."
-                ),
-                file=sys.stderr,
-            )
-            sys.exit(1)
-        os.remove(local_latest_link)
-    os.symlink(run_timestamp, local_latest_link)
+    if os.path.lexists(local_latest_link) and os.path.isdir(local_latest_link) and not os.path.islink(local_latest_link):
+        print(
+            (
+                f"ERROR: Cannot update latest alias because '{local_latest_link}' exists "
+                "as a directory. Remove or rename this directory and rerun."
+            ),
+            file=sys.stderr,
+        )
+        sys.exit(1)
 
     # Resolve actual host list from metadata (metadata.txt is authoritative)
     try:
@@ -335,7 +347,7 @@ Examples:
     print(f"Local raw logs dir: {local_raw_logs_dir}")
     print(f"Local analysis dir: {local_analysis_dir}")
     print(f"QoS case manifest: {qos_manifest_path}")
-    print(f"Local latest alias: {local_latest_link} -> {run_timestamp}")
+    print(f"Local latest alias (updated on success): {local_latest_link} -> {run_timestamp}")
     print(f"SSH user for remote ops: {args.ssh_user}")
     print(f"Strict analysis mode: {args.strict_analysis}")
 
@@ -582,8 +594,11 @@ Examples:
             os.path.join(local_analysis_dir, "qos_sweep_summary.csv"),
             case_results,
         )
-        if os.path.lexists(local_latest_link):
-            os.remove(local_latest_link)
-        os.symlink(run_timestamp, local_latest_link)
+
+    try:
+        _update_latest_alias(local_results_root, args.rmw, run_timestamp)
+    except RuntimeError as exc:
+        print(f"ERROR: {exc}", file=sys.stderr)
+        sys.exit(1)
 
     print("All tests and aggregation complete.")

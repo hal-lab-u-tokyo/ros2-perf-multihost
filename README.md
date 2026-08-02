@@ -406,7 +406,9 @@ The table below summarizes how zenohd is placed and managed for each exec-policy
 
 `performance_test.py` launches node groups via REST for each trial, then collects logs from each Host with `scp`.
 
-On prepare, the Manager creates `<ws-dir>/<topology>/results/<session_timestamp>-<rmw>/` and updates `<ws-dir>/<topology>/results/latest-<rmw>` to point to it.
+On prepare, the Manager creates `<ws-dir>/<topology>/results/<session_timestamp>-<rmw>/`.
+After all trials, log collection, and aggregation succeed, `performance_test.py` updates `<ws-dir>/<topology>/results/latest-<rmw>` to point to that completed run directory.
+If execution fails before completion, `latest-<rmw>` is left unchanged.
 
 For a single QoS case, the result layout is the original flat layout:
 
