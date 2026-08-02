@@ -85,11 +85,21 @@ def run_test(
         if zenoh_config_override is not None:
             env["ZENOH_CONFIG_OVERRIDE"] = str(zenoh_config_override)
 
-        result = subprocess.run(cmd, text=True, env=env)
-        print(result)
+        result = subprocess.run(
+            cmd,
+            text=True,
+            capture_output=True,
+            env=env,
+        )
+        if result.stdout:
+            print(result.stdout.strip())
         if result.returncode != 0:
+            if result.stderr:
+                print("--- local_exec.sh stderr ---", file=sys.stderr)
+                print(result.stderr.strip(), file=sys.stderr)
             raise RuntimeError(
-                f"run_test failed for local execution: rc={result.returncode}, cmd={cmd}"
+                "run_test failed for local execution: "
+                f"rc={result.returncode}, cmd={shlex.join(cmd)}"
             )
         return
 
