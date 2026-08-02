@@ -25,13 +25,13 @@ def append_publisher_block(lines, node_name, pub_list, qos_opts):
     topic_names = ",".join(p["topic_name"] for p in pub_list)
     payload_sizes = [
         require_positive_int(
-            p, "payload_size", f"node '{node_name}' publisher[{idx}]"
+            p, "payload_size", f"node '{node_name}' publishers[{idx}]"
         )
         for idx, p in enumerate(pub_list)
     ]
     period_mses = [
         require_positive_int(
-            p, "period_ms", f"node '{node_name}' publisher[{idx}]"
+            p, "period_ms", f"node '{node_name}' publishers[{idx}]"
         )
         for idx, p in enumerate(pub_list)
     ]
@@ -165,13 +165,13 @@ def generate_exec_scripts(json_content, output_dir, settings):
                                        for p in publisher_entries)
                 payload_sizes = [
                     require_positive_int(
-                        p, "payload_size", f"node '{node_name}' publisher[{idx}]"
+                        p, "payload_size", f"node '{node_name}' publishers[{idx}]"
                     )
                     for idx, p in enumerate(publisher_entries)
                 ]
                 period_mses = [
                     require_positive_int(
-                        p, "period_ms", f"node '{node_name}' publisher[{idx}]"
+                        p, "period_ms", f"node '{node_name}' publishers[{idx}]"
                     )
                     for idx, p in enumerate(publisher_entries)
                 ]

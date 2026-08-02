@@ -187,7 +187,7 @@ def normalize_intermediate_entries(intermediate_value, node_name):
 def _normalize_node_roles(node, node_context):
     """Normalize one node entry to internal role keys.
 
-    Internal keys are: node_name, publisher, subscriber, intermediate.
+    Internal keys are: node_name, publisher, subscriber.
     """
     if not isinstance(node, dict):
         raise ValueError(f"{node_context}: must be an object")
@@ -273,6 +273,7 @@ def resolve_hosts_with_nodes(json_content):
                 f"{host_context}.node_names: must be a non-empty array")
 
         resolved_nodes = []
+        seen_node_names = set()
         for node_name_idx, node_name in enumerate(node_names):
             item_context = f"{host_context}.node_names[{node_name_idx}]"
             if not isinstance(node_name, str) or not node_name.strip():
@@ -286,6 +287,11 @@ def resolve_hosts_with_nodes(json_content):
                 raise ValueError(
                     f"{item_context}: unknown node_name '{stripped_name}' (not found in root.nodes)"
                 )
+            if stripped_name in seen_node_names:
+                raise ValueError(
+                    f"{item_context}: duplicate node_name '{stripped_name}' within the same host"
+                )
+            seen_node_names.add(stripped_name)
             resolved_nodes.append(node_by_name[stripped_name])
 
         resolved_hosts.append(
