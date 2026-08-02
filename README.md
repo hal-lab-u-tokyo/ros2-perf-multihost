@@ -20,7 +20,7 @@ Our purpose is to provide a "scientific scale" for optimizing distributed system
   - [Quick Steps](#quick-steps)
 - [Preliminaries](#preliminaries)
   - [Directory Structure](#directory-structure)
-  - [Preparation of Hosts](#preparation-of-hosts)
+  - [Setup](#setup)
 - [Usage in Details](#usage-in-details)
   - [Step1: Define Topology](#step1-define-topology)
   - [Step2: Generate Execution Scripts](#step2-generate-execution-scripts)
@@ -166,160 +166,13 @@ Before starting multi-host benchmarks, it is helpful to understand an overview o
 | `ros2_node_impl_ws/` | ROS 2 node implementation workspace for generated execution scripts. |
 | `docker/` | Shared Docker image definition and Compose-related assets. |
 
-### Preparation of Hosts
+## Setup
 
-This section describes the requirements and setup steps for each Host to run this framework.
+One-time setup steps are maintained in a dedicated document.
+For Manager/Host requirements, SSH setup, Docker and ROS 2 preparation, and chrony configuration, see:
 
-#### Requirements
+- [SETUP.md](./SETUP.md)
 
-Here is the baseline environment we have tested so far.
-
-- Ubuntu 24.04
-- Verified devices: Raspberry Pi 4 and Raspberry Pi 5.
-  - Other devices or servers should also work if Ubuntu 24.04 is available.
-- User and repository path assumption:
-  - Scripts and examples in this repository assume user `ubuntu` and `/home/ubuntu/ros2-perf-multihost`.
-  - If your username and path differ, how to override these settings is described later.
-  - The default `ubuntu` user needs passwordless `sudo` only for `chronyc` (described later).
-
-#### SSH access (on the Manager)
-
-This framework assumes that the Manager can SSH into each Host by hostname only, without a password (using key-based authentication).
-Therefore, configure the following settings on the Manager machine to meet this requirement.
-
-- Generate and register SSH keys (e.g., `ssh-keygen -t ed25519 && ssh-copy-id ubuntu@host1`).
-- Ensure hostnames are resolvable from the Manager.
-- Consider assigning static IP addresses to each Host to avoid SSH connectivity issues after a reboot or DHCP lease renewal.
-- Recommended Manager-side configuration examples:
-  - `/etc/hosts`:
-    ```text
-    <snipped.>
-    192.168.10.11 host1
-    192.168.10.12 host2
-    192.168.10.13 host3
-    <snipped.>
-    ```
-  - `~/.ssh/config`:
-    ```text
-    Host host1
-        User ubuntu
-        IdentityFile ~/.ssh/id_ed25519
-    Host host2
-        User ubuntu
-        IdentityFile ~/.ssh/id_ed25519
-    Host host3
-        User ubuntu
-        IdentityFile ~/.ssh/id_ed25519
-    ```
-
-#### Clone this repository
-
-Clone this repository on each Host. We recommend cloning it into the home directory.
-
-```bash
-cd ~
-git clone https://github.com/hal-lab-u-tokyo/ros2-perf-multihost.git
-```
-
-#### Docker and the published image
-
-Install Docker Engine and enable non-root usage.
-
-- Follow the official [Install Docker Engine on Ubuntu](https://docs.docker.com/engine/install/ubuntu/) guide.
-- To run Docker commands as a non-root user, add your user to the `docker` group:
-  ```bash
-  sudo usermod -aG docker $USER
-  ```
-  Then log out and log back in, or run `newgrp docker` to update the group membership.
-
-Pull the published GitHub Packages image [`ghcr.io/hal-lab-u-tokyo/ros2-perf-multihost:latest`](https://github.com/hal-lab-u-tokyo/ros2-perf-multihost/pkgs/container/ros2-perf-multihost).
-
-```bash
-docker pull ghcr.io/hal-lab-u-tokyo/ros2-perf-multihost:latest
-```
-
-For details on the Docker image, see [docker/README.md](./docker/README.md).
-
-#### [Optional] Native ROS 2 Environment
-
-If you want to evaluate native execution mode as well, install ROS 2 and build the package.
-
-Follow the official [ROS 2 Jazzy Installation steps](https://docs.ros.org/en/jazzy/Installation/Ubuntu-Install-Debs.html).
-Other ROS 2 distributions may also work, but they are not officially tested yet.
-
-To benchmark with non-default RMW implementations, install the corresponding packages:
-
-```bash
-# For CycloneDDS (rmw_cyclonedds_cpp)
-sudo apt install -y ros-jazzy-rmw-cyclonedds-cpp
-
-# For Zenoh (rmw_zenoh_cpp)
-sudo apt install -y ros-jazzy-rmw-zenoh-cpp
-```
-
-Then, build the ROS 2 package used by this framework in `ros2_node_impl_ws/` (see [ros2_node_impl_ws/README.md](./ros2_node_impl_ws/README.md) for details on ROS 2 node features).
-
-```bash
-source /opt/ros/jazzy/setup.bash
-cd ros2_node_impl_ws
-colcon build --packages-select ros2_perf_multihost_nodes
-```
-
-It is recommended to add the following to your `~/.bashrc` so the built package is automatically sourced in every shell session:
-
-```bash
-echo "source ~/ros2-perf-multihost/ros2_node_impl_ws/install/local_setup.bash" >> ~/.bashrc
-```
-
-#### Python dependencies
-
-Install the following packages on each target Host:
-
-```bash
-sudo apt update
-sudo apt install -y python3-flask python3-psutil
-```
-
-Note that the `python3-requests` package is required on the Manager machine.
-Therefore, install the following package on the Manager (not on each Host):
-
-```bash
-sudo apt update
-sudo apt install -y python3-requests
-```
-
-#### Clock synchronization for REST benchmark (chrony)
-
-For remote benchmark reproducibility, the REST server uses [chrony](https://chrony-project.org/) to synchronize the clock between Hosts.
-
-Install and enable chrony as follows:
-
-```bash
-sudo apt install -y chrony
-sudo systemctl enable --now chrony
-```
-
-Because the REST server invokes `sudo -n chronyc` (non-interactive), the `ubuntu` user must be allowed to run `chronyc` via `sudo` without a password.
-The sudoers entry below grants passwordless `sudo` only for `/usr/bin/chronyc`, so no other commands are affected.
-
-Check the permission, and if needed, configure the sudoers entry on each Host as follows:
-
-```bash
-# Check the permission required by rest_server.py (makestep)
-sudo -k
-sudo -n chronyc -a makestep
-
-# If this command fails because a password is required, configure the sudoers entry as follows.
-cat <<'EOF' | sudo tee /etc/sudoers.d/ros2-perf-chrony
-ubuntu ALL=(root) NOPASSWD:/usr/bin/chronyc
-EOF
-sudo chmod 440 /etc/sudoers.d/ros2-perf-chrony
-```
-
-If startup sync fails because `sudo` for `chronyc` requires a password, `rest_server.py` exits and prints guidance with the setup URL.
-For other startup sync failures (for example, temporary NTP reachability issues), the server continues startup by default and reports the error in logs. To fail fast on any startup sync failure, set `ROS2_PERF_CHRONY_FAIL_FAST_ON_STARTUP=1`.
-
-For details on synchronization behavior and environment variables, see [remote_hosts_scripts/README.md](./remote_hosts_scripts/README.md#clock-synchronization-chrony).
 
 ## Usage in Details
 
@@ -405,6 +258,28 @@ If the server exits at startup with a chrony sudo permission error, check the ch
 
 For details on the specification of REST server and environment variables, see [remote_hosts_scripts/README.md](./remote_hosts_scripts/README.md#rest_serverpy).
 
+#### Evaluate Clock Skew Before Benchmark (Recommended)
+
+When you need stricter one-way latency interpretation, evaluate inter-host clock skew before running trials.
+
+Stricter REST-based check (recommended for REST benchmark runs):
+
+Prerequisite: start `remote_hosts_scripts/rest_server.py` on each target Host first. If REST is not running/reachable, clock probe requests fail (timeout/connection error) and that Host is recorded as `error`.
+
+```bash
+python3 manager_scripts/system_perf/check_clock_skew_rest.py --hosts host1,host2,host3 --samples 30 --interval 0.05
+python3 manager_scripts/system_perf/check_clock_skew_rest.py --topology topology_example/simple.json --samples 30 --interval 0.05
+```
+
+You can specify `--hosts`, `--topology`, or both.
+If both are specified and the host lists do not match, the script prints a warning and aborts without evaluation.
+
+`check_clock_skew_rest.py` saves CSV files under `performance_ws/system_perf/clock_skew/<timestamp>/` by default.
+For option details and output field definitions, see:
+
+- [manager_scripts/system_perf/README.md#check_clock_skew_restpy](./manager_scripts/system_perf/README.md#check_clock_skew_restpy)
+- [remote_hosts_scripts/README.md#rest_serverpy](./remote_hosts_scripts/README.md#rest_serverpy)
+
 ##### Alternative method (manual startup on each Host):
 
 If you prefer to control startup host by host (for example, when debugging a specific Host or when centralized SSH fan-out is not available), you can start `rest_server.py` manually on each target Host.
@@ -422,6 +297,8 @@ python3 remote_hosts_scripts/rest_server.py
 Then, run the benchmark script on the Manager.
 For `docker` and `native` modes, `performance_test.py` automatically distributes the generated host-specific execution files to each Host.
 It then prepares the run and executes each trial via the REST APIs, collects logs from each Host, and aggregates the CSV outputs.
+It also runs `system_perf` preflight checks (`check_chrony_manager_sync.py` and `check_clock_skew_rest.py`) before trials on every run.
+These preflight outputs are saved under `<ws-dir>/<topology>/results/<timestamp>-<rmw>/system_perf/`.
 
 ```bash
 python3 performance_test/performance_test.py \
@@ -529,6 +406,7 @@ For details on output directory structure and CSV column definitions, see [perfo
 
 For detailed usage in subdomains, see the following documents:
 
+- [SETUP.md](./SETUP.md): One-time Manager/Host setup, SSH, Docker/ROS2, and chrony configuration.
 - [topology_example/README.md](./topology_example/README.md): Topology JSON format and modeling guidance.
 - [manager_scripts/README.md](./manager_scripts/README.md): Script usage, generated file details, `metadata.txt` format, and runtime options.
 - [remote_hosts_scripts/README.md](./remote_hosts_scripts/README.md): REST server endpoints, environment variables, and monitor CSV format.
@@ -543,6 +421,7 @@ Common issues and fixes:
 - `python3 manager_scripts/generate_exec_scripts.py ...` fails because output exists: rerun with `--force` or remove the existing topology directory under `performance_ws/`.
 - `distribute_exec_scripts.sh` fails with SSH/SCP errors: verify hostnames, SSH keys, and that repository paths are identical across Hosts.
 - REST benchmark does not start remote execution: ensure REST servers are running on every target Host (for example, run `./manager_scripts/manage_rest_servers.sh start <topology>` from the Manager before calling `performance_test.py`).
+- Clock skew should be measured more strictly before latency trials: run `python3 manager_scripts/system_perf/check_clock_skew_rest.py --hosts host1,host2,host3 --samples 30 --interval 0.05` and review `performance_ws/system_perf/clock_skew/<timestamp>/{summary,pairwise}.csv`.
 - Docker mode fails on remote Hosts: pull `ghcr.io/hal-lab-u-tokyo/ros2-perf-multihost:latest` and confirm Docker permissions on each Host.
 - Native mode cannot find workspace paths: set `ROS2_PERF_WS` to the project root before running `<host_name>_exec_native.sh`.
 - Expected CSV outputs are missing: check `<ws-dir>/<topology>/results/latest-<rmw>/raw_logs/trial<N>/` for trial logs and analyzer error output from the CSV-generation step; `coordination_logs/` only covers the REST prepare/start phases.

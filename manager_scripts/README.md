@@ -9,6 +9,9 @@ This directory contains scripts for generating and distributing topology-specifi
 | `generate_exec_scripts.py` | Generates execution scripts and Compose files from a topology JSON file |
 | `distribute_exec_scripts.sh` | Distributes generated scripts to each host via SCP |
 | `manage_rest_servers.sh` | Manages `remote_hosts_scripts/rest_server.py` on all Hosts via SSH from the Manager |
+| `system_perf/check_clock_skew_rest.py` | Estimates per-host clock skew via REST four-timestamp probes and saves CSV reports |
+| `system_perf/check_chrony_manager_sync.py` | Checks whether Hosts are synchronized to Manager NTP source and reports likely chrony misconfigurations |
+| `system_perf/README.md` | Usage and output details for system-performance checks |
 
 For usage of each script, see the [Usage in Details](../README.md#usage-in-details) section in the top-level README.
 
@@ -174,3 +177,10 @@ Example:
 ./manager_scripts/manage_rest_servers.sh logs simple --follow
 ./manager_scripts/manage_rest_servers.sh stop simple
 ```
+
+## system_perf
+
+System performance check tools are organized under `manager_scripts/system_perf/`.
+
+- Detailed usage for `check_clock_skew_rest.py` and `check_chrony_manager_sync.py`:
+  - [manager_scripts/system_perf/README.md](./system_perf/README.md)
