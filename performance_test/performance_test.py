@@ -42,7 +42,6 @@ def _preflight_check_ssh_all_hosts(hosts, ssh_user):
             "\n".join(failures)
         )
 
-
 def _preflight_check_rest_port_all_hosts(hosts, port=5000):
     failures = []
     for host in hosts:
@@ -58,6 +57,67 @@ def _preflight_check_rest_port_all_hosts(hosts, port=5000):
             + "\nEnsure REST servers are running on all hosts before benchmark execution."
         )
 
+def _run_system_perf_preflight(repo_root, hosts, local_session_dir):
+    """Run mandatory chrony and clock-skew checks before benchmark trials."""
+    if not hosts:
+        raise RuntimeError("No hosts resolved for system_perf preflight")
+
+    hosts_csv = ",".join(hosts)
+    system_perf_dir = os.path.join(local_session_dir, "system_perf")
+    chrony_output_dir = os.path.join(system_perf_dir, "chrony_check")
+    skew_output_dir = os.path.join(system_perf_dir, "clock_skew")
+    os.makedirs(system_perf_dir, exist_ok=True)
+
+    chrony_script = os.path.join(
+        repo_root, "manager_scripts", "system_perf", "check_chrony_manager_sync.py"
+    )
+    skew_script = os.path.join(
+        repo_root, "manager_scripts", "system_perf", "check_clock_skew_rest.py"
+    )
+
+    checks = [
+        (
+            "chrony manager-sync check",
+            [
+                sys.executable,
+                chrony_script,
+                "--hosts",
+                hosts_csv,
+                "--output-dir",
+                chrony_output_dir,
+            ],
+        ),
+        (
+            "REST clock-skew check",
+            [
+                sys.executable,
+                skew_script,
+                "--hosts",
+                hosts_csv,
+                "--output-dir",
+                skew_output_dir,
+            ],
+        ),
+    ]
+
+    for label, cmd in checks:
+        print(f"Preflight(system_perf): running {label}...")
+        result = subprocess.run(
+            cmd,
+            text=True,
+            capture_output=True,
+            cwd=repo_root,
+        )
+        if result.stdout:
+            print(result.stdout.strip())
+        if result.returncode != 0:
+            if result.stderr:
+                print(result.stderr.strip(), file=sys.stderr)
+            raise RuntimeError(
+                f"system_perf preflight failed during {label}: rc={result.returncode}"
+            )
+
+    print(f"Preflight(system_perf) outputs: {system_perf_dir}")
 
 def _read_csv_total_row(path):
     if not os.path.exists(path):
@@ -69,7 +129,6 @@ def _read_csv_total_row(path):
             if row and row[0] == "total":
                 return row
     return None
-
 
 def _write_qos_sweep_summary(summary_path, case_results):
     os.makedirs(os.path.dirname(summary_path), exist_ok=True)
@@ -118,7 +177,6 @@ def _write_qos_sweep_summary(summary_path, case_results):
         writer.writerow(header)
         writer.writerows(rows)
     print(f"QoS sweep summary saved: {summary_path}")
-
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(
@@ -287,6 +345,13 @@ Examples:
         print("Preflight: checking REST server reachability on port 5000...")
         try:
             _preflight_check_rest_port_all_hosts(hosts, port=5000)
+        except RuntimeError as exc:
+            print(f"ERROR: {exc}", file=sys.stderr)
+            sys.exit(1)
+
+        print("Preflight: running mandatory system_perf checks...")
+        try:
+            _run_system_perf_preflight(repo_root, hosts, local_session_dir)
         except RuntimeError as exc:
             print(f"ERROR: {exc}", file=sys.stderr)
             sys.exit(1)

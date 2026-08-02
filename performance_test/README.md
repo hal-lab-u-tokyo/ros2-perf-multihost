@@ -17,6 +17,14 @@ This directory contains scripts for trial automation, log collection, and CSV ag
 
 For usage of `performance_test.py`, see the [Usage in Details](../README.md#usage-in-details) section in the top-level README.
 
+For `docker`/`native` runs, `performance_test.py` always executes `system_perf` preflight checks before trials:
+
+- `manager_scripts/system_perf/check_chrony_manager_sync.py`
+- `manager_scripts/system_perf/check_clock_skew_rest.py`
+
+If either check fails, benchmark execution is aborted.
+Per-run outputs are stored under `<ws-dir>/<topology>/results/<timestamp>-<rmw>/system_perf/`.
+
 When `performance_test.py` is run with `--strict-analysis`, aggregation fails if any trial summary (`analysis/trialN/total_latency.txt`) contains malformed, `N/A`, `NaN`, or `inf` values.
 Use this mode for CI or formal evaluations where partially valid totals are not acceptable.
 
@@ -32,6 +40,21 @@ results/
 │   ├── rest_server.log              # managed by manage_rest_servers.sh
 │   └── zenohd_router.log            # created when rmw_zenohd is started natively
 └── 2026-04-26_13-21-45-fastdds/
+    ├── system_perf/
+    │   ├── chrony_check/
+    │   │   ├── latest -> <timestamp>/
+    │   │   └── <timestamp>/
+    │   │       ├── summary.csv
+    │   │       ├── sources_raw.csv
+    │   │       └── result.log
+    │   └── clock_skew/
+    │       ├── latest -> <timestamp>/
+    │       └── <timestamp>/
+    │           ├── samples.csv
+    │           ├── summary.csv
+    │           ├── manager_host.csv
+    │           ├── pairwise.csv
+    │           └── result.log
     ├── coordination_logs/           # created in docker/native mode; local_exec.sh also writes local_exec_trial<N>.log
     │   ├── prepare_run.log          # stdout/stderr of the prepare_run REST phase
     │   ├── exec_trial1.log          # stdout/stderr of the REST call for trial 1
