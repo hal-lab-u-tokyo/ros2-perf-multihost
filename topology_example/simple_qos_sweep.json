@@ -56,11 +56,6 @@
           "topic_name": "amazon",
           "payload_size": 32,
           "period_ms": 1000
-        },
-        {
-          "topic_name": "inazuma",
-          "payload_size": 32,
-          "period_ms": 1000
         }
       ],
       "subscribers": [
