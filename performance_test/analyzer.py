@@ -8,20 +8,74 @@ import sys
 import numpy as np
 
 
-def _read_metadata_value(metadata_path, key):
-    """Return the raw value for `key:` from metadata.txt, or None."""
-    if not os.path.exists(metadata_path):
-        return None
-    with open(metadata_path, "r") as f:
-        for line in f:
-            if line.startswith(f"{key}:"):
-                return line.split(":", 1)[1].strip()
-    return None
+def _write_csv(path, header, rows):
+    with open(path, "w", newline="") as f:
+        writer = csv.writer(f)
+        writer.writerow(header)
+        writer.writerows(rows)
+
+
+def _write_text_table(path, header, rows):
+    col_widths = [
+        max(len(str(item))
+            for item in [header[idx], *[row[idx] for row in rows]]) + 2
+        for idx in range(len(header))
+    ]
+    with open(path, "w") as f:
+        header_line = "".join(
+            f"{str(header[idx]):<{col_widths[idx]}}" for idx in range(len(header))
+        )
+        f.write(f"{header_line}\n")
+        f.write("-" * len(header_line))
+        f.write("\n")
+        for row in rows:
+            line = "".join(
+                f"{str(row[idx]):<{col_widths[idx]}}" for idx in range(len(row))
+            )
+            f.write(f"{line}\n")
+
+
+def _read_trial_total_latency_row(results_dir):
+    csv_path = os.path.join(results_dir, "total_latency.csv")
+    if os.path.exists(csv_path):
+        with open(csv_path, "r", newline="") as f:
+            reader = csv.reader(f)
+            header = next(reader, None)
+            row = next(reader, None)
+        if header and row:
+            return row, csv_path
+
+    txt_path = os.path.join(results_dir, "total_latency.txt")
+    if not os.path.exists(txt_path):
+        return None, txt_path
+
+    with open(txt_path) as f:
+        lines = f.readlines()
+        if len(lines) < 3:
+            return None, txt_path
+        return lines[2].strip().split(), txt_path
 
 
 def _parse_all_latency_losses(all_latency_path):
-    """Parse all_latency.txt rows into (topic, loss_count)."""
+    """Parse all_latency rows into (topic, loss_count), preferring CSV when available."""
     rows = []
+
+    csv_path = os.path.splitext(all_latency_path)[0] + ".csv"
+    if os.path.exists(csv_path):
+        with open(csv_path, "r", newline="") as f:
+            reader = csv.DictReader(f)
+            for row in reader:
+                topic = row.get("topic")
+                raw_loss = row.get("lost[#]")
+                if topic is None or raw_loss is None:
+                    continue
+                try:
+                    loss_count = float(raw_loss)
+                except ValueError:
+                    continue
+                rows.append((topic, loss_count))
+        return rows
+
     if not os.path.exists(all_latency_path):
         return rows
     with open(all_latency_path, "r") as f:
@@ -37,6 +91,17 @@ def _parse_all_latency_losses(all_latency_path):
             continue
         rows.append((topic, loss_count))
     return rows
+
+
+def _read_metadata_value(metadata_path, key):
+    """Return the raw value for `key:` from metadata.txt, or None."""
+    if not os.path.exists(metadata_path):
+        return None
+    with open(metadata_path, "r") as f:
+        for line in f:
+            if line.startswith(f"{key}:"):
+                return line.split(":", 1)[1].strip()
+    return None
 
 
 def _collect_topic_runtime_config(ws_dir, topology_name):
@@ -220,15 +285,9 @@ def aggregate_total_latency(
 
     for trial_idx in range(num_trials):
         trial_results_dir = os.path.join(trial_dir, f"trial{trial_idx + 1}")
-        total_path = os.path.join(trial_results_dir, "total_latency.txt")
-        if not os.path.exists(total_path):
+        values, total_path = _read_trial_total_latency_row(trial_results_dir)
+        if values is None:
             continue
-
-        with open(total_path) as f:
-            lines = f.readlines()
-            if len(lines) < 3:
-                continue
-            values = lines[2].strip().split()
 
         if len(values) < 8:
             print(
@@ -324,20 +383,31 @@ def aggregate_total_latency(
         max_mbps = round(np.max(all_throughputs_mbps), 6)
         throughput_rows.append(["total", mean_bps, mean_mbps])
 
+    latency_header = ["trial", "lost[#]", "mean[ms]", "sd[ms]",
+                      "min[ms]", "q1[ms]", "mid[ms]", "q3[ms]", "max[ms]"]
     latency_csv_path = os.path.join(trial_dir, "total_latency.csv")
-    with open(latency_csv_path, "w", newline="") as f:
-        writer = csv.writer(f)
-        writer.writerow(["trial", "lost[#]", "mean[ms]", "sd[ms]",
-                        "min[ms]", "q1[ms]", "mid[ms]", "q3[ms]", "max[ms]"])
-        writer.writerows(rows)
+    _write_csv(latency_csv_path, latency_header, rows)
     print(f"  Aggregated CSV saved: {latency_csv_path}")
 
+    latency_txt_path = os.path.join(trial_dir, "total_latency.txt")
+    _write_text_table(latency_txt_path, latency_header, rows)
+    print(f"  Aggregated TXT saved: {latency_txt_path}")
+
     throughput_csv_path = os.path.join(trial_dir, "throughput.csv")
-    with open(throughput_csv_path, "w", newline="") as f:
-        writer = csv.writer(f)
-        writer.writerow(["trial", "throughput[B/s]", "throughput[MB/s]"])
-        writer.writerows(throughput_rows)
+    _write_csv(
+        throughput_csv_path,
+        ["trial", "throughput[B/s]", "throughput[MB/s]"],
+        throughput_rows,
+    )
     print(f"  Aggregated throughput CSV saved: {throughput_csv_path}")
+
+    throughput_txt_path = os.path.join(trial_dir, "throughput.txt")
+    _write_text_table(
+        throughput_txt_path,
+        ["trial", "throughput[B/s]", "throughput[MB/s]"],
+        throughput_rows,
+    )
+    print(f"  Aggregated throughput TXT saved: {throughput_txt_path}")
 
     host_trials_usage_rows = []
     src_log_dir = os.path.abspath(log_dir)
@@ -367,23 +437,22 @@ def aggregate_total_latency(
     if host_trials_usage_rows:
         host_trials_usage_csv = os.path.join(
             trial_dir, "host_trials_usage.csv")
-        with open(host_trials_usage_csv, "w", newline="") as f:
-            writer = csv.writer(f)
-            writer.writerow(
-                [
-                    "host",
-                    "trial",
-                    "cpu_mean[%]",
-                    "cpu_max[%]",
-                    "mem_mean[%]",
-                    "mem_max[%]",
-                    "load1_mean",
-                    "swap_mean[%]",
-                    "swap_max[%]",
-                    "samples",
-                ]
-            )
-            writer.writerows(host_trials_usage_rows)
+        _write_csv(
+            host_trials_usage_csv,
+            [
+                "host",
+                "trial",
+                "cpu_mean[%]",
+                "cpu_max[%]",
+                "mem_mean[%]",
+                "mem_max[%]",
+                "load1_mean",
+                "swap_mean[%]",
+                "swap_max[%]",
+                "samples",
+            ],
+            host_trials_usage_rows,
+        )
         print(f"  Per-host trial usage CSV saved: {host_trials_usage_csv}")
 
     host_summary_rows = []
@@ -416,24 +485,25 @@ def aggregate_total_latency(
         )
 
     if host_summary_rows:
+        host_summary_header = [
+            "host",
+            "cpu_mean_mean[%]",
+            "cpu_max_max[%]",
+            "mem_mean_mean[%]",
+            "mem_max_max[%]",
+            "load1_mean_mean",
+            "swap_mean_mean[%]",
+            "swap_max_max[%]",
+            "trials_covered",
+        ]
         host_summary_csv = os.path.join(trial_dir, "host_usage_summary.csv")
-        with open(host_summary_csv, "w", newline="") as f:
-            writer = csv.writer(f)
-            writer.writerow(
-                [
-                    "host",
-                    "cpu_mean_mean[%]",
-                    "cpu_max_max[%]",
-                    "mem_mean_mean[%]",
-                    "mem_max_max[%]",
-                    "load1_mean_mean",
-                    "swap_mean_mean[%]",
-                    "swap_max_max[%]",
-                    "trials_covered",
-                ]
-            )
-            writer.writerows(host_summary_rows)
+        _write_csv(host_summary_csv, host_summary_header, host_summary_rows)
         print(f"  Per-host summary CSV saved: {host_summary_csv}")
+
+        host_summary_txt = os.path.join(trial_dir, "host_usage_summary.txt")
+        _write_text_table(host_summary_txt,
+                          host_summary_header, host_summary_rows)
+        print(f"  Per-host summary TXT saved: {host_summary_txt}")
 
 
 def summarize_all_payloads(base_result_dir, prefix, payload_sizes):

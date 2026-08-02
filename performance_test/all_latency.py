@@ -2,12 +2,44 @@
 irobot_benchmark -> latency_all.txt
 
 input: logs folder
-output: latency_all.txt, latency_total.txt
+output: latency_all.txt/csv, latency_total.txt/csv
 """
 
-import os
-import numpy as np
 import argparse
+import csv
+import os
+
+import numpy as np
+
+
+def _write_csv_table(path, header, rows):
+    with open(path, "w", newline="") as f:
+        writer = csv.writer(f)
+        writer.writerow(header)
+        writer.writerows(rows)
+
+
+def _write_text_table(path, header, rows, col_widths=None):
+    if col_widths is None:
+        col_widths = [
+            max(len(str(item))
+                for item in [header[idx], *[row[idx] for row in rows]]) + 2
+            for idx in range(len(header))
+        ]
+
+    with open(path, "w") as f:
+        header_line = "".join(
+            f"{str(header[idx]):<{col_widths[idx]}}" for idx in range(len(header))
+        )
+        f.write(f"{header_line}\n")
+        f.write("-" * len(header_line))
+        f.write("\n")
+
+        for row in rows:
+            line = "".join(
+                f"{str(row[idx]):<{col_widths[idx]}}" for idx in range(len(row))
+            )
+            f.write(f"{line}\n")
 
 
 # all_node_info = [{"name": lyon, "type": Publisher, "pub_topics": ["amazon", "inazuma", ...], "sub_topics": [] }, {}]
@@ -280,48 +312,34 @@ def cal_all_latency(all_node_info, logs_folder_path):
 
 
 def write_all_latency(sub_all_node_statics, results_dir):
-    data = []
-    data.append(["node", "topic", "lost[#]", "mean[ms]", "sd[ms]",
-                "min[ms]", "q1[ms]", "mid[ms]", "q3[ms]", "max[ms]"])
-    with open(f"{results_dir}/all_latency.txt", "w") as f:
-        for node_statics in sub_all_node_statics:
-            node_name = node_statics["node"]
-            for topic_statics in node_statics["topics"]:
-                topic_name = topic_statics["topic"]
-                topic_loss = topic_statics["loss"]
-                topic_mean = topic_statics["mean"]
-                topic_sd = topic_statics["sd"]
-                topic_min = topic_statics["min"]
-                topic_q1 = topic_statics["q1"]
-                topic_mid = topic_statics["mid"]
-                topic_q3 = topic_statics["q3"]
-                topic_max = topic_statics["max"]
-                data.append(
-                    [
-                        node_name,
-                        topic_name,
-                        topic_loss,
-                        topic_mean,
-                        topic_sd,
-                        topic_min,
-                        topic_q1,
-                        topic_mid,
-                        topic_q3,
-                        topic_max,
-                    ]
-                )
+    header = ["node", "topic", "lost[#]", "mean[ms]", "sd[ms]",
+              "min[ms]", "q1[ms]", "mid[ms]", "q3[ms]", "max[ms]"]
+    rows = []
+    for node_statics in sub_all_node_statics:
+        node_name = node_statics["node"]
+        for topic_statics in node_statics["topics"]:
+            rows.append(
+                [
+                    node_name,
+                    topic_statics["topic"],
+                    topic_statics["loss"],
+                    topic_statics["mean"],
+                    topic_statics["sd"],
+                    topic_statics["min"],
+                    topic_statics["q1"],
+                    topic_statics["mid"],
+                    topic_statics["q3"],
+                    topic_statics["max"],
+                ]
+            )
 
-        col_widths = [12, 12, 12, 12, 12, 12, 12, 12, 12, 12]
-        header = "".join(
-            f"{data[0][i]:<{col_widths[i]}}" for i in range(len(data[0])))
-        f.write(f"{header}\n")
-        f.write("-" * len(header))
-        f.write("\n")
-
-        for row in data[1:]:
-            row = "".join(
-                f"{row[i]:<{col_widths[i]}}" for i in range(len(row)))
-            f.write(f"{row}\n")
+    _write_csv_table(f"{results_dir}/all_latency.csv", header, rows)
+    _write_text_table(
+        f"{results_dir}/all_latency.txt",
+        header,
+        rows,
+        col_widths=[12, 12, 12, 12, 12, 12, 12, 12, 12, 12],
+    )
 
 
 def write_total_latency(sub_all_node_statics, all_latency_results, result_dir):
@@ -350,24 +368,18 @@ def write_total_latency(sub_all_node_statics, all_latency_results, result_dir):
         total_q3 = "N/A"
         total_max = "N/A"
 
-    data = []
-    data.append(["lost[#]", "mean[ms]", "sd[ms]", "min[ms]",
-                "q1[ms]", "mid[ms]", "q3[ms]", "max[ms]"])
-    with open(f"{result_dir}/total_latency.txt", "w") as f:
-        data.append([total_loss, total_mean, total_sd, total_min,
-                    total_q1, total_mid, total_q3, total_max])
+    header = ["lost[#]", "mean[ms]", "sd[ms]", "min[ms]",
+              "q1[ms]", "mid[ms]", "q3[ms]", "max[ms]"]
+    rows = [[total_loss, total_mean, total_sd, total_min,
+             total_q1, total_mid, total_q3, total_max]]
 
-        col_widths = [12, 12, 12, 12, 12, 12, 12, 12]
-        header = "".join(
-            f"{data[0][i]:<{col_widths[i]}}" for i in range(len(data[0])))
-        f.write(f"{header}\n")
-        f.write("-" * len(header))
-        f.write("\n")
-
-        for row in data[1:]:
-            row = "".join(
-                f"{row[i]:<{col_widths[i]}}" for i in range(len(row)))
-            f.write(f"{row}\n")
+    _write_csv_table(f"{result_dir}/total_latency.csv", header, rows)
+    _write_text_table(
+        f"{result_dir}/total_latency.txt",
+        header,
+        rows,
+        col_widths=[12, 12, 12, 12, 12, 12, 12, 12],
+    )
 
 
 def process_log_directory(log_dir_name, logs_base_path, results_base_path):

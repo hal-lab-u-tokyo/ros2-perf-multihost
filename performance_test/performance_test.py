@@ -14,6 +14,26 @@ from runner import collect_logs, collect_runtime_logs, prepare_run, resolve_host
 from zenoh_runtime import build_config_override, resolve_router_target, start_router, stop_router
 
 
+def _write_text_table(path, header, rows):
+    col_widths = [
+        max(len(str(item))
+            for item in [header[idx], *[row[idx] for row in rows]]) + 2
+        for idx in range(len(header))
+    ]
+    with open(path, "w") as f:
+        header_line = "".join(
+            f"{str(header[idx]):<{col_widths[idx]}}" for idx in range(len(header))
+        )
+        f.write(f"{header_line}\n")
+        f.write("-" * len(header_line))
+        f.write("\n")
+        for row in rows:
+            line = "".join(
+                f"{str(row[idx]):<{col_widths[idx]}}" for idx in range(len(row))
+            )
+            f.write(f"{line}\n")
+
+
 def _preflight_check_ssh_all_hosts(hosts, ssh_user):
     failures = []
     for host in hosts:
@@ -181,6 +201,10 @@ def _write_qos_sweep_summary(summary_path, case_results):
         writer.writerow(header)
         writer.writerows(rows)
     print(f"QoS sweep summary saved: {summary_path}")
+
+    summary_txt_path = os.path.splitext(summary_path)[0] + ".txt"
+    _write_text_table(summary_txt_path, header, rows)
+    print(f"QoS sweep summary TXT saved: {summary_txt_path}")
 
 
 def _update_latest_alias(results_root, rmw, run_timestamp):

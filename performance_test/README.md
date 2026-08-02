@@ -25,7 +25,7 @@ For `docker`/`native` runs, `performance_test.py` always executes `system_perf` 
 If either check fails, benchmark execution is aborted.
 Per-run outputs are stored under `<ws-dir>/<topology>/results/<timestamp>-<rmw>/system_perf/`.
 
-When `performance_test.py` is run with `--strict-analysis`, aggregation fails if any trial summary (`analysis/trialN/total_latency.txt`) contains malformed, `N/A`, `NaN`, or `inf` values.
+When `performance_test.py` is run with `--strict-analysis`, aggregation fails if any trial summary (`analysis/trialN/total_latency.csv`, or legacy `analysis/trialN/total_latency.txt`) contains malformed, `N/A`, `NaN`, or `inf` values.
 Use this mode for CI or formal evaluations where partially valid totals are not acceptable.
 
 ## Output Structure
@@ -74,8 +74,11 @@ results/
     │   └── ...
     ├── analysis/
     │   ├── total_latency.csv
+    │   ├── total_latency.txt
     │   ├── throughput.csv
+    │   ├── throughput.txt
     │   ├── host_trials_usage.csv
+    │   ├── host_usage_summary.txt
     │   └── host_usage_summary.csv
     └── runtime_logs/                # created in docker/native mode
         ├── host1_rest_server.log
@@ -102,19 +105,34 @@ results/
     │   │   └── ...
     │   ├── analysis/
     │   │   ├── total_latency.csv
+    │   │   ├── total_latency.txt
     │   │   ├── throughput.csv
+    │   │   ├── throughput.txt
+    │   │   ├── host_usage_summary.txt
     │   │   └── host_usage_summary.csv
     │   └── coordination_logs/
     ├── qos_case1/
     │   └── ...
     └── analysis/
-        └── qos_sweep_summary.csv
+        ├── qos_sweep_summary.csv
+        └── qos_sweep_summary.txt
 ```
 
 For single-QoS input, the original non-nested `raw_logs/` and `analysis/`
 layout is preserved.
 
 ## CSV Formats
+
+Human-readable `.txt` companions are also written for the artifacts most often inspected directly in an editor or terminal:
+
+- `analysis/trialN/all_latency.txt` alongside `analysis/trialN/all_latency.csv`
+- `analysis/trialN/total_latency.txt` alongside `analysis/trialN/total_latency.csv`
+- `analysis/total_latency.txt` alongside `analysis/total_latency.csv`
+- `analysis/throughput.txt` alongside `analysis/throughput.csv`
+- `analysis/host_usage_summary.txt` alongside `analysis/host_usage_summary.csv`
+- `analysis/qos_sweep_summary.txt` alongside `analysis/qos_sweep_summary.csv`
+
+Machine processing should prefer the `.csv` files. The `.txt` files are display-oriented views of the same rows.
 
 ### total_latency.csv
 
