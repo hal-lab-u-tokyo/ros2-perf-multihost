@@ -1,258 +1,238 @@
 {
-  "qos": {
-    "history": "KEEP_LAST",
-    "depth": 1,
-    "reliability": "RELIABLE"
-  },
   "hosts": [
     {
       "host_name": "host1",
-      "nodes": [
-        {
-          "node_name": "montreal",
-          "publisher": [
-            {
-              "topic_name": "amazon",
-              "payload_size": 64,
-              "period_ms": 100
-            },
-            {
-              "topic_name": "nile",
-              "payload_size": 64,
-              "period_ms": 100
-            },
-            {
-              "topic_name": "ganges",
-              "payload_size": 64,
-              "period_ms": 100
-            },
-            {
-              "topic_name": "danube",
-              "payload_size": 64,
-              "period_ms": 100
-            }
-          ]
-        },
-        {
-          "node_name": "lyon",
-          "intermediate": [
-            {
-              "subscriber": [
-                {
-                  "topic_name": "amazon"
-                }
-              ],
-              "publisher": [
-                {
-                  "topic_name": "tigris",
-                  "payload_size": 64,
-                  "period_ms": 100
-                }
-              ]
-            }
-          ]
-        }
+      "node_names": [
+        "montreal",
+        "lyon"
       ]
     },
     {
       "host_name": "host2",
-      "nodes": [
-        {
-          "node_name": "hamburg",
-          "intermediate": [
-            {
-              "subscriber": [
-                {
-                  "topic_name": "nile"
-                },
-                {
-                  "topic_name": "tigris"
-                },
-                {
-                  "topic_name": "ganges"
-                },
-                {
-                  "topic_name": "danube"
-                }
-              ],
-              "publisher": [
-                {
-                  "topic_name": "parana",
-                  "payload_size": 64,
-                  "period_ms": 100
-                }
-              ]
-            }
-          ]
-        }
+      "node_names": [
+        "hamburg"
       ]
     },
     {
       "host_name": "host3",
-      "nodes": [
-        {
-          "node_name": "osaka",
-          "intermediate": [
-            {
-              "subscriber": [
-                {
-                  "topic_name": "parana"
-                }
-              ],
-              "publisher": [
-                {
-                  "topic_name": "salween",
-                  "payload_size": 64,
-                  "period_ms": 100
-                }
-              ]
-            }
-          ]
-        }
+      "node_names": [
+        "osaka"
       ]
     },
     {
       "host_name": "host4",
-      "nodes": [
-        {
-          "node_name": "mandalay",
-          "intermediate": [
-            {
-              "subscriber": [
-                {
-                  "topic_name": "salween"
-                },
-                {
-                  "topic_name": "danube"
-                }
-              ],
-              "publisher": [
-                {
-                  "topic_name": "missouri",
-                  "payload_size": 64,
-                  "period_ms": 100
-                }
-              ]
-            }
-          ]
-        }
+      "node_names": [
+        "mandalay"
       ]
     },
     {
       "host_name": "host5",
-      "nodes": [
-        {
-          "node_name": "ponce",
-          "intermediate": [
-            {
-              "subscriber": [
-                {
-                  "topic_name": "missouri"
-                },
-                {
-                  "topic_name": "danube"
-                },
-                {
-                  "topic_name": "volga"
-                }
-              ],
-              "publisher": [
-                {
-                  "topic_name": "mekong",
-                  "payload_size": 64,
-                  "period_ms": 100
-                },
-                {
-                  "topic_name": "congo",
-                  "payload_size": 64,
-                  "period_ms": 100
-                }
-              ]
-            }
-          ]
-        }
+      "node_names": [
+        "ponce"
       ]
     },
     {
       "host_name": "host6",
-      "nodes": [
-        {
-          "node_name": "barcelona",
-          "intermediate": [
-            {
-              "subscriber": [
-                {
-                  "topic_name": "mekong"
-                }
-              ],
-              "publisher": [
-                {
-                  "topic_name": "lena",
-                  "payload_size": 64,
-                  "period_ms": 100
-                }
-              ]
-            }
-          ]
-        },
-        {
-          "node_name": "georgetown",
-          "intermediate": [
-            {
-              "subscriber": [
-                {
-                  "topic_name": "lena"
-                }
-              ],
-              "publisher": [
-                {
-                  "topic_name": "volga",
-                  "payload_size": 64,
-                  "period_ms": 100
-                }
-              ]
-            }
-          ]
-        }
+      "node_names": [
+        "barcelona",
+        "georgetown"
       ]
     },
     {
       "host_name": "host7",
-      "nodes": [
+      "node_names": [
+        "geneva",
+        "arequipa"
+      ]
+    }
+  ],
+  "nodes": [
+    {
+      "node_name": "montreal",
+      "publishers": [
         {
-          "node_name": "geneva",
-          "intermediate": [
-            {
-              "subscriber": [
-                {
-                  "topic_name": "congo"
-                },
-                {
-                  "topic_name": "danube"
-                },
-                {
-                  "topic_name": "parana"
-                }
-              ],
-              "publisher": [
-                {
-                  "topic_name": "arkansas",
-                  "payload_size": 64,
-                  "period_ms": 100
-                }
-              ]
-            }
-          ]
+          "topic_name": "amazon",
+          "payload_size": 64,
+          "period_ms": 100
         },
         {
-          "node_name": "arequipa",
-          "subscriber": [
-            {
-              "topic_name": "arkansas"
-            }
-          ]
+          "topic_name": "nile",
+          "payload_size": 64,
+          "period_ms": 100
+        },
+        {
+          "topic_name": "ganges",
+          "payload_size": 64,
+          "period_ms": 100
+        },
+        {
+          "topic_name": "danube",
+          "payload_size": 64,
+          "period_ms": 100
+        }
+      ]
+    },
+    {
+      "node_name": "lyon",
+      "publishers": [
+        {
+          "topic_name": "tigris",
+          "payload_size": 64,
+          "period_ms": 100
+        }
+      ],
+      "subscribers": [
+        {
+          "topic_name": "amazon"
+        }
+      ]
+    },
+    {
+      "node_name": "hamburg",
+      "publishers": [
+        {
+          "topic_name": "parana",
+          "payload_size": 64,
+          "period_ms": 100
+        }
+      ],
+      "subscribers": [
+        {
+          "topic_name": "nile"
+        },
+        {
+          "topic_name": "tigris"
+        },
+        {
+          "topic_name": "ganges"
+        },
+        {
+          "topic_name": "danube"
+        }
+      ]
+    },
+    {
+      "node_name": "osaka",
+      "publishers": [
+        {
+          "topic_name": "salween",
+          "payload_size": 64,
+          "period_ms": 100
+        }
+      ],
+      "subscribers": [
+        {
+          "topic_name": "parana"
+        }
+      ]
+    },
+    {
+      "node_name": "mandalay",
+      "publishers": [
+        {
+          "topic_name": "missouri",
+          "payload_size": 64,
+          "period_ms": 100
+        }
+      ],
+      "subscribers": [
+        {
+          "topic_name": "salween"
+        },
+        {
+          "topic_name": "danube"
+        }
+      ]
+    },
+    {
+      "node_name": "ponce",
+      "publishers": [
+        {
+          "topic_name": "mekong",
+          "payload_size": 64,
+          "period_ms": 100
+        },
+        {
+          "topic_name": "congo",
+          "payload_size": 64,
+          "period_ms": 100
+        }
+      ],
+      "subscribers": [
+        {
+          "topic_name": "missouri"
+        },
+        {
+          "topic_name": "danube"
+        },
+        {
+          "topic_name": "volga"
+        }
+      ]
+    },
+    {
+      "node_name": "barcelona",
+      "publishers": [
+        {
+          "topic_name": "lena",
+          "payload_size": 64,
+          "period_ms": 100
+        }
+      ],
+      "subscribers": [
+        {
+          "topic_name": "mekong"
+        }
+      ]
+    },
+    {
+      "node_name": "georgetown",
+      "publishers": [
+        {
+          "topic_name": "volga",
+          "payload_size": 64,
+          "period_ms": 100
+        }
+      ],
+      "subscribers": [
+        {
+          "topic_name": "lena"
+        }
+      ]
+    },
+    {
+      "node_name": "geneva",
+      "publishers": [
+        {
+          "topic_name": "arkansas",
+          "payload_size": 64,
+          "period_ms": 100
+        }
+      ],
+      "subscribers": [
+        {
+          "topic_name": "congo"
+        },
+        {
+          "topic_name": "danube"
+        },
+        {
+          "topic_name": "parana"
+        }
+      ]
+    },
+    {
+      "node_name": "arequipa",
+      "subscribers": [
+        {
+          "topic_name": "arkansas"
         }
       ]
     }
-  ]
+  ],
+  "qos": {
+    "history": "KEEP_LAST",
+    "depth": 1,
+    "reliability": "RELIABLE"
+  }
 }
