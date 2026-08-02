@@ -35,7 +35,7 @@ Our purpose is to provide a "scientific scale" for optimizing distributed system
 ### Key Features 🚀
 
 - **Manager-Host Coordination**: Deploy nodes in bulk to multiple target Hosts (Raspberry Pi, Jetson, servers, etc.) via REST API and remotely manage their lifecycle from a central Manager.
-- **Flexible Topology Configuration**: Define node relationships, Host assignments, and single or sweep QoS settings declaratively via JSON. Iterate complex topologies for multiple RMWs efficiently.
+- **Flexible Topology Configuration**: Define node relationships, Host assignments, and QoS settings declaratively via JSON. Iterate complex topologies for multiple RMWs efficiently.
 - **RMW Neutrality**: Evaluate multiple RMW implementations (FastDDS, CycloneDDS, Zenoh) while using QoS and topology definitions for cross-RMW comparisons.
 - **Dual Execution Modes**: Support both Docker containerized and native ROS 2 environments for seamless evaluation across development as well as production-like setups.
 - **Precision Telemetry & Monitoring**: Record CPU and memory load on each Host with trial-aligned timestamps, enabling time-correlated analysis with end-to-end communication metrics.
@@ -49,7 +49,7 @@ This framework employs a two-tier architecture:
 
 The workflow proceeds as follows:
 
-1. **Topology Definition**: Users define node placement, topic relationships, and either one QoS setting or a QoS sweep array in a topology JSON file.
+1. **Topology Definition**: Users define node placement, topic relationships, and QoS settings in a topology JSON file.
 2. **Coordination**: The Manager generates execution scripts for the selected RMW and distributes them to each Host for execution.
 3. **Execution**: All Hosts begin operation tests simultaneously while collecting system metrics in the background.
 4. **Data Aggregation**: After experiment completion, the Manager collates logs from all Hosts and outputs analysis-ready CSV files.
@@ -109,7 +109,6 @@ Run everything on a single machine in this local workflow.
 
 This quick example uses [simple.json](./topology_example/simple.json).
 This topology defines a system consisting of 3 Hosts, where nodes communicate through topics.
-For QoS sweep experiments, define `qos` as an array of QoS cases instead of a single object.
 
 #### Step2: Generate Execution Scripts
 
@@ -147,10 +146,6 @@ For example with the command above: `performance_ws/simple/results/latest-fastdd
 Because this run is only a local simulation, the aggregated results are not meaningful for performance evaluation.
 A detailed explanation of how to interpret the analysis outputs is provided later.
 
-If the topology JSON contains multiple QoS cases, `performance_test.py` creates
-`qos_case0/`, `qos_case1/`, ... under the run directory and writes an overall
-`analysis/qos_sweep_summary.csv`.
-
 Need multi-host operation, Docker or native execution, and REST automation?
 Want to learn more about these steps and output metrics?
 Let’s move on to the following sections to explore the full capabilities of this framework!
@@ -178,7 +173,6 @@ For Manager/Host requirements, SSH setup, Docker and ROS 2 preparation, and chro
 
 - [SETUP.md](./SETUP.md)
 
-
 ## Usage in Details
 
 Once you have completed the [Preliminaries](#preliminaries), you are ready to start here.
@@ -188,51 +182,9 @@ This section walks you through the full usage of the framework in detail, from g
 ### Step1: Define Topology
 
 Define node placement, topic relationships, and QoS configuration in a JSON topology file.
-The top-level `qos` field can be either a single QoS object or an array of QoS
-objects. When `qos` is an array, the Manager treats it as a QoS sweep and runs
-the same Host/node assignment once per QoS case.
-
-Single QoS case:
-
-```json
-{
-  "qos": {
-    "history": "KEEP_LAST",
-    "depth": 1,
-    "reliability": "RELIABLE"
-  },
-  "hosts": []
-}
-```
-
-QoS sweep:
-
-```json
-{
-  "qos": [
-    {
-      "history": "KEEP_LAST",
-      "depth": 1,
-      "reliability": "RELIABLE"
-    },
-    {
-      "history": "KEEP_LAST",
-      "depth": 1,
-      "reliability": "BEST_EFFORT"
-    },
-    {
-      "history": "KEEP_ALL",
-      "reliability": "RELIABLE"
-    }
-  ],
-  "hosts": []
-}
-```
-
-For `KEEP_ALL`, `depth` may be omitted because ROS 2 ignores depth for that
-history policy. Generated scripts preserve the first QoS case as the default
-and accept runtime QoS overrides for each sweep case.
-See [topology_example/README.md](./topology_example/README.md) for the JSON schema and definition guidance.
+The top-level `qos` field supports both a normal single-QoS configuration and a QoS sweep configuration.
+For QoS sweep, define `qos` as an array so the same topology can be executed once per QoS case.
+See [topology_example/README.md](./topology_example/README.md) for the JSON schema, examples, and QoS sweep input format.
 
 ### Step2: Generate Execution Scripts
 

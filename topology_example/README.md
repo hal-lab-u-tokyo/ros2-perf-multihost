@@ -8,7 +8,7 @@ JSON files in this directory are converted into execution scripts by the followi
 
 | Key | Required | Type | Default | Description |
 |---|---|---|---|---|
-| qos | Optional | object | - | QoS configuration object. If omitted, each field uses its default value. |
+| qos | Optional | object or array | - | QoS configuration. Use an object for one QoS case, or an array for QoS sweep execution. If omitted, each field uses its default value. |
 | hosts | Required | array | - | Array of host definitions. |
 
 ### `qos` Object
@@ -18,6 +18,38 @@ JSON files in this directory are converted into execution scripts by the followi
 | history | Optional | string | KEEP_LAST | QoS history policy. |
 | depth | Optional | number | 1 | QoS depth. Effective only when `history` is `KEEP_LAST`; ignored for `KEEP_ALL`. |
 | reliability | Optional | string | RELIABLE | QoS reliability policy. |
+
+### `qos` Array for QoS Sweep
+
+You can also specify `qos` as an array of QoS objects.
+In that form, the framework treats the topology as a QoS sweep and runs the same host/node assignment once per QoS case.
+
+Example:
+
+```json
+{
+  "qos": [
+    {
+      "history": "KEEP_LAST",
+      "depth": 1,
+      "reliability": "RELIABLE"
+    },
+    {
+      "history": "KEEP_LAST",
+      "depth": 1,
+      "reliability": "BEST_EFFORT"
+    },
+    {
+      "history": "KEEP_ALL",
+      "reliability": "RELIABLE"
+    }
+  ],
+  "hosts": []
+}
+```
+
+For `KEEP_ALL`, `depth` may be omitted because ROS 2 ignores it for that history policy.
+The generator stores the normalized QoS case list in `metadata.txt`, and the benchmark runner executes one full trial set per case.
 
 ## 2. Under `hosts`
 
@@ -145,12 +177,12 @@ The RMW implementation is selected at runtime (for example via `performance_test
 }
 ```
 
-## 6. Draft QoS Sweep Input
+## 6. QoS Sweep Example
 
-For future sweep converters and runners, `qos` can be represented as an array.
+To run QoS sweep, represent `qos` as an array.
 Each element is one QoS case to run with the same host and node allocation.
-The current `manager_scripts/generate_exec_scripts.py` flow is not expected to
-consume this array format until a compatible converter is added.
+The current `manager_scripts/generate_exec_scripts.py` and `performance_test.py`
+flow supports this format directly.
 
 ```json
 {
