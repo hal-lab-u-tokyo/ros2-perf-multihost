@@ -37,8 +37,9 @@ def _preflight_check_ssh_all_hosts(hosts, ssh_user):
                       or f"return code {result.returncode}").strip()
             failures.append(f"- {host}: {detail}")
     if failures:
+        failure_lines = "\n".join(failures)
         raise RuntimeError(
-            f"SSH preflight failed for one or more hosts:\n{'\n'.join(failures)}"
+            f"SSH preflight failed for one or more hosts:\n{failure_lines}"
         )
 
 
