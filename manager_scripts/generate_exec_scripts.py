@@ -32,8 +32,11 @@ DEFAULT_PERF_WS_DIR = "performance_ws"
 DEFAULT_EVAL_TIME = 60
 
 
-def resolve_image_tag():
-    """Return the exact v* Git tag at HEAD, or latest."""
+def resolve_image_tag(image_tag=None):
+    """Return an explicit image tag, the exact v* Git tag, or latest."""
+    if image_tag:
+        return image_tag
+
     git_tags = subprocess.run(
         ["git", "tag", "--points-at", "HEAD", "--list", "v*"],
         capture_output=True,
@@ -58,13 +61,14 @@ if __name__ == "__main__":
         description="Generate Docker execution scripts and compose files from a JSON topology",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         usage=(
-            "%(prog)s <topology.json> [--ws-dir|-w <dir>] [--force|-f] "
+            "%(prog)s <topology.json> [--ws-dir|-w <dir>] [--image-tag <tag>] [--force|-f] "
             "[--help|-h]"
         ),
         epilog="""
 Examples:
     python3 manager_scripts/generate_exec_scripts.py topology_example/simple.json --ws-dir performance_ws
     short: python3 manager_scripts/generate_exec_scripts.py topology_example/simple.json -w performance_ws
+    development image: python3 manager_scripts/generate_exec_scripts.py topology_example/simple.json --image-tag dev
 """,
     )
     parser.add_argument("json_path", help="Path to the input JSON file")
@@ -76,13 +80,17 @@ Examples:
         help=f"Base directory for generated artifacts (default: {DEFAULT_PERF_WS_DIR})",
     )
     parser.add_argument(
+        "--image-tag",
+        help="Docker image tag to use (default: exact v* tag at HEAD, otherwise latest)",
+    )
+    parser.add_argument(
         "-f",
         "--force",
         action="store_true",
         help="Overwrite existing output directory without confirmation",
     )
     args = parser.parse_args()
-    image_tag = resolve_image_tag()
+    image_tag = resolve_image_tag(args.image_tag)
 
     settings = GenerationSettings(
         project_root_in_container=PROJECT_ROOT_IN_CONTAINER,

@@ -23,24 +23,42 @@ Generate execution scripts and Docker Compose files from a topology JSON file.
 python3 manager_scripts/generate_exec_scripts.py \
 	<topology.json> \
 	[--ws-dir|-w <dir>] \
+	[--image-tag <tag>] \
 	[--force|-f]
 ```
 
-- `<topology.json>`: Path to the topology definition JSON file
+- `<topology.json>`: Path to the input topology definition JSON file
 - `--ws-dir` (`-w`): Base directory for generated artifacts (default: `performance_ws`)
-- `--force` (`-f`): Overwrite an existing output directory without confirmation
+- `--image-tag`: Docker image tag to use. Usually this option is not needed:
+	the generator selects the exact `v*` tag at `HEAD`, or `latest` when no such
+	tag exists. Specify it for development images such as `dev`; the selected tag
+	is embedded in the generated Compose files and must be available on every
+	benchmark Host.
+- `--force` (`-f`): Overwrite existing output directory without confirmation
 
 ### Docker Image Version
 
 The generator uses a `v*` Git tag when one points exactly at the checked-out
-commit; otherwise, it uses `latest`. When checking out a release tag, pull the
-identically named image on every Host. For example, for `v0.4.0`:
+commit; otherwise, it uses `latest`, unless `--image-tag` is specified. In the
+normal workflow, no image option is needed. Use `--image-tag` when validating a
+development image such as `dev`, and pull the selected image tag on every Host
+before distributing the generated files.
+For example, for a release tag `v0.4.0`:
 
 ```bash
 git checkout v0.4.0
 docker pull ghcr.io/hal-lab-u-tokyo/ros2-perf-multihost:v0.4.0
 python3 manager_scripts/generate_exec_scripts.py \
 	topology_example/simple.json
+```
+
+For a development image:
+
+```bash
+docker pull ghcr.io/hal-lab-u-tokyo/ros2-perf-multihost:dev
+python3 manager_scripts/generate_exec_scripts.py \
+	topology_example/simple.json \
+	--image-tag dev
 ```
 
 ## Generated Files
