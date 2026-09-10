@@ -101,12 +101,16 @@ def generate_exec_scripts(json_content, output_dir, settings):
                 '            "--qos-reliability", qos_reliability,',
             ]
             if publisher_entries:
-                args.append(f'            "--topic-names-pub", "{",".join(p["topic_name"] for p in publisher_entries)}",')
+                args.append(
+                    f'            "--topic-names-pub", "{",".join(p["topic_name"] for p in publisher_entries)}",')
                 for index, entry in enumerate(publisher_entries):
-                    args.append(f'            "--size", "{require_positive_int(entry, "payload_size", f"node \'{node_name}\' publishers[{index}]")}",')
-                    args.append(f'            "--period", "{require_positive_int(entry, "period_ms", f"node \'{node_name}\' publishers[{index}]")}",')
+                    args.append(
+                        f'            "--size", "{require_positive_int(entry, "payload_size", f"node \'{node_name}\' publishers[{index}]")}",')
+                    args.append(
+                        f'            "--period", "{require_positive_int(entry, "period_ms", f"node \'{node_name}\' publishers[{index}]")}",')
             if subscriber_entries:
-                args.append(f'            "--topic-names-sub", "{",".join(s["topic_name"] for s in subscriber_entries)}",')
+                args.append(
+                    f'            "--topic-names-sub", "{",".join(s["topic_name"] for s in subscriber_entries)}",')
             args.append('            "--log-dir", log_dir,')
             node_var_lines.extend([
                 f"    {var_name} = Node(",

@@ -55,38 +55,38 @@ class BenchmarkNode : public rclcpp::Node {
           topic_name,
           start_time + rclcpp::Duration::from_seconds(options_.eval_time));
       publish_indices_.emplace(topic_name, 0);
-      publishers_.emplace(
-          topic_name, create_publisher<Message>(topic_name, qos));
+      publish_logs_.try_emplace(topic_name);
+      publishers_.emplace(topic_name,
+                          create_publisher<Message>(topic_name, qos));
 
       const int payload_size = options_.payload_size[index];
       const int period_ms = options_.period_ms[index];
-      timers_.emplace(
-          topic_name,
-          create_wall_timer(std::chrono::milliseconds(period_ms),
-                            [this, topic_name, payload_size]() {
-                              publish_message(topic_name, payload_size);
-                            }));
+      timers_.emplace(topic_name,
+                      create_wall_timer(std::chrono::milliseconds(period_ms),
+                                        [this, topic_name, payload_size]() {
+                                          publish_message(topic_name,
+                                                          payload_size);
+                                        }));
     }
 
     for (const auto& topic_name : options_.topic_names_sub) {
       const auto start_time = get_clock()->now();
       subscribe_start_times_.emplace(topic_name, start_time);
+      subscribe_logs_.try_emplace(topic_name);
       subscribe_end_times_.emplace(
           topic_name,
           start_time + rclcpp::Duration::from_seconds(options_.eval_time));
       subscribers_.emplace(
-          topic_name,
-          create_subscription<Message>(
-              topic_name, qos,
-              [this, topic_name](const Message::SharedPtr message) {
-                record_received_message(topic_name, *message);
-              }));
+          topic_name, create_subscription<Message>(
+                          topic_name, qos,
+                          [this, topic_name](const Message::SharedPtr message) {
+                            record_received_message(topic_name, *message);
+                          }));
     }
 
-    shutdown_timer_ = create_wall_timer(
-        std::chrono::seconds(options_.eval_time + 10), []() {
-          rclcpp::shutdown();
-        });
+    shutdown_timer_ =
+        create_wall_timer(std::chrono::seconds(options_.eval_time + 10),
+                          []() { rclcpp::shutdown(); });
   }
 
   ~BenchmarkNode() override {
@@ -159,8 +159,7 @@ class BenchmarkNode : public rclcpp::Node {
     message->header.stamp.sec = static_cast<int32_t>(
         (now - publish_start_times_.at(topic_name)).seconds());
     message->header.stamp.nanosec = static_cast<uint32_t>(
-        (now - publish_start_times_.at(topic_name)).nanoseconds() %
-        1000000000);
+        (now - publish_start_times_.at(topic_name)).nanoseconds() % 1000000000);
     message->header.pub_idx = publish_indices_.at(topic_name);
     message->header.node_name = options_.node_name;
     publish_logs_[topic_name].push_back({message->header.pub_idx, now});
@@ -204,8 +203,8 @@ class BenchmarkNode : public rclcpp::Node {
                          std::ios::trunc);
       file << "StartTime: "
            << subscribe_start_times_.at(topic_name).nanoseconds()
-           << "\nEndTime: "
-           << subscribe_end_times_.at(topic_name).nanoseconds() << '\n';
+           << "\nEndTime: " << subscribe_end_times_.at(topic_name).nanoseconds()
+           << '\n';
       for (const auto& log : logs) {
         file << "Pub Node_Name: " << log.pub_node_name
              << ", Index: " << log.message_idx

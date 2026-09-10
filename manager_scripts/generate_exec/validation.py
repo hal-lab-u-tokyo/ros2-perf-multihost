@@ -235,7 +235,8 @@ def _normalize_node_roles(node, node_context):
 
     if publisher_entries is not None and subscriber_entries is not None:
         publisher_topics = {entry["topic_name"] for entry in publisher_entries}
-        subscriber_topics = {entry["topic_name"] for entry in subscriber_entries}
+        subscriber_topics = {entry["topic_name"]
+                             for entry in subscriber_entries}
         overlapping_topics = sorted(publisher_topics & subscriber_topics)
         if overlapping_topics:
             raise ValueError(

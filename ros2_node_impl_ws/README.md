@@ -95,15 +95,6 @@ If `--log-dir` is omitted, no log files or metadata files are created. Leave it 
 
 When `--log-dir` is set, each node creates `<node_name>_log/` under that directory and writes log files plus `metadata.txt` there.
 
-Basic layout:
-
-```text
-<log_dir>/
-    <node_name>_log/
-        metadata.txt
-        <topic_name>_log.txt
-```
-
 Publish-side and subscribe-side logs use separate file names.
 
 ```text

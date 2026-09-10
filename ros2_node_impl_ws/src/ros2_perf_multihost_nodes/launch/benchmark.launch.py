@@ -9,7 +9,8 @@ def generate_launch_description():
         [
             DeclareLaunchArgument("node_name", default_value="node1"),
             DeclareLaunchArgument("eval_time", default_value="60"),
-            DeclareLaunchArgument("topic_names_pub", default_value="topic_out"),
+            DeclareLaunchArgument(
+                "topic_names_pub", default_value="topic_out"),
             DeclareLaunchArgument("topic_names_sub", default_value="topic_in"),
             DeclareLaunchArgument("size", default_value="64"),
             DeclareLaunchArgument("period", default_value="100"),
@@ -23,13 +24,16 @@ def generate_launch_description():
                 arguments=[
                     "--node-name", LaunchConfiguration("node_name"),
                     "--eval-time", LaunchConfiguration("eval_time"),
-                    "--topic-names-pub", LaunchConfiguration("topic_names_pub"),
-                    "--topic-names-sub", LaunchConfiguration("topic_names_sub"),
+                    "--topic-names-pub", LaunchConfiguration(
+                        "topic_names_pub"),
+                    "--topic-names-sub", LaunchConfiguration(
+                        "topic_names_sub"),
                     "--size", LaunchConfiguration("size"),
                     "--period", LaunchConfiguration("period"),
                     "--qos-history", LaunchConfiguration("qos_history"),
                     "--qos-depth", LaunchConfiguration("qos_depth"),
-                    "--qos-reliability", LaunchConfiguration("qos_reliability"),
+                    "--qos-reliability", LaunchConfiguration(
+                        "qos_reliability"),
                 ],
             ),
         ]

@@ -25,8 +25,9 @@ rosidl_get_typesupport_target(cpp_typesupport_target ${PROJECT_NAME}
 
 add_library(benchmark_options SHARED src/benchmark_options/cli_options.cpp)
 target_include_directories(
-  benchmark_options PUBLIC $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
-                           $<INSTALL_INTERFACE:include>)
+  benchmark_options
+  PUBLIC $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+         $<INSTALL_INTERFACE:include>)
 ament_target_dependencies(benchmark_options cxxopts)
 
 add_executable(benchmark_node src/benchmark_node.cpp)
@@ -34,7 +35,8 @@ target_include_directories(
   benchmark_node PUBLIC $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
                         $<INSTALL_INTERFACE:include>)
 ament_target_dependencies(benchmark_node rclcpp std_msgs)
-target_link_libraries(benchmark_node benchmark_options "${cpp_typesupport_target}")
+target_link_libraries(benchmark_node benchmark_options
+                      "${cpp_typesupport_target}")
 
 install(DIRECTORY include/ DESTINATION include)
 
@@ -44,8 +46,7 @@ install(
   LIBRARY DESTINATION lib
   RUNTIME DESTINATION bin)
 
-install(TARGETS benchmark_node
-        DESTINATION lib/${PROJECT_NAME})
+install(TARGETS benchmark_node DESTINATION lib/${PROJECT_NAME})
 
 install(DIRECTORY launch DESTINATION share/${PROJECT_NAME})
 

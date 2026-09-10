@@ -20,32 +20,30 @@ void Options::parse(int argc, char** argv) {
   constexpr int kDefaultPayloadSize = 64;
   constexpr int kDefaultPeriodMs = 100;
 
-  cxxopts::Options options(
-      "ros2 run ros2_perf_multihost_nodes benchmark_node",
-      "ROS 2 performance benchmark node options.");
+  cxxopts::Options options("ros2 run ros2_perf_multihost_nodes benchmark_node",
+                           "ROS 2 performance benchmark node options.");
   options.custom_help("[OPTIONS]");
-  options.add_options()
-      ("h,help", "Show this help message and exit")
-      ("node-name", "Node name (required)",
-       cxxopts::value<std::string>(node_name))
-      ("topic-names-pub", "Publisher topic names (repeatable)",
-       cxxopts::value<std::vector<std::string>>(topic_names_pub))
-      ("topic-names-sub", "Subscriber topic names (repeatable)",
-       cxxopts::value<std::vector<std::string>>(topic_names_sub))
-      ("s,size", "Payload size in bytes for publisher topics", 
-       cxxopts::value<std::vector<int>>(payload_size), "bytes")
-      ("p,period", "Publish period in milliseconds for publisher topics",
-       cxxopts::value<std::vector<int>>(period_ms), "ms")
-      ("eval-time", "Evaluation duration in seconds",
-       cxxopts::value<int>(eval_time)->default_value("60"), "sec")
-      ("log-dir", "Directory to write logs and metadata",
-       cxxopts::value<std::string>(log_dir))
-      ("qos-history", "QoS history policy: KEEP_LAST or KEEP_ALL",
-       cxxopts::value<std::string>(qos_history)->default_value("KEEP_LAST"))
-      ("qos-depth", "QoS depth when qos_history=KEEP_LAST",
-       cxxopts::value<int>(qos_depth)->default_value("1"))
-      ("qos-reliability", "QoS reliability: RELIABLE or BEST_EFFORT",
-       cxxopts::value<std::string>(qos_reliability)->default_value("RELIABLE"));
+  options.add_options()("h,help", "Show this help message and exit")(
+      "node-name", "Node name (required)",
+      cxxopts::value<std::string>(node_name))(
+      "topic-names-pub", "Publisher topic names (repeatable)",
+      cxxopts::value<std::vector<std::string>>(topic_names_pub))(
+      "topic-names-sub", "Subscriber topic names (repeatable)",
+      cxxopts::value<std::vector<std::string>>(topic_names_sub))(
+      "s,size", "Payload size in bytes for publisher topics",
+      cxxopts::value<std::vector<int>>(payload_size), "bytes")(
+      "p,period", "Publish period in milliseconds for publisher topics",
+      cxxopts::value<std::vector<int>>(period_ms),
+      "ms")("eval-time", "Evaluation duration in seconds",
+            cxxopts::value<int>(eval_time)->default_value("60"),
+            "sec")("log-dir", "Directory to write logs and metadata",
+                   cxxopts::value<std::string>(log_dir))(
+      "qos-history", "QoS history policy: KEEP_LAST or KEEP_ALL",
+      cxxopts::value<std::string>(qos_history)->default_value("KEEP_LAST"))(
+      "qos-depth", "QoS depth when qos_history=KEEP_LAST",
+      cxxopts::value<int>(qos_depth)->default_value("1"))(
+      "qos-reliability", "QoS reliability: RELIABLE or BEST_EFFORT",
+      cxxopts::value<std::string>(qos_reliability)->default_value("RELIABLE"));
 
   auto print_help = [&options]() {
     std::cout << "Node role:\n"
@@ -69,9 +67,21 @@ void Options::parse(int argc, char** argv) {
       std::exit(1);
     }
     if (topic_names_pub.empty() && topic_names_sub.empty()) {
-      std::cout << "Error: at least one publisher or subscriber topic is required.\n\n";
+      std::cout << "Error: at least one publisher or subscriber topic is "
+                   "required.\n\n";
       print_help();
       std::exit(1);
+    }
+    for (const auto& publisher_topic : topic_names_pub) {
+      for (const auto& subscriber_topic : topic_names_sub) {
+        if (publisher_topic == subscriber_topic) {
+          std::cout
+              << "Error: publisher and subscriber topics must not overlap: "
+              << publisher_topic << ".\n\n";
+          print_help();
+          std::exit(1);
+        }
+      }
     }
     if (!payload_size.empty() && topic_names_pub.empty()) {
       std::cout << "Error: --size requires --topic-names-pub.\n\n";
@@ -94,6 +104,13 @@ void Options::parse(int argc, char** argv) {
       print_help();
       std::exit(1);
     }
+    for (const int size : payload_size) {
+      if (size <= 0) {
+        std::cout << "Error: --size values must be positive.\n\n";
+        print_help();
+        std::exit(1);
+      }
+    }
 
     if (period_ms.empty()) {
       period_ms.assign(topic_names_pub.size(), kDefaultPeriodMs);
@@ -104,6 +121,13 @@ void Options::parse(int argc, char** argv) {
                    "number of --topic-names-pub entries.\n\n";
       print_help();
       std::exit(1);
+    }
+    for (const int period : period_ms) {
+      if (period <= 0) {
+        std::cout << "Error: --period values must be positive.\n\n";
+        print_help();
+        std::exit(1);
+      }
     }
   } catch (const cxxopts::exceptions::exception& exception) {
     std::cout << "Error parsing options: " << exception.what() << "\n\n";
