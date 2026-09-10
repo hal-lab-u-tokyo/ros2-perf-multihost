@@ -15,7 +15,16 @@ find_package(std_msgs REQUIRED)
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
-set(message_files msg/PerformanceHeader.msg msg/IntMessage.msg)
+set(message_files
+  msg/PerformanceHeader.msg
+  msg/IntMessage.msg
+  msg/Stamped3Float32.msg
+  msg/Stamped4Float32.msg
+  msg/Stamped4Int32.msg
+  msg/Stamped9Float32.msg
+  msg/Stamped12Float32.msg
+  msg/StampedInt64.msg
+  msg/StampedVector.msg)
 
 rosidl_generate_interfaces(${PROJECT_NAME} ${message_files} DEPENDENCIES
                            builtin_interfaces)
