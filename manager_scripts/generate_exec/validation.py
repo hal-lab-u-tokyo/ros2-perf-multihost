@@ -233,6 +233,16 @@ def _normalize_node_roles(node, node_context):
         )
         normalized["subscriber"] = subscriber_entries
 
+    if publisher_entries is not None and subscriber_entries is not None:
+        publisher_topics = {entry["topic_name"] for entry in publisher_entries}
+        subscriber_topics = {entry["topic_name"] for entry in subscriber_entries}
+        overlapping_topics = sorted(publisher_topics & subscriber_topics)
+        if overlapping_topics:
+            raise ValueError(
+                f"{node_context}: publishers and subscribers cannot use the "
+                f"same topic(s): {', '.join(overlapping_topics)}"
+            )
+
     return normalized
 
 

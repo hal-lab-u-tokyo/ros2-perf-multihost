@@ -52,19 +52,7 @@ def get_node_and_topics(logs_folder_path):
                     # ”Publisher", "Intermediate"
                     node_type = line.split(":", 1)[1].strip()
 
-            if node_type == "Publisher":
-                for line in lines:
-                    if line.startswith("Topics:"):
-                        topics = line.split(":", 1)[1].strip().split(",")
-                        pub_topic_list = [topic for topic in topics if topic]
-
-            elif node_type == "Subscriber":
-                for line in lines:
-                    if line.startswith("Topics:"):
-                        topics = line.split(":", 1)[1].strip().split(",")
-                        sub_topic_list = [topic for topic in topics if topic]
-
-            elif node_type == "Intermediate":
+            if node_type == "Benchmark":
                 for line in lines:
                     if line.startswith("Topics(Pub):"):
                         pub_topics = line.split(":", 1)[1].strip().split(",")
@@ -135,7 +123,7 @@ def cal_all_latency(all_node_info, logs_folder_path):
     all_latency_results = []
     sub_all_node_statics = []
     for sub_node_info in all_node_info:
-        if sub_node_info["type"] == "Publisher":
+        if not sub_node_info["sub_topics"]:
             continue
 
         else:
@@ -162,30 +150,19 @@ def cal_all_latency(all_node_info, logs_folder_path):
                         loss = 0
                         latency_results = []
 
-                        pub_logdata_path = ""
-                        if pub_node_type == "Publisher":
-                            pub_logdata_path = os.path.join(
-                                logs_folder_path, f"{pub_node_name}_log", f"{sub_topic}_log.txt")
-                        elif pub_node_type == "Intermediate":
-                            pub_logdata_path = os.path.join(
-                                logs_folder_path, f"{pub_node_name}_log", f"{sub_topic}_pub_log.txt"
-                            )
-
-                        sub_logdata_path = ""
-                        if sub_node_type == "Subscriber":
-                            sub_logdata_path = os.path.join(
-                                logs_folder_path, f"{sub_node_name}_log", f"{sub_topic}_log.txt")
-                        elif sub_node_type == "Intermediate":
-                            sub_logdata_path = os.path.join(
-                                logs_folder_path, f"{sub_node_name}_log", f"{sub_topic}_sub_log.txt"
-                            )
+                        pub_logdata_path = os.path.join(
+                            logs_folder_path, f"{pub_node_name}_log", f"{sub_topic}_pub_log.txt"
+                        )
+                        sub_logdata_path = os.path.join(
+                            logs_folder_path, f"{sub_node_name}_log", f"{sub_topic}_sub_log.txt"
+                        )
 
                         pub_logdata_list = get_log(
-                            pub_logdata_path, pub_node_type
+                            pub_logdata_path, "Publisher"
                             # [("StartTime, 1111"), ("EndTime, 2222"), (0, 1120), (1, 1125)...]
                         )
                         sub_logdata_list = get_log(
-                            sub_logdata_path, sub_node_type
+                            sub_logdata_path, "Benchmark"
                             # [("StartTime, 1112"), ("EndTime, 2232"), (0, 1121), (1, 1128)...]
                         )
 

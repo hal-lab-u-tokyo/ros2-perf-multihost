@@ -7,12 +7,12 @@ def generate_launch_description():
         [
             Node(
                 package="ros2_perf_multihost_nodes",
-                executable="publisher_node",
+                executable="benchmark_node",
                 output="screen",
                 arguments=[
                     "--node-name",
                     "pub1",
-                    "--topic-names",
+                    "--topic-names-pub",
                     "topic1",
                     "--size",
                     "64",
@@ -22,18 +22,18 @@ def generate_launch_description():
             ),
             Node(
                 package="ros2_perf_multihost_nodes",
-                executable="subscriber_node",
+                executable="benchmark_node",
                 output="screen",
                 arguments=[
                     "--node-name",
                     "sub1",
-                    "--topic-names",
+                    "--topic-names-sub",
                     "topic1",
                 ],
             ),
             Node(
                 package="ros2_perf_multihost_nodes",
-                executable="intermediate_node",
+                executable="benchmark_node",
                 output="screen",
                 arguments=[
                     "--node-name",

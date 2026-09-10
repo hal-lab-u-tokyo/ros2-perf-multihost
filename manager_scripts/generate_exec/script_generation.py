@@ -21,46 +21,32 @@ class GenerationSettings:
     default_eval_time: int
 
 
-def append_publisher_block(lines, node_name, pub_list, qos_opts):
-    topic_names = ",".join(p["topic_name"] for p in pub_list)
-    payload_sizes = [
-        require_positive_int(
-            p, "payload_size", f"node '{node_name}' publishers[{idx}]"
+def append_benchmark_block(lines, node_name, pub_list, sub_list, qos_opts):
+    arguments = [f"--node-name {node_name}"]
+    if pub_list:
+        arguments.append(
+            "--topic-names-pub " + ",".join(p["topic_name"] for p in pub_list)
         )
-        for idx, p in enumerate(pub_list)
-    ]
-    period_mses = [
-        require_positive_int(
-            p, "period_ms", f"node '{node_name}' publishers[{idx}]"
+        for index, publisher in enumerate(pub_list):
+            context = f"node '{node_name}' publishers[{index}]"
+            arguments.append(
+                f"--size {require_positive_int(publisher, 'payload_size', context)}"
+            )
+            arguments.append(
+                f"--period {require_positive_int(publisher, 'period_ms', context)}"
+            )
+    if sub_list:
+        arguments.append(
+            "--topic-names-sub " + ",".join(s["topic_name"] for s in sub_list)
         )
-        for idx, p in enumerate(pub_list)
-    ]
-    payload_args = " ".join(f"--size {int(v)}" for v in payload_sizes)
-    period_args = " ".join(f"--period {int(v)}" for v in period_mses)
     lines.extend(
         [
-            f"# {node_name} publisher",
-            "( ros2 run ros2_perf_multihost_nodes publisher_node \\",
-            f"  --node-name {node_name} --topic-names {topic_names} \\",
-            f"  {payload_args} {period_args} --eval-time \"$EVAL_TIME\" \\",
+            f"# {node_name} benchmark node",
+            "( ros2 run ros2_perf_multihost_nodes benchmark_node \\",
+            f"  {' '.join(arguments)} --eval-time \"$EVAL_TIME\" \\",
             f"  {qos_opts} --log-dir \"$LOG_DIR\" \\",
             ") & node_pids+=($!)",
-            f'echo "Started {node_name} publisher at $(date +%Y-%m-%dT%H:%M:%S.%3N%z)"',
-        ]
-    )
-
-
-def append_subscriber_block(lines, node_name, sub_list, qos_opts):
-    topic_names = ",".join(s["topic_name"] for s in sub_list)
-    lines.extend(
-        [
-            f"# {node_name} subscriber",
-            "( ros2 run ros2_perf_multihost_nodes subscriber_node \\",
-            f"  --node-name {node_name} --topic-names {topic_names} \\",
-            "  --eval-time \"$EVAL_TIME\" \\",
-            f"  {qos_opts} --log-dir \"$LOG_DIR\" \\",
-            ") & node_pids+=($!)",
-            f'echo "Started {node_name} subscriber at $(date +%Y-%m-%dT%H:%M:%S.%3N%z)"',
+            f'echo "Started {node_name} benchmark node at $(date +%Y-%m-%dT%H:%M:%S.%3N%z)"',
         ]
     )
 
@@ -104,126 +90,34 @@ def generate_exec_scripts(json_content, output_dir, settings):
             publisher_entries = node.get("publisher", []) or []
             subscriber_entries = node.get("subscriber", []) or []
 
-            if publisher_entries and subscriber_entries:
-                var_name = f"_node_{node_idx}"
-                node_var_names.append(var_name)
-                node_idx += 1
-
-                pub_defs_by_topic = {}
-                for pub in publisher_entries:
-                    topic_name = pub["topic_name"]
-                    if topic_name not in pub_defs_by_topic:
-                        pub_defs_by_topic[topic_name] = pub
-                pub_defs = list(pub_defs_by_topic.values())
-                sub_topics = list(dict.fromkeys(
-                    s["topic_name"] for s in subscriber_entries))
-
-                payload_sizes = [
-                    require_positive_int(
-                        p, "payload_size",
-                        f"node '{node_name}' publishers[{idx}]",
-                    )
-                    for idx, p in enumerate(pub_defs)
-                ]
-                period_mses = [
-                    require_positive_int(
-                        p, "period_ms",
-                        f"node '{node_name}' publishers[{idx}]",
-                    )
-                    for idx, p in enumerate(pub_defs)
-                ]
-                args = [
-                    f'            "--node-name", "{node_name}",',
-                    f'            "--topic-names-pub", "{",".join(p["topic_name"] for p in pub_defs)}",',
-                    f'            "--topic-names-sub", "{",".join(sub_topics)}",',
-                    '            "--eval-time", eval_time,',
-                    '            "--qos-history", qos_history,',
-                    '            "--qos-depth", qos_depth,',
-                    '            "--qos-reliability", qos_reliability,',
-                ]
-                for v in payload_sizes:
-                    args.append(f'            "--size", "{int(v)}",')
-                for v in period_mses:
-                    args.append(f'            "--period", "{int(v)}",')
-                args.append('            "--log-dir", log_dir,')
-                node_var_lines.extend([
-                    f"    {var_name} = Node(",
-                    '        package="ros2_perf_multihost_nodes",',
-                    '        executable="intermediate_node",',
-                    '        output="screen",',
-                    "        arguments=[",
-                    *args,
-                    "        ],",
-                    "    )",
-                ])
-
-            elif publisher_entries:
-                var_name = f"_node_{node_idx}"
-                node_var_names.append(var_name)
-                node_idx += 1
-                topic_names = ",".join(p["topic_name"]
-                                       for p in publisher_entries)
-                payload_sizes = [
-                    require_positive_int(
-                        p, "payload_size", f"node '{node_name}' publishers[{idx}]"
-                    )
-                    for idx, p in enumerate(publisher_entries)
-                ]
-                period_mses = [
-                    require_positive_int(
-                        p, "period_ms", f"node '{node_name}' publishers[{idx}]"
-                    )
-                    for idx, p in enumerate(publisher_entries)
-                ]
-                args = [
-                    f'            "--node-name", "{node_name}",',
-                    f'            "--topic-names", "{topic_names}",',
-                    '            "--eval-time", eval_time,',
-                    '            "--qos-history", qos_history,',
-                    '            "--qos-depth", qos_depth,',
-                    '            "--qos-reliability", qos_reliability,',
-                ]
-                for v in payload_sizes:
-                    args.append(f'            "--size", "{int(v)}",')
-                for v in period_mses:
-                    args.append(f'            "--period", "{int(v)}",')
-                args.append('            "--log-dir", log_dir,')
-                node_var_lines.extend([
-                    f"    {var_name} = Node(",
-                    '        package="ros2_perf_multihost_nodes",',
-                    '        executable="publisher_node",',
-                    '        output="screen",',
-                    "        arguments=[",
-                    *args,
-                    "        ],",
-                    "    )",
-                ])
-
-            elif subscriber_entries:
-                var_name = f"_node_{node_idx}"
-                node_var_names.append(var_name)
-                node_idx += 1
-                topic_names = ",".join(s["topic_name"]
-                                       for s in subscriber_entries)
-                args = [
-                    f'            "--node-name", "{node_name}",',
-                    f'            "--topic-names", "{topic_names}",',
-                    '            "--eval-time", eval_time,',
-                    '            "--qos-history", qos_history,',
-                    '            "--qos-depth", qos_depth,',
-                    '            "--qos-reliability", qos_reliability,',
-                    '            "--log-dir", log_dir,',
-                ]
-                node_var_lines.extend([
-                    f"    {var_name} = Node(",
-                    '        package="ros2_perf_multihost_nodes",',
-                    '        executable="subscriber_node",',
-                    '        output="screen",',
-                    "        arguments=[",
-                    *args,
-                    "        ],",
-                    "    )",
-                ])
+            var_name = f"_node_{node_idx}"
+            node_var_names.append(var_name)
+            node_idx += 1
+            args = [
+                f'            "--node-name", "{node_name}",',
+                '            "--eval-time", eval_time,',
+                '            "--qos-history", qos_history,',
+                '            "--qos-depth", qos_depth,',
+                '            "--qos-reliability", qos_reliability,',
+            ]
+            if publisher_entries:
+                args.append(f'            "--topic-names-pub", "{",".join(p["topic_name"] for p in publisher_entries)}",')
+                for index, entry in enumerate(publisher_entries):
+                    args.append(f'            "--size", "{require_positive_int(entry, "payload_size", f"node \'{node_name}\' publishers[{index}]")}",')
+                    args.append(f'            "--period", "{require_positive_int(entry, "period_ms", f"node \'{node_name}\' publishers[{index}]")}",')
+            if subscriber_entries:
+                args.append(f'            "--topic-names-sub", "{",".join(s["topic_name"] for s in subscriber_entries)}",')
+            args.append('            "--log-dir", log_dir,')
+            node_var_lines.extend([
+                f"    {var_name} = Node(",
+                '        package="ros2_perf_multihost_nodes",',
+                '        executable="benchmark_node",',
+                '        output="screen",',
+                "        arguments=[",
+                *args,
+                "        ],",
+                "    )",
+            ])
 
         # Assemble the full launch file
         lines = [
@@ -491,7 +385,7 @@ def run_script_common_prefix(lines, rel_root, eval_time_default, settings, defau
             '',
             'Notes:',
             '  --eval-time is applied to all nodes started via this script.',
-            '  payload_size and period_ms must be set in each Publisher/Intermediate entry in topology JSON.',
+            '  payload_size and period_ms must be set in each publishers entry in topology JSON.',
             'EOF',
             '}',
             "",

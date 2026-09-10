@@ -23,52 +23,28 @@ rosidl_generate_interfaces(${PROJECT_NAME} ${message_files} DEPENDENCIES
 rosidl_get_typesupport_target(cpp_typesupport_target ${PROJECT_NAME}
                               rosidl_typesupport_cpp)
 
-add_library(node_options SHARED src/node_options/cli_options.cpp)
+add_library(benchmark_options SHARED src/benchmark_options/cli_options.cpp)
 target_include_directories(
-  node_options PUBLIC $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
-                      $<INSTALL_INTERFACE:include>)
-ament_target_dependencies(node_options cxxopts)
+  benchmark_options PUBLIC $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+                           $<INSTALL_INTERFACE:include>)
+ament_target_dependencies(benchmark_options cxxopts)
 
-add_library(node_options_intermediate SHARED
-            src/node_options_intermediate/cli_options.cpp)
+add_executable(benchmark_node src/benchmark_node.cpp)
 target_include_directories(
-  node_options_intermediate
-  PUBLIC $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
-         $<INSTALL_INTERFACE:include>)
-ament_target_dependencies(node_options_intermediate cxxopts)
-
-add_executable(publisher_node src/publisher_node.cpp)
-target_include_directories(
-  publisher_node PUBLIC $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+  benchmark_node PUBLIC $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
                         $<INSTALL_INTERFACE:include>)
-ament_target_dependencies(publisher_node rclcpp std_msgs)
-target_link_libraries(publisher_node node_options "${cpp_typesupport_target}")
-
-add_executable(subscriber_node src/subscriber_node.cpp)
-target_include_directories(
-  subscriber_node PUBLIC $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
-                         $<INSTALL_INTERFACE:include>)
-ament_target_dependencies(subscriber_node rclcpp std_msgs)
-target_link_libraries(subscriber_node node_options "${cpp_typesupport_target}")
-
-add_executable(intermediate_node src/intermediate_node.cpp)
-target_include_directories(
-  intermediate_node
-  PUBLIC $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
-         $<INSTALL_INTERFACE:include>)
-ament_target_dependencies(intermediate_node rclcpp std_msgs)
-target_link_libraries(intermediate_node node_options_intermediate
-                      "${cpp_typesupport_target}")
+ament_target_dependencies(benchmark_node rclcpp std_msgs)
+target_link_libraries(benchmark_node benchmark_options "${cpp_typesupport_target}")
 
 install(DIRECTORY include/ DESTINATION include)
 
 install(
-  TARGETS node_options node_options_intermediate
+  TARGETS benchmark_options
   ARCHIVE DESTINATION lib
   LIBRARY DESTINATION lib
   RUNTIME DESTINATION bin)
 
-install(TARGETS publisher_node subscriber_node intermediate_node
+install(TARGETS benchmark_node
         DESTINATION lib/${PROJECT_NAME})
 
 install(DIRECTORY launch DESTINATION share/${PROJECT_NAME})

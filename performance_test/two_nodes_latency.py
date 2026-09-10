@@ -44,12 +44,7 @@ def check_connect(args):
             if line.startswith("Period:"):
                 pub_period_ms_list = line.split(":", 1)[1].strip().split(",")
 
-        if (pub_node_type == "Publisher"):
-            for line in lines:
-                if line.startswith("Topics:"):
-                    topics = line.split(":", 1)[1].strip().split(",")
-
-        elif (pub_node_type == "Intermediate"):
+        if pub_node_type == "Benchmark":
             for line in lines:
                 if line.startswith("Topics(Pub):"):
                     topics = line.split(":", 1)[1].strip().split(",")
@@ -67,12 +62,7 @@ def check_connect(args):
             if line.startswith("NodeType:"):
                 sub_node_type = line.split(":", 1)[1].strip().split(",")[0]
 
-        if (sub_node_type == "Subscriber"):
-            for line in lines:
-                if line.startswith("Topics:"):
-                    topics = line.split(":", 1)[1].strip().split(",")
-
-        elif (sub_node_type == "Intermediate"):
+        if sub_node_type == "Benchmark":
             for line in lines:
                 if line.startswith("Topics(Sub):"):
                     topics = line.split(":", 1)[1].strip().split(",")
@@ -115,31 +105,7 @@ def get_logdata(pub_info, sub_info, topic_list):
     pub_node_name = pub_info["name"]
     pub_logdata = {}
 
-    if (pub_info["type"] == "Publisher"):
-        for topic in topic_list:
-            pub_logdata[f"{topic}"] = []
-            pub_logdata_path = f"logs/{pub_node_name}_log/{topic}_log.txt"
-
-            with open(pub_logdata_path, "r") as log_file:
-                lines = log_file.readlines()
-                for line in lines:
-                    line = line.strip()
-                    if "StartTime:" in line:
-                        start_time = line.split(
-                            ":", 1)[1].strip().split(",")[0]
-                        pub_logdata[f"{topic}"].append(
-                            ("StartTime", start_time))
-                    if "EndTime:" in line:
-                        end_time = line.split(":", 1)[1].strip().split(",")[0]
-                        pub_logdata[f"{topic}"].append(("EndTime", end_time))
-
-                    if "Index:" in line and "Timestamp:" in line:
-                        # Split out the values from "Index:" and "Timestamp:".
-                        parts = line.split(", ")
-                        index = int(parts[0].split(":")[1].strip())
-                        timestamp = int(parts[1].split(":")[1].strip())
-                        pub_logdata[f"{topic}"].append((index, timestamp))
-    elif (pub_info["type"] == "Intermediate"):
+    if pub_info["type"] == "Benchmark":
         for topic in topic_list:
             pub_logdata[f"{topic}"] = []
             pub_logdata_path = f"logs/{pub_node_name}_log/{topic}_pub_log.txt"
@@ -160,38 +126,14 @@ def get_logdata(pub_info, sub_info, topic_list):
                     if "Index:" in line and "Timestamp:" in line:
                         # Split out the values from "Index:" and "Timestamp:".
                         parts = line.split(", ")
-                        index = int(parts[1].split(":")[1].strip())
-                        timestamp = int(parts[2].split(":")[1].strip())
+                        index = int(parts[0].split(":")[1].strip())
+                        timestamp = int(parts[1].split(":")[1].strip())
                         pub_logdata[f"{topic}"].append((index, timestamp))
 
     sub_node_name = sub_info["name"]
     sub_logdata = {}
 
-    if (sub_info["type"] == "Subscriber"):
-        for topic in topic_list:
-            sub_logdata[f"{topic}"] = []
-            sub_logdata_path = f"logs/{sub_node_name}_log/{topic}_log.txt"
-
-            with open(sub_logdata_path, "r") as log_file:
-                lines = log_file.readlines()
-                for line in lines:
-                    line = line.strip()
-                    if "StartTime:" in line:
-                        start_time = line.split(
-                            ":", 1)[1].strip().split(",")[0]
-                        sub_logdata[f"{topic}"].append(
-                            ("StartTime", start_time))
-                    if "EndTime:" in line:
-                        end_time = line.split(":", 1)[1].strip().split(",")[0]
-                        sub_logdata[f"{topic}"].append(("EndTime", end_time))
-
-                    if "Index:" in line and "Timestamp:" in line:
-                        # Split out the values from "Index:" and "Timestamp:".
-                        parts = line.split(", ")
-                        index = int(parts[0].split(":")[1].strip())
-                        timestamp = int(parts[1].split(":")[1].strip())
-                        sub_logdata[f"{topic}"].append((index, timestamp))
-    elif (sub_info["type"] == "Intermediate"):
+    if sub_info["type"] == "Benchmark":
         for topic in topic_list:
             sub_logdata[f"{topic}"] = []
             sub_logdata_path = f"logs/{sub_node_name}_log/{topic}_sub_log.txt"
