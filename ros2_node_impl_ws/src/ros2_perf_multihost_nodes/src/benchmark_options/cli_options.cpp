@@ -2,6 +2,7 @@
 
 #include <cstdlib>
 #include <iostream>
+#include <unordered_set>
 #include <vector>
 
 #include "cxxopts.hpp"
@@ -72,6 +73,39 @@ void Options::parse(int argc, char** argv) {
       print_help();
       std::exit(1);
     }
+    if (qos_history != "KEEP_LAST" && qos_history != "KEEP_ALL") {
+      std::cout << "Error: --qos-history must be KEEP_LAST or KEEP_ALL.\n\n";
+      print_help();
+      std::exit(1);
+    }
+    if (qos_depth <= 0) {
+      std::cout << "Error: --qos-depth must be positive.\n\n";
+      print_help();
+      std::exit(1);
+    }
+    if (qos_reliability != "RELIABLE" &&
+        qos_reliability != "BEST_EFFORT") {
+      std::cout << "Error: --qos-reliability must be RELIABLE or BEST_EFFORT.\n\n";
+      print_help();
+      std::exit(1);
+    }
+
+    auto validate_unique_topics = [&print_help](
+                                      const std::vector<std::string>& topics,
+                                      const char* role) {
+      std::unordered_set<std::string> unique_topics;
+      for (const auto& topic : topics) {
+        if (!unique_topics.insert(topic).second) {
+          std::cout << "Error: duplicate " << role << " topic: " << topic
+                    << ".\n\n";
+          print_help();
+          std::exit(1);
+        }
+      }
+    };
+    validate_unique_topics(topic_names_pub, "publisher");
+    validate_unique_topics(topic_names_sub, "subscriber");
+
     for (const auto& publisher_topic : topic_names_pub) {
       for (const auto& subscriber_topic : topic_names_sub) {
         if (publisher_topic == subscriber_topic) {

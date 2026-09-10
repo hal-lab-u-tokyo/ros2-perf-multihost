@@ -123,6 +123,7 @@ def validate_publisher_entries(pub_entries, context):
     if not isinstance(pub_entries, list) or not pub_entries:
         raise ValueError(f"{context}: must be a non-empty array")
 
+    topic_names = set()
     for pub_idx, pub in enumerate(pub_entries):
         pub_context = f"{context}[{pub_idx}]"
         if not isinstance(pub, dict):
@@ -138,6 +139,12 @@ def validate_publisher_entries(pub_entries, context):
             raise ValueError(
                 f"{pub_context}: 'topic_name' must be a valid ROS identifier (alphanumerics, underscores, hyphens; no spaces or special characters)"
             )
+        if topic_name_str in topic_names:
+            raise ValueError(
+                f"{pub_context}: duplicate publisher topic_name "
+                f"'{topic_name_str}'"
+            )
+        topic_names.add(topic_name_str)
         require_positive_int(pub, "payload_size", pub_context)
         require_positive_int(pub, "period_ms", pub_context)
 
@@ -147,6 +154,7 @@ def validate_subscriber_entries(sub_entries, context):
     if not isinstance(sub_entries, list) or not sub_entries:
         raise ValueError(f"{context}: must be a non-empty array")
 
+    topic_names = set()
     for sub_idx, sub in enumerate(sub_entries):
         sub_context = f"{context}[{sub_idx}]"
         if not isinstance(sub, dict):
@@ -158,6 +166,12 @@ def validate_subscriber_entries(sub_entries, context):
             raise ValueError(
                 f"{sub_context}: 'topic_name' must be a valid ROS identifier (alphanumerics, underscores, hyphens; no spaces or special characters)"
             )
+        if topic_name_str in topic_names:
+            raise ValueError(
+                f"{sub_context}: duplicate subscriber topic_name "
+                f"'{topic_name_str}'"
+            )
+        topic_names.add(topic_name_str)
 
 
 def normalize_intermediate_entries(intermediate_value, node_name):
