@@ -4,6 +4,7 @@ import argparse
 import json
 import os
 import shutil
+import subprocess
 
 from generate_exec.metadata import generate_metadata_file
 from generate_exec.paths import (
@@ -25,9 +26,31 @@ from generate_exec.validation import normalize_qos_cases, normalize_ws_dir, vali
 
 PROJECT_ROOT_IN_CONTAINER = "/workdir/ros2-perf-multihost"
 ROS_WS_IN_CONTAINER = f"{PROJECT_ROOT_IN_CONTAINER}/ros2_node_impl_ws"
-IMAGE_NAME = "ghcr.io/hal-lab-u-tokyo/ros2-perf-multihost:latest"
+IMAGE_REPOSITORY = "ghcr.io/hal-lab-u-tokyo/ros2-perf-multihost"
+DEFAULT_IMAGE_TAG = "latest"
 DEFAULT_PERF_WS_DIR = "performance_ws"
 DEFAULT_EVAL_TIME = 60
+
+
+def resolve_image_tag():
+    """Return the exact v* Git tag at HEAD, or latest."""
+    git_tags = subprocess.run(
+        ["git", "tag", "--points-at", "HEAD", "--list", "v*"],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    if git_tags.returncode != 0:
+        raise RuntimeError(
+            "Failed to inspect version tags: " + git_tags.stderr.strip()
+        )
+    tags = sorted(tag for tag in git_tags.stdout.splitlines() if tag)
+    if len(tags) > 1:
+        raise RuntimeError(
+            "Multiple version tags point at HEAD; keep only one version tag: "
+            + ", ".join(tags)
+        )
+    return tags[0] if tags else DEFAULT_IMAGE_TAG
 
 
 if __name__ == "__main__":
@@ -59,11 +82,12 @@ Examples:
         help="Overwrite existing output directory without confirmation",
     )
     args = parser.parse_args()
+    image_tag = resolve_image_tag()
 
     settings = GenerationSettings(
         project_root_in_container=PROJECT_ROOT_IN_CONTAINER,
         ros_ws_in_container=ROS_WS_IN_CONTAINER,
-        image_name=IMAGE_NAME,
+        image_name=f"{IMAGE_REPOSITORY}:{image_tag}",
         perf_ws_dir=args.ws_dir,
         default_eval_time=DEFAULT_EVAL_TIME,
     )
@@ -111,6 +135,7 @@ Examples:
         args.ws_dir,
         project_root,
         topology_dir,
+        settings.image_name,
     )
 
     print(

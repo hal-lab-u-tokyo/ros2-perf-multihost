@@ -70,7 +70,9 @@ Pull the published GitHub Packages image [`ghcr.io/hal-lab-u-tokyo/ros2-perf-mul
 docker pull ghcr.io/hal-lab-u-tokyo/ros2-perf-multihost:latest
 ```
 
-For details on the Docker image, see [docker/README.md](./docker/README.md).
+For Docker image version selection and generator options, see
+[manager_scripts/README.md](./manager_scripts/README.md#generate_exec_scriptspy).
+For image publishing details, see [docker/README.md](./docker/README.md).
 
 ## [Optional] Native ROS 2 Environment
 
