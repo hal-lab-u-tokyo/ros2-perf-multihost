@@ -4,6 +4,17 @@ import argparse
 import os
 
 
+SUPPORTED_MESSAGE_TYPES = {
+    "stamped3_float32",
+    "stamped4_float32",
+    "stamped4_int32",
+    "stamped9_float32",
+    "stamped12_float32",
+    "stamped_int64",
+    "stamped_vector",
+}
+
+
 def require_positive_int(entry, key, context):
     """Read a required positive integer field from entry."""
     if key not in entry:
@@ -130,7 +141,7 @@ def validate_publisher_entries(pub_entries, context):
             raise ValueError(f"{pub_context}: must be an object")
         ensure_only_allowed_keys(
             pub,
-            {"topic_name", "payload_size", "period_ms"},
+            {"topic_name", "msg_type", "msg_size", "period_ms", "msg_pass_by"},
             pub_context,
         )
         topic_name_str = require_non_empty_string(
@@ -145,7 +156,15 @@ def validate_publisher_entries(pub_entries, context):
                 f"'{topic_name_str}'"
             )
         topic_names.add(topic_name_str)
-        require_positive_int(pub, "payload_size", pub_context)
+        msg_type = require_non_empty_string(pub, "msg_type", pub_context)
+        if msg_type not in SUPPORTED_MESSAGE_TYPES:
+            raise ValueError(f"{pub_context}: unsupported msg_type '{msg_type}'")
+        if msg_type == "stamped_vector":
+            require_positive_int(pub, "msg_size", pub_context)
+        elif "msg_size" in pub:
+            raise ValueError(f"{pub_context}: msg_size is only valid for stamped_vector")
+        if pub.get("msg_pass_by") != "shared_ptr":
+            raise ValueError(f"{pub_context}: msg_pass_by must be shared_ptr")
         require_positive_int(pub, "period_ms", pub_context)
 
 
@@ -159,7 +178,7 @@ def validate_subscriber_entries(sub_entries, context):
         sub_context = f"{context}[{sub_idx}]"
         if not isinstance(sub, dict):
             raise ValueError(f"{sub_context}: must be an object")
-        ensure_only_allowed_keys(sub, {"topic_name"}, sub_context)
+        ensure_only_allowed_keys(sub, {"topic_name", "msg_type"}, sub_context)
         topic_name_str = require_non_empty_string(
             sub, "topic_name", sub_context)
         if not _is_valid_identifier(topic_name_str):
@@ -172,6 +191,9 @@ def validate_subscriber_entries(sub_entries, context):
                 f"'{topic_name_str}'"
             )
         topic_names.add(topic_name_str)
+        msg_type = require_non_empty_string(sub, "msg_type", sub_context)
+        if msg_type not in SUPPORTED_MESSAGE_TYPES:
+            raise ValueError(f"{sub_context}: unsupported msg_type '{msg_type}'")
 
 
 def normalize_intermediate_entries(intermediate_value, node_name):
@@ -257,6 +279,17 @@ def _normalize_node_roles(node, node_context):
                 f"{node_context}: publishers and subscribers cannot use the "
                 f"same topic(s): {', '.join(overlapping_topics)}"
             )
+
+        publisher_types = {entry["topic_name"]: entry["msg_type"]
+                           for entry in publisher_entries}
+        subscriber_types = {entry["topic_name"]: entry["msg_type"]
+                            for entry in subscriber_entries}
+        for topic_name in publisher_types.keys() & subscriber_types.keys():
+            if publisher_types[topic_name] != subscriber_types[topic_name]:
+                raise ValueError(
+                    f"{node_context}: publisher/subscriber msg_type mismatch "
+                    f"for topic '{topic_name}'"
+                )
 
     return normalized
 
@@ -379,7 +412,37 @@ def validate_topology_json_schema(json_content):
             raise ValueError(f"{host_context}: 'node_names' is required")
 
     # resolve_hosts_with_nodes validates nodes[] and host node references.
-    resolve_hosts_with_nodes(json_content)
+    resolved_hosts = resolve_hosts_with_nodes(json_content)
+    publisher_types = {}
+    subscriber_types = {}
+    for host in resolved_hosts:
+        for node in host["nodes"]:
+            for publisher in node.get("publisher", []):
+                topic_name = publisher["topic_name"]
+                msg_type = publisher["msg_type"]
+                existing_type = publisher_types.setdefault(topic_name, msg_type)
+                if existing_type != msg_type:
+                    raise ValueError(
+                        f"topic '{topic_name}' has inconsistent publisher "
+                        "msg_type values"
+                    )
+            for subscriber in node.get("subscriber", []):
+                topic_name = subscriber["topic_name"]
+                msg_type = subscriber["msg_type"]
+                existing_type = subscriber_types.setdefault(topic_name, msg_type)
+                if existing_type != msg_type:
+                    raise ValueError(
+                        f"topic '{topic_name}' has inconsistent subscriber "
+                        "msg_type values"
+                    )
+
+    for topic_name in publisher_types.keys() & subscriber_types.keys():
+        if publisher_types[topic_name] != subscriber_types[topic_name]:
+            raise ValueError(
+                f"topic '{topic_name}' has publisher msg_type "
+                f"'{publisher_types[topic_name]}' but subscriber msg_type "
+                f"'{subscriber_types[topic_name]}'"
+            )
 
 
 def normalize_ws_dir(ws_dir):

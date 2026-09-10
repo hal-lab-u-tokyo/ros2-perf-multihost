@@ -40,14 +40,17 @@ Notes:
 | Key | Required | Type | Description |
 |---|---|---|---|
 | topic_name | Required | string | Topic name to publish. |
-| payload_size | Required | number | Payload size (bytes). Must be a positive integer. |
+| msg_type | Required | string | Concrete message type: `stamped3_float32`, `stamped4_float32`, `stamped4_int32`, `stamped9_float32`, `stamped12_float32`, `stamped_int64`, or `stamped_vector`. |
+| msg_size | Required for `stamped_vector` | number | Size in bytes of the variable-length `data` field. Forbidden for fixed-size types. |
 | period_ms | Required | number | Publish period (ms). Must be a positive integer. |
+| msg_pass_by | Required | string | Must be `shared_ptr`, matching the iRobot Sierra Nevada topology. |
 
 ### Elements of the `subscribers` Array
 
 | Key | Required | Type | Description |
 |---|---|---|---|
 | topic_name | Required | string | Topic name to subscribe to. |
+| msg_type | Required | string | Concrete message type. It must match every publisher of the same topic. |
 
 ## 4. `qos` (Optional)
 

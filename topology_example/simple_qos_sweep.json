@@ -26,7 +26,9 @@
       "publishers": [
         {
           "topic_name": "amazon",
-          "payload_size": 32,
+          "msg_type": "stamped_vector",
+          "msg_size": 32,
+          "msg_pass_by": "shared_ptr",
           "period_ms": 1000
         }
       ]
@@ -36,7 +38,9 @@
       "publishers": [
         {
           "topic_name": "inazuma",
-          "payload_size": 32,
+          "msg_type": "stamped_vector",
+          "msg_size": 32,
+          "msg_pass_by": "shared_ptr",
           "period_ms": 1000
         }
       ]
@@ -45,7 +49,8 @@
       "node_name": "sub1",
       "subscribers": [
         {
-          "topic_name": "amazon"
+          "topic_name": "amazon",
+          "msg_type": "stamped_vector"
         }
       ]
     },
@@ -54,13 +59,16 @@
       "publishers": [
         {
           "topic_name": "amazon",
-          "payload_size": 32,
+          "msg_type": "stamped_vector",
+          "msg_size": 32,
+          "msg_pass_by": "shared_ptr",
           "period_ms": 1000
         }
       ],
       "subscribers": [
         {
-          "topic_name": "inazuma"
+          "topic_name": "inazuma",
+          "msg_type": "stamped_vector"
         }
       ]
     }

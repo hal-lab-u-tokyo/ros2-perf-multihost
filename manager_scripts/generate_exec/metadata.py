@@ -14,6 +14,16 @@ from .validation import (
 )
 
 
+FIXED_MESSAGE_PAYLOAD_SIZES = {
+    "stamped3_float32": 3 * 4,
+    "stamped4_float32": 4 * 4,
+    "stamped4_int32": 4 * 4,
+    "stamped9_float32": 9 * 4,
+    "stamped12_float32": 12 * 4,
+    "stamped_int64": 8,
+}
+
+
 def collect_metadata_node_names(json_content):
     """Collect host names, node names, and topic counts for metadata.txt."""
     host_names = []
@@ -47,27 +57,36 @@ def collect_metadata_node_names(json_content):
 
 
 def collect_topic_runtime_config(json_content):
-    """Collect topic -> payload/period/publisher_count from topology."""
+    """Collect topic -> message type/size/period/publisher_count from topology."""
     topic_cfg = {}
 
     def add_publisher_topic(entry, context):
         topic = entry.get("topic_name")
         if not topic:
             raise ValueError(f"{context}: missing topic_name")
-        payload_size = require_positive_int(entry, "payload_size", context)
+        msg_type = entry["msg_type"]
+        msg_size = int(entry.get("msg_size", 0))
+        payload_size = (
+            msg_size if msg_type == "stamped_vector"
+            else FIXED_MESSAGE_PAYLOAD_SIZES[msg_type]
+        )
         period_ms = require_positive_int(entry, "period_ms", context)
 
         cfg = topic_cfg.setdefault(
             topic,
             {
+                "msg_type": msg_type,
+                "msg_size": msg_size,
                 "payload_size": payload_size,
                 "period_ms": period_ms,
                 "publisher_count": 0,
             },
         )
-        if cfg["payload_size"] != payload_size or cfg["period_ms"] != period_ms:
+        if (cfg["msg_type"] != msg_type or cfg["msg_size"] != msg_size or
+            cfg["payload_size"] != payload_size or
+            cfg["period_ms"] != period_ms):
             raise ValueError(
-                f"Inconsistent payload/period for topic '{topic}' in topology JSON"
+            f"Inconsistent type/size/period for topic '{topic}' in topology JSON"
             )
         cfg["publisher_count"] += 1
 

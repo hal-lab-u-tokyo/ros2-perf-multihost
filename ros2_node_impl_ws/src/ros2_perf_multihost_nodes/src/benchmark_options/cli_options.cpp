@@ -18,7 +18,6 @@ Options::Options()
 Options::Options(int argc, char** argv) : Options() { parse(argc, argv); }
 
 void Options::parse(int argc, char** argv) {
-  constexpr int kDefaultPayloadSize = 64;
   constexpr int kDefaultPeriodMs = 100;
 
   cxxopts::Options options("ros2 run ros2_perf_multihost_nodes benchmark_node",
@@ -31,8 +30,12 @@ void Options::parse(int argc, char** argv) {
       cxxopts::value<std::vector<std::string>>(topic_names_pub))(
       "topic-names-sub", "Subscriber topic names (repeatable)",
       cxxopts::value<std::vector<std::string>>(topic_names_sub))(
-      "s,size", "Payload size in bytes for publisher topics",
-      cxxopts::value<std::vector<int>>(payload_size), "bytes")(
+      "msg-types-pub", "Message types for publisher topics (repeatable)",
+      cxxopts::value<std::vector<std::string>>(msg_types_pub))(
+      "msg-types-sub", "Message types for subscriber topics (repeatable)",
+      cxxopts::value<std::vector<std::string>>(msg_types_sub))(
+      "msg-sizes-pub", "Message sizes in bytes for publisher topics",
+      cxxopts::value<std::vector<int>>(msg_sizes_pub), "bytes")(
       "p,period", "Publish period in milliseconds for publisher topics",
       cxxopts::value<std::vector<int>>(period_ms),
       "ms")("eval-time", "Evaluation duration in seconds",
@@ -53,7 +56,9 @@ void Options::parse(int argc, char** argv) {
               << options.help() << "\nExample:\n"
               << "  ros2 run ros2_perf_multihost_nodes benchmark_node \\\n"
               << "    --node-name node1 --topic-names-pub output \\\n"
-              << "    --topic-names-sub input --size 64 --period 100\n";
+              << "    --msg-types-pub stamped_vector --msg-sizes-pub 64 \\\n"
+              << "    --topic-names-sub input --msg-types-sub stamped_vector \\\n"
+              << "    --period 100\n";
   };
 
   try {
@@ -117,8 +122,8 @@ void Options::parse(int argc, char** argv) {
         }
       }
     }
-    if (!payload_size.empty() && topic_names_pub.empty()) {
-      std::cout << "Error: --size requires --topic-names-pub.\n\n";
+    if (!msg_sizes_pub.empty() && topic_names_pub.empty()) {
+      std::cout << "Error: --msg-sizes-pub requires --topic-names-pub.\n\n";
       print_help();
       std::exit(1);
     }
@@ -128,19 +133,36 @@ void Options::parse(int argc, char** argv) {
       std::exit(1);
     }
 
-    if (payload_size.empty()) {
-      payload_size.assign(topic_names_pub.size(), kDefaultPayloadSize);
-    } else if (payload_size.size() == 1) {
-      payload_size.assign(topic_names_pub.size(), payload_size.front());
-    } else if (payload_size.size() != topic_names_pub.size()) {
-      std::cout << "Error: --size must be specified once or match the number "
-                   "of --topic-names-pub entries.\n\n";
+    if (msg_types_pub.size() != topic_names_pub.size()) {
+      std::cout << "Error: --msg-types-pub must match the number of "
+                   "--topic-names-pub entries.\n\n";
       print_help();
       std::exit(1);
     }
-    for (const int size : payload_size) {
-      if (size <= 0) {
-        std::cout << "Error: --size values must be positive.\n\n";
+    if (msg_types_sub.size() != topic_names_sub.size()) {
+      std::cout << "Error: --msg-types-sub must match the number of "
+                   "--topic-names-sub entries.\n\n";
+      print_help();
+      std::exit(1);
+    }
+    if (msg_sizes_pub.empty()) {
+      msg_sizes_pub.assign(topic_names_pub.size(), 0);
+    } else if (msg_sizes_pub.size() != topic_names_pub.size()) {
+      std::cout << "Error: --msg-sizes-pub must match the number of "
+                   "--topic-names-pub entries.\n\n";
+      print_help();
+      std::exit(1);
+    }
+    for (size_t index = 0; index < msg_types_pub.size(); ++index) {
+      const bool variable_size = msg_types_pub[index] == "stamped_vector";
+      if (variable_size && msg_sizes_pub[index] <= 0) {
+        std::cout << "Error: stamped_vector requires a positive --msg-sizes-pub "
+                     "value.\n\n";
+        print_help();
+        std::exit(1);
+      }
+      if (!variable_size && msg_sizes_pub[index] != 0) {
+        std::cout << "Error: --msg-sizes-pub is only valid for stamped_vector.\n\n";
         print_help();
         std::exit(1);
       }
@@ -159,6 +181,26 @@ void Options::parse(int argc, char** argv) {
     for (const int period : period_ms) {
       if (period <= 0) {
         std::cout << "Error: --period values must be positive.\n\n";
+        print_help();
+        std::exit(1);
+      }
+    }
+    const std::unordered_set<std::string> supported_types = {
+        "stamped3_float32", "stamped4_float32", "stamped4_int32",
+        "stamped9_float32", "stamped12_float32", "stamped_int64",
+        "stamped_vector"};
+    for (const auto& msg_type : msg_types_pub) {
+      if (supported_types.count(msg_type) == 0) {
+        std::cout << "Error: unsupported publisher message type: " << msg_type
+                  << ".\n\n";
+        print_help();
+        std::exit(1);
+      }
+    }
+    for (const auto& msg_type : msg_types_sub) {
+      if (supported_types.count(msg_type) == 0) {
+        std::cout << "Error: unsupported subscriber message type: " << msg_type
+                  << ".\n\n";
         print_help();
         std::exit(1);
       }
