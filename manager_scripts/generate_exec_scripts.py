@@ -25,7 +25,8 @@ from generate_exec.validation import normalize_qos_cases, normalize_ws_dir, vali
 
 PROJECT_ROOT_IN_CONTAINER = "/workdir/ros2-perf-multihost"
 ROS_WS_IN_CONTAINER = f"{PROJECT_ROOT_IN_CONTAINER}/ros2_node_impl_ws"
-IMAGE_NAME = "ghcr.io/hal-lab-u-tokyo/ros2-perf-multihost:latest"
+IMAGE_REPOSITORY = "ghcr.io/hal-lab-u-tokyo/ros2-perf-multihost"
+DEFAULT_IMAGE_TAG = "latest"
 DEFAULT_PERF_WS_DIR = "performance_ws"
 DEFAULT_EVAL_TIME = 60
 
@@ -36,6 +37,7 @@ if __name__ == "__main__":
         formatter_class=argparse.RawDescriptionHelpFormatter,
         usage=(
             "%(prog)s <topology.json> [--ws-dir|-w <dir>] [--force|-f] "
+            "[--image-tag <tag>] "
             "[--help|-h]"
         ),
         epilog="""
@@ -58,12 +60,20 @@ Examples:
         action="store_true",
         help="Overwrite existing output directory without confirmation",
     )
+    parser.add_argument(
+        "--image-tag",
+        default=DEFAULT_IMAGE_TAG,
+        help=(
+            "GHCR image tag for generated Docker artifacts "
+            f"(default: {DEFAULT_IMAGE_TAG})"
+        ),
+    )
     args = parser.parse_args()
 
     settings = GenerationSettings(
         project_root_in_container=PROJECT_ROOT_IN_CONTAINER,
         ros_ws_in_container=ROS_WS_IN_CONTAINER,
-        image_name=IMAGE_NAME,
+        image_name=f"{IMAGE_REPOSITORY}:{args.image_tag}",
         perf_ws_dir=args.ws_dir,
         default_eval_time=DEFAULT_EVAL_TIME,
     )

@@ -201,7 +201,8 @@ Generated launch and execution scripts receive the active case at runtime via
 python3 manager_scripts/generate_exec_scripts.py \
   <topology.json> \
   [--ws-dir|-w <dir>] \
-  [--force|-f]
+  [--force|-f] \
+  [--image-tag <tag>]
 ```
 
 Arguments:
@@ -209,6 +210,24 @@ Arguments:
 - `<topology.json>`: Path to the topology definition JSON file
 - `--ws-dir` (`-w`): Base directory for generated artifacts (default: `performance_ws`)
 - `--force` (`-f`): Overwrite an existing output directory without confirmation; useful in CI or scripts
+- `--image-tag`: GHCR image tag used by the generated Docker artifacts (default: `latest`)
+
+#### Docker Image Version
+
+When using the current `main` branch, keep the default `latest` image tag.
+When checking out a release tag, pull the identically named image on every Host
+and pass that tag to the generator. For example, for `v0.4.0`:
+
+```bash
+git checkout v0.4.0
+docker pull ghcr.io/hal-lab-u-tokyo/ros2-perf-multihost:v0.4.0
+python3 manager_scripts/generate_exec_scripts.py \
+  topology_example/simple.json \
+  --image-tag v0.4.0
+```
+
+Using matching source and image tags ensures that the generated scripts run the
+ROS 2 node implementation from that release.
 
 Example:
 
@@ -461,7 +480,7 @@ Common issues and fixes:
 - `distribute_exec_scripts.sh` fails with SSH/SCP errors: verify hostnames, SSH keys, and that repository paths are identical across Hosts.
 - REST benchmark does not start remote execution: ensure REST servers are running on every target Host (for example, run `./manager_scripts/manage_rest_servers.sh start <topology>` from the Manager before calling `performance_test.py`).
 - Clock skew should be measured more strictly before latency trials: run `python3 manager_scripts/system_perf/check_clock_skew_rest.py --hosts host1,host2,host3 --samples 30 --interval 0.05` and review `performance_ws/system_perf/clock_skew/<timestamp>/{summary,pairwise}.csv`.
-- Docker mode fails on remote Hosts: pull `ghcr.io/hal-lab-u-tokyo/ros2-perf-multihost:latest` and confirm Docker permissions on each Host.
+- Docker mode fails on remote Hosts: pull the image tag selected when generating artifacts (normally `latest`) and confirm Docker permissions on each Host.
 - Native mode cannot find workspace paths: set `ROS2_PERF_WS` to the project root before running `<host_name>_exec_native.sh`.
 - Expected CSV outputs are missing: check `<ws-dir>/<topology>/results/latest-<rmw>/raw_logs/trial<N>/` for trial logs and analyzer error output from the CSV-generation step; `coordination_logs/` only covers the REST prepare/start phases.
 - For QoS sweep runs, expected CSV outputs are under `<ws-dir>/<topology>/results/latest-<rmw>/qos_case<N>/analysis/`; the cross-case summary is `<ws-dir>/<topology>/results/latest-<rmw>/analysis/qos_sweep_summary.csv`.
