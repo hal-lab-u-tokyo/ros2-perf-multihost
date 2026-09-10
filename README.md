@@ -201,8 +201,7 @@ Generated launch and execution scripts receive the active case at runtime via
 python3 manager_scripts/generate_exec_scripts.py \
   <topology.json> \
   [--ws-dir|-w <dir>] \
-  [--force|-f] \
-  [--image-tag <tag>]
+  [--force|-f]
 ```
 
 Arguments:
@@ -210,24 +209,6 @@ Arguments:
 - `<topology.json>`: Path to the topology definition JSON file
 - `--ws-dir` (`-w`): Base directory for generated artifacts (default: `performance_ws`)
 - `--force` (`-f`): Overwrite an existing output directory without confirmation; useful in CI or scripts
-- `--image-tag`: GHCR image tag used by the generated Docker artifacts (default: `latest`)
-
-#### Docker Image Version
-
-When using the current `main` branch, keep the default `latest` image tag.
-When checking out a release tag, pull the identically named image on every Host
-and pass that tag to the generator. For example, for `v0.4.0`:
-
-```bash
-git checkout v0.4.0
-docker pull ghcr.io/hal-lab-u-tokyo/ros2-perf-multihost:v0.4.0
-python3 manager_scripts/generate_exec_scripts.py \
-  topology_example/simple.json \
-  --image-tag v0.4.0
-```
-
-Using matching source and image tags ensures that the generated scripts run the
-ROS 2 node implementation from that release.
 
 Example:
 
@@ -237,7 +218,9 @@ python3 manager_scripts/generate_exec_scripts.py \
   topology_example/simple.json
 ```
 
-For details on generated files in `exec_scripts/`, `metadata.txt` format, runtime options supported by generated scripts, see [manager_scripts/README.md](./manager_scripts/README.md).
+For generator options, Docker image version selection, generated files in
+`exec_scripts/`, and `metadata.txt` format, see
+[manager_scripts/README.md](./manager_scripts/README.md).
 
 ### Step3: Run Benchmark via REST
 

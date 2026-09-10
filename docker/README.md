@@ -3,9 +3,9 @@
 This directory is for maintainers of the shared GitHub Container Registry (GHCR)
 image. It is not part of the normal runtime workflow for end users.
 
-Users should pull the published image rather than building it locally. They use
-`latest` with the current `main` branch, or an image tag matching their checked
-out release tag.
+Users should pull the published image rather than building it locally. The
+script generator selects `latest` for untagged commits and the matching image
+tag for an exact `v*` Git tag.
 
 - Published image: [`ghcr.io/hal-lab-u-tokyo/ros2-perf-multihost`](https://github.com/hal-lab-u-tokyo/ros2-perf-multihost/pkgs/container/ros2-perf-multihost)
 

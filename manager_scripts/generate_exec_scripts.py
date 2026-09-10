@@ -4,6 +4,7 @@ import argparse
 import json
 import os
 import shutil
+import subprocess
 
 from generate_exec.metadata import generate_metadata_file
 from generate_exec.paths import (
@@ -31,13 +32,29 @@ DEFAULT_PERF_WS_DIR = "performance_ws"
 DEFAULT_EVAL_TIME = 60
 
 
+def resolve_image_tag():
+    """Return the exact v* Git tag at HEAD, or latest."""
+    git_tags = subprocess.run(
+        ["git", "tag", "--points-at", "HEAD", "--list", "v*"],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    tags = sorted(tag for tag in git_tags.stdout.splitlines() if tag)
+    if len(tags) > 1:
+        raise RuntimeError(
+            "Multiple version tags point at HEAD; keep only one version tag: "
+            + ", ".join(tags)
+        )
+    return tags[0] if tags else DEFAULT_IMAGE_TAG
+
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(
         description="Generate Docker execution scripts and compose files from a JSON topology",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         usage=(
             "%(prog)s <topology.json> [--ws-dir|-w <dir>] [--force|-f] "
-            "[--image-tag <tag>] "
             "[--help|-h]"
         ),
         epilog="""
@@ -60,20 +77,13 @@ Examples:
         action="store_true",
         help="Overwrite existing output directory without confirmation",
     )
-    parser.add_argument(
-        "--image-tag",
-        default=DEFAULT_IMAGE_TAG,
-        help=(
-            "GHCR image tag for generated Docker artifacts "
-            f"(default: {DEFAULT_IMAGE_TAG})"
-        ),
-    )
     args = parser.parse_args()
+    image_tag = resolve_image_tag()
 
     settings = GenerationSettings(
         project_root_in_container=PROJECT_ROOT_IN_CONTAINER,
         ros_ws_in_container=ROS_WS_IN_CONTAINER,
-        image_name=f"{IMAGE_REPOSITORY}:{args.image_tag}",
+        image_name=f"{IMAGE_REPOSITORY}:{image_tag}",
         perf_ws_dir=args.ws_dir,
         default_eval_time=DEFAULT_EVAL_TIME,
     )
@@ -121,6 +131,7 @@ Examples:
         args.ws_dir,
         project_root,
         topology_dir,
+        settings.image_name,
     )
 
     print(

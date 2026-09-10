@@ -70,19 +70,9 @@ Pull the published GitHub Packages image [`ghcr.io/hal-lab-u-tokyo/ros2-perf-mul
 docker pull ghcr.io/hal-lab-u-tokyo/ros2-perf-multihost:latest
 ```
 
-Use `latest` when working from the current `main` branch. When checking out a
-release tag, pull the identically named image and generate Docker artifacts
-with `--image-tag <release-tag>`. For example:
-
-```bash
-docker pull ghcr.io/hal-lab-u-tokyo/ros2-perf-multihost:v0.4.0
-python3 manager_scripts/generate_exec_scripts.py \
-  topology_example/simple.json \
-  --ws-dir performance_ws \
-  --image-tag v0.4.0
-```
-
-For details on the Docker image, see [docker/README.md](./docker/README.md).
+For Docker image version selection and generator options, see
+[manager_scripts/README.md](./manager_scripts/README.md#generate_exec_scriptspy).
+For image publishing details, see [docker/README.md](./docker/README.md).
 
 ## [Optional] Native ROS 2 Environment
 
