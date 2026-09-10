@@ -105,12 +105,12 @@ docker pull ghcr.io/hal-lab-u-tokyo/ros2-perf-multihost:latest
 
 Run everything on a single machine in this local workflow.
 
-#### Step1: Define Topology
+#### Quick Step1: Define Topology
 
 This quick example uses [simple.json](./topology_example/simple.json).
 This topology defines a system consisting of 3 Hosts, where nodes communicate through topics.
 
-#### Step2: Generate Execution Scripts
+#### Quick Step2: Generate Execution Scripts
 
 Generate execution scripts and Docker artifacts from the topology JSON.
 
@@ -120,7 +120,7 @@ python3 manager_scripts/generate_exec_scripts.py \
   --ws-dir performance_ws
 ```
 
-#### Step3: Run Benchmark on Local
+#### Quick Step3: Run Benchmark on Local
 
 Run a local simulation of the multi-host behavior on a single machine.
 The topology name (directory under `performance_ws/`) is required; the RMW defaults to `fastdds` if not specified.
@@ -134,7 +134,7 @@ python3 performance_test/performance_test.py \
 
 This runs 3 trials, each lasting 10 seconds, using Fast DDS (default RMW).
 
-#### Step4: Results and Analysis
+#### Quick Step4: Results and Analysis
 
 As a quick check for this single-QoS example, confirm that the following outputs are generated:
 
@@ -218,7 +218,9 @@ python3 manager_scripts/generate_exec_scripts.py \
   topology_example/simple.json
 ```
 
-For details on generated files in `exec_scripts/`, `metadata.txt` format, runtime options supported by generated scripts, see [manager_scripts/README.md](./manager_scripts/README.md).
+For generator options, Docker image version selection, generated files in
+`exec_scripts/`, and `metadata.txt` format, see
+[manager_scripts/README.md](./manager_scripts/README.md).
 
 ### Step3: Run Benchmark via REST
 
@@ -461,7 +463,7 @@ Common issues and fixes:
 - `distribute_exec_scripts.sh` fails with SSH/SCP errors: verify hostnames, SSH keys, and that repository paths are identical across Hosts.
 - REST benchmark does not start remote execution: ensure REST servers are running on every target Host (for example, run `./manager_scripts/manage_rest_servers.sh start <topology>` from the Manager before calling `performance_test.py`).
 - Clock skew should be measured more strictly before latency trials: run `python3 manager_scripts/system_perf/check_clock_skew_rest.py --hosts host1,host2,host3 --samples 30 --interval 0.05` and review `performance_ws/system_perf/clock_skew/<timestamp>/{summary,pairwise}.csv`.
-- Docker mode fails on remote Hosts: pull `ghcr.io/hal-lab-u-tokyo/ros2-perf-multihost:latest` and confirm Docker permissions on each Host.
+- Docker mode fails on remote Hosts: pull the image tag selected when generating artifacts (normally `latest`) and confirm Docker permissions on each Host.
 - Native mode cannot find workspace paths: set `ROS2_PERF_WS` to the project root before running `<host_name>_exec_native.sh`.
 - Expected CSV outputs are missing: check `<ws-dir>/<topology>/results/latest-<rmw>/raw_logs/trial<N>/` for trial logs and analyzer error output from the CSV-generation step; `coordination_logs/` only covers the REST prepare/start phases.
 - For QoS sweep runs, expected CSV outputs are under `<ws-dir>/<topology>/results/latest-<rmw>/qos_case<N>/analysis/`; the cross-case summary is `<ws-dir>/<topology>/results/latest-<rmw>/analysis/qos_sweep_summary.csv`.

@@ -3,6 +3,7 @@
 import json
 import os
 import shlex
+import subprocess
 import sys
 from datetime import datetime
 
@@ -86,8 +87,26 @@ def unique_in_order(items):
     return list(dict.fromkeys(items))
 
 
+def collect_git_revision(project_root):
+    """Return the source commit hash and committer date, if available."""
+    git_revision = subprocess.run(
+        ["git", "show", "-s", "--format=%H%n%cI", "HEAD"],
+        cwd=project_root,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    if git_revision.returncode != 0:
+        return "unknown", "unknown"
+
+    revision_lines = git_revision.stdout.splitlines()
+    if len(revision_lines) != 2:
+        return "unknown", "unknown"
+    return revision_lines[0], revision_lines[1]
+
+
 def generate_metadata_file(
-    json_content, json_path, ws_dir, project_root, topology_dir
+    json_content, json_path, ws_dir, project_root, topology_dir, image_name
 ):
     """Generate <ws-dir>/<topology>/metadata.txt."""
     topology_root = os.path.join(project_root, ws_dir, topology_dir)
@@ -118,6 +137,8 @@ def generate_metadata_file(
     qos_mode = "sweep" if isinstance(
         json_content.get("qos"), list) else "single"
     timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+    source_git_commit, source_git_commit_date = collect_git_revision(
+        project_root)
     sections = [
         [
             "# --- 1. general info ---",
@@ -127,6 +148,9 @@ def generate_metadata_file(
             f"json_path: {json_path}",
             f"ws_dir: {ws_dir}",
             f"topology_dir: {topology_dir}",
+            f"image: {image_name}",
+            f"source_git_commit: {source_git_commit}",
+            f"source_git_commit_date: {source_git_commit_date}",
         ],
         [
             "# --- 2. test config ---",
