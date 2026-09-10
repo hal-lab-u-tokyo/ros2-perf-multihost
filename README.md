@@ -105,12 +105,12 @@ docker pull ghcr.io/hal-lab-u-tokyo/ros2-perf-multihost:latest
 
 Run everything on a single machine in this local workflow.
 
-#### Step1: Define Topology
+#### Quick Step1: Define Topology
 
 This quick example uses [simple.json](./topology_example/simple.json).
 This topology defines a system consisting of 3 Hosts, where nodes communicate through topics.
 
-#### Step2: Generate Execution Scripts
+#### Quick Step2: Generate Execution Scripts
 
 Generate execution scripts and Docker artifacts from the topology JSON.
 
@@ -120,7 +120,7 @@ python3 manager_scripts/generate_exec_scripts.py \
   --ws-dir performance_ws
 ```
 
-#### Step3: Run Benchmark on Local
+#### Quick Step3: Run Benchmark on Local
 
 Run a local simulation of the multi-host behavior on a single machine.
 The topology name (directory under `performance_ws/`) is required; the RMW defaults to `fastdds` if not specified.
@@ -134,7 +134,7 @@ python3 performance_test/performance_test.py \
 
 This runs 3 trials, each lasting 10 seconds, using Fast DDS (default RMW).
 
-#### Step4: Results and Analysis
+#### Quick Step4: Results and Analysis
 
 As a quick check for this single-QoS example, confirm that the following outputs are generated:
 
