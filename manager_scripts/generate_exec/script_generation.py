@@ -241,7 +241,7 @@ def append_common_service(
     lines.append(
         (
             '    command: [ "/bin/bash", "-lc", '
-            f'"set +u; . \\\"$$ROS2_NODE_IMPL_WS/install/setup.sh\\\"; set -u; ros2 launch /exec_scripts/{host_name}.launch.py eval_time:=\\\"$$EVAL_TIME\\\" log_dir:=\\\"$$LOG_DIR\\\" qos_history:=\\\"$$QOS_HISTORY\\\" qos_depth:=\\\"$$QOS_DEPTH\\\" qos_reliability:=\\\"$$QOS_RELIABILITY\\\"" ]'
+            f'"test -x \\\"$$ROS2_NODE_IMPL_WS/install/ros2_perf_multihost_nodes/lib/ros2_perf_multihost_nodes/benchmark_node\\\" || {{ echo \\\"ERROR: benchmark_node is missing from the container image. Rebuild or pull an image that includes the current node implementation.\\\" >&2; exit 127; }}; set +u; . \\\"$$ROS2_NODE_IMPL_WS/install/setup.sh\\\"; set -u; ros2 launch /exec_scripts/{host_name}.launch.py eval_time:=\\\"$$EVAL_TIME\\\" log_dir:=\\\"$$LOG_DIR\\\" qos_history:=\\\"$$QOS_HISTORY\\\" qos_depth:=\\\"$$QOS_DEPTH\\\" qos_reliability:=\\\"$$QOS_RELIABILITY\\\"" ]'
         )
     )
 
@@ -667,7 +667,7 @@ def generate_local_run_script(json_content, output_dir, project_root, settings):
                 'ZENOH_ROUTER_CHECK_ATTEMPTS="${ZENOH_ROUTER_CHECK_ATTEMPTS:-}" '
                 'RUST_LOG="${RUST_LOG:-}" '
                 'LOG_DIR="$LOG_DIR" '
-                f'docker compose -f "$COMPOSE_FILE" up {host_services} || status=$?'
+                f'docker compose -f "$COMPOSE_FILE" up --abort-on-container-failure {host_services} || status=$?'
             ),
             '  echo "Stopping service_zenohd..."',
             (
@@ -701,7 +701,7 @@ def generate_local_run_script(json_content, output_dir, project_root, settings):
                 'ZENOH_ROUTER_CHECK_ATTEMPTS="${ZENOH_ROUTER_CHECK_ATTEMPTS:-}" '
                 'RUST_LOG="${RUST_LOG:-}" '
                 'LOG_DIR="$LOG_DIR" '
-                f'docker compose -f "$COMPOSE_FILE" up {host_services} || status=$?'
+                f'docker compose -f "$COMPOSE_FILE" up --abort-on-container-failure {host_services} || status=$?'
             ),
             'fi',
             'exit "$status"',
