@@ -17,6 +17,9 @@ permissions:
 
 jobs:
   publish:
+    concurrency:
+      group: publish-docker-${{ github.event_name == 'workflow_dispatch' && inputs.image_tag || github.ref }}
+      cancel-in-progress: true
     runs-on: ubuntu-latest
 
     steps:

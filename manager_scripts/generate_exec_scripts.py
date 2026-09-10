@@ -40,6 +40,10 @@ def resolve_image_tag():
         text=True,
         check=False,
     )
+    if git_tags.returncode != 0:
+        raise RuntimeError(
+            "Failed to inspect version tags: " + git_tags.stderr.strip()
+        )
     tags = sorted(tag for tag in git_tags.stdout.splitlines() if tag)
     if len(tags) > 1:
         raise RuntimeError(
