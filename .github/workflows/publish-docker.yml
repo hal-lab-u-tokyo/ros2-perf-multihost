@@ -4,6 +4,12 @@ on:
   push:
     branches: [main]
     tags: ["v*"]
+  workflow_dispatch:
+    inputs:
+      image_tag:
+        description: Image tag to publish
+        required: true
+        type: string
 
 permissions:
   contents: read
@@ -16,8 +22,6 @@ jobs:
     steps:
       - name: Check out source
         uses: actions/checkout@v4
-        with:
-          ref: ${{ github.event_name == 'release' && github.event.release.tag_name || github.sha }}
 
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v3
@@ -39,7 +43,8 @@ jobs:
           images: ghcr.io/hal-lab-u-tokyo/ros2-perf-multihost
           tags: |
             type=raw,value=latest,enable=${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
-            type=raw,value=${{ github.event.release.tag_name }},enable=${{ github.event_name == 'release' }}
+            type=ref,event=tag
+            type=raw,value=${{ inputs.image_tag }},enable=${{ github.event_name == 'workflow_dispatch' }}
 
       - name: Build and push image
         uses: docker/build-push-action@v6
