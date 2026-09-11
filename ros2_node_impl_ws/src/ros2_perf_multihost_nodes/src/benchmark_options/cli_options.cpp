@@ -11,10 +11,7 @@
 namespace benchmark_options {
 
 Options::Options()
-    : eval_time(60),
-      qos_history("KEEP_LAST"),
-      qos_depth(1),
-      qos_reliability("RELIABLE") {}
+    : eval_time(60), qos_history("KEEP_LAST"), qos_depth(1), qos_reliability("RELIABLE") {}
 
 Options::Options(int argc, char** argv) : Options() { parse(argc, argv); }
 
@@ -25,8 +22,7 @@ void Options::parse(int argc, char** argv) {
                            "ROS 2 performance benchmark node options.");
   options.custom_help("[OPTIONS]");
   options.add_options()("h,help", "Show this help message and exit")(
-      "node-name", "Node name (required)",
-      cxxopts::value<std::string>(node_name))(
+      "node-name", "Node name (required)", cxxopts::value<std::string>(node_name))(
       "topic-names-pub", "Publisher topic names (repeatable)",
       cxxopts::value<std::vector<std::string>>(topic_names_pub))(
       "topic-names-sub", "Subscriber topic names (repeatable)",
@@ -36,15 +32,16 @@ void Options::parse(int argc, char** argv) {
       "msg-types-sub", "Message types for subscriber topics (repeatable)",
       cxxopts::value<std::vector<std::string>>(msg_types_sub))(
       "msg-sizes-pub", "Message sizes in bytes for publisher topics",
-      cxxopts::value<std::vector<int>>(msg_sizes_pub), "bytes")(
-      "msg-pass-by-pub", "Publisher message passing modes (repeatable)",
-      cxxopts::value<std::vector<std::string>>(msg_pass_by_pub))(
+      cxxopts::value<std::vector<int>>(msg_sizes_pub),
+      "bytes")("msg-pass-by-pub", "Publisher message passing modes (repeatable)",
+               cxxopts::value<std::vector<std::string>>(msg_pass_by_pub))(
+      "msg-pass-by-sub", "Subscriber message passing modes (repeatable)",
+      cxxopts::value<std::vector<std::string>>(msg_pass_by_sub))(
       "p,period", "Publish period in milliseconds for publisher topics",
       cxxopts::value<std::vector<int>>(period_ms),
       "ms")("eval-time", "Evaluation duration in seconds",
-            cxxopts::value<int>(eval_time)->default_value("60"),
-            "sec")("log-dir", "Directory to write logs and metadata",
-                   cxxopts::value<std::string>(log_dir))(
+            cxxopts::value<int>(eval_time)->default_value("60"), "sec")(
+      "log-dir", "Directory to write logs and metadata", cxxopts::value<std::string>(log_dir))(
       "qos-history", "QoS history policy: KEEP_LAST or KEEP_ALL",
       cxxopts::value<std::string>(qos_history)->default_value("KEEP_LAST"))(
       "qos-depth", "QoS depth when qos_history=KEEP_LAST",
@@ -60,8 +57,9 @@ void Options::parse(int argc, char** argv) {
               << "  ros2 run ros2_perf_multihost_nodes benchmark_node \\\n"
               << "    --node-name node1 --topic-names-pub output \\\n"
               << "    --msg-types-pub stamped_vector --msg-sizes-pub 64 \\\n"
-              << "    --msg-pass-by-pub shared_ptr \\\n"
+              << "    --msg-pass-by-pub unique_ptr \\\n"
               << "    --topic-names-sub input --msg-types-sub stamped_vector \\\n"
+              << "    --msg-pass-by-sub const_shared_ptr_with_info \\\n"
               << "    --period 100\n";
   };
 
@@ -92,21 +90,18 @@ void Options::parse(int argc, char** argv) {
       print_help();
       std::exit(1);
     }
-    if (qos_reliability != "RELIABLE" &&
-        qos_reliability != "BEST_EFFORT") {
+    if (qos_reliability != "RELIABLE" && qos_reliability != "BEST_EFFORT") {
       std::cout << "Error: --qos-reliability must be RELIABLE or BEST_EFFORT.\n\n";
       print_help();
       std::exit(1);
     }
 
-    auto validate_unique_topics = [&print_help](
-                                      const std::vector<std::string>& topics,
-                                      const char* role) {
+    auto validate_unique_topics = [&print_help](const std::vector<std::string>& topics,
+                                                const char* role) {
       std::unordered_set<std::string> unique_topics;
       for (const auto& topic : topics) {
         if (!unique_topics.insert(topic).second) {
-          std::cout << "Error: duplicate " << role << " topic: " << topic
-                    << ".\n\n";
+          std::cout << "Error: duplicate " << role << " topic: " << topic << ".\n\n";
           print_help();
           std::exit(1);
         }
@@ -118,9 +113,8 @@ void Options::parse(int argc, char** argv) {
     for (const auto& publisher_topic : topic_names_pub) {
       for (const auto& subscriber_topic : topic_names_sub) {
         if (publisher_topic == subscriber_topic) {
-          std::cout
-              << "Error: publisher and subscriber topics must not overlap: "
-              << publisher_topic << ".\n\n";
+          std::cout << "Error: publisher and subscriber topics must not overlap: "
+                    << publisher_topic << ".\n\n";
           print_help();
           std::exit(1);
         }
@@ -157,15 +151,34 @@ void Options::parse(int argc, char** argv) {
       print_help();
       std::exit(1);
     }
-    if (msg_pass_by_pub.size() != topic_names_pub.size()) {
+    if (msg_pass_by_pub.empty()) {
+      msg_pass_by_pub.assign(topic_names_pub.size(), "const_ref");
+    } else if (msg_pass_by_pub.size() != topic_names_pub.size()) {
       std::cout << "Error: --msg-pass-by-pub must match the number of "
                    "--topic-names-pub entries.\n\n";
       print_help();
       std::exit(1);
     }
     for (const auto& msg_pass_by : msg_pass_by_pub) {
-      if (msg_pass_by != "shared_ptr") {
-        std::cout << "Error: --msg-pass-by-pub must be shared_ptr.\n\n";
+      if (msg_pass_by != "const_ref" && msg_pass_by != "unique_ptr") {
+        std::cout << "Error: --msg-pass-by-pub must be const_ref or "
+                     "unique_ptr.\n\n";
+        print_help();
+        std::exit(1);
+      }
+    }
+    if (msg_pass_by_sub.empty()) {
+      msg_pass_by_sub.assign(topic_names_sub.size(), "const_shared_ptr");
+    } else if (msg_pass_by_sub.size() != topic_names_sub.size()) {
+      std::cout << "Error: --msg-pass-by-sub must match the number of "
+                   "--topic-names-sub entries.\n\n";
+      print_help();
+      std::exit(1);
+    }
+    for (const auto& msg_pass_by : msg_pass_by_sub) {
+      if (msg_pass_by != "const_shared_ptr" && msg_pass_by != "const_shared_ptr_with_info") {
+        std::cout << "Error: --msg-pass-by-sub must be const_shared_ptr or "
+                     "const_shared_ptr_with_info.\n\n";
         print_help();
         std::exit(1);
       }
@@ -187,28 +200,25 @@ void Options::parse(int argc, char** argv) {
         std::exit(1);
       }
     }
-    auto validate_message_type = [&print_help](const std::string& msg_type,
-                          int msg_size,
-                          bool requires_msg_size,
-                          const char* role) {
+    auto validate_message_type = [&print_help](const std::string& msg_type, int msg_size,
+                                               bool requires_msg_size, const char* role) {
       bool supported = false;
       bool variable_size = false;
-#define FIND_MESSAGE_TYPE(topology_name, ros_name, is_variable, element_size, fixed_size) \
-      if (msg_type == #topology_name) {                                                \
-        supported = true;                                                               \
-        variable_size = is_variable;                                                    \
-        if (requires_msg_size && is_variable && msg_size % element_size != 0) {        \
-          std::cout << "Error: --msg-sizes-pub must be divisible by "                 \
-                    << element_size << " for " << msg_type << ".\n\n";              \
-          print_help();                                                                  \
-          std::exit(1);                                                                  \
-        }                                                                                \
-      }
+#define FIND_MESSAGE_TYPE(topology_name, ros_name, is_variable, element_size, fixed_size)    \
+  if (msg_type == #topology_name) {                                                          \
+    supported = true;                                                                        \
+    variable_size = is_variable;                                                             \
+    if (requires_msg_size && is_variable && msg_size % element_size != 0) {                  \
+      std::cout << "Error: --msg-sizes-pub must be divisible by " << element_size << " for " \
+                << msg_type << ".\n\n";                                                      \
+      print_help();                                                                          \
+      std::exit(1);                                                                          \
+    }                                                                                        \
+  }
       ROS2_PERF_FOR_EACH_MESSAGE_TYPE(FIND_MESSAGE_TYPE)
 #undef FIND_MESSAGE_TYPE
       if (!supported) {
-        std::cout << "Error: unsupported " << role << " message type: "
-                  << msg_type << ".\n\n";
+        std::cout << "Error: unsupported " << role << " message type: " << msg_type << ".\n\n";
         print_help();
         std::exit(1);
       }
@@ -219,15 +229,14 @@ void Options::parse(int argc, char** argv) {
         std::exit(1);
       }
       if (requires_msg_size && !variable_size && msg_size != 0) {
-        std::cout << "Error: --msg-sizes-pub is valid only for variable-length "
-                  << role << " messages.\n\n";
+        std::cout << "Error: --msg-sizes-pub is valid only for variable-length " << role
+                  << " messages.\n\n";
         print_help();
         std::exit(1);
       }
     };
     for (size_t index = 0; index < msg_types_pub.size(); ++index) {
-      validate_message_type(msg_types_pub[index], msg_sizes_pub[index], true,
-                            "publisher");
+      validate_message_type(msg_types_pub[index], msg_sizes_pub[index], true, "publisher");
     }
     for (const auto& msg_type : msg_types_sub) {
       validate_message_type(msg_type, 0, false, "subscriber");
@@ -242,8 +251,7 @@ void Options::parse(int argc, char** argv) {
 std::ostream& operator<<(std::ostream& os, const Options& options) {
   os << "Node Name: " << options.node_name << '\n'
      << "Evaluation time: " << options.eval_time << "s\n"
-     << "Log output: "
-     << (options.log_dir.empty() ? "disabled" : options.log_dir) << '\n';
+     << "Log output: " << (options.log_dir.empty() ? "disabled" : options.log_dir) << '\n';
   return os;
 }
 

@@ -28,7 +28,7 @@
           "topic_name": "amazon",
           "msg_type": "stamped_vector",
           "msg_size": 32,
-          "msg_pass_by": "shared_ptr",
+          "msg_pass_by": "const_ref",
           "period_ms": 1000
         }
       ]
@@ -40,7 +40,7 @@
           "topic_name": "inazuma",
           "msg_type": "stamped_vector",
           "msg_size": 32,
-          "msg_pass_by": "shared_ptr",
+          "msg_pass_by": "const_ref",
           "period_ms": 1000
         }
       ]
@@ -61,7 +61,7 @@
           "topic_name": "amazon",
           "msg_type": "stamped_vector",
           "msg_size": 32,
-          "msg_pass_by": "shared_ptr",
+          "msg_pass_by": "const_ref",
           "period_ms": 1000
         }
       ],

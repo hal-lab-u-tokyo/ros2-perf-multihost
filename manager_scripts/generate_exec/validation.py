@@ -161,8 +161,12 @@ def validate_publisher_entries(pub_entries, context):
                 )
         elif "msg_size" in pub:
             raise ValueError(f"{pub_context}: msg_size is only valid for stamped_vector")
-        if pub.get("msg_pass_by") != "shared_ptr":
-            raise ValueError(f"{pub_context}: msg_pass_by must be shared_ptr")
+        msg_pass_by = pub.get("msg_pass_by", "const_ref")
+        if msg_pass_by not in ("const_ref", "unique_ptr"):
+            raise ValueError(
+                f"{pub_context}: msg_pass_by must be one of "
+                "const_ref, unique_ptr"
+            )
         require_positive_int(pub, "period_ms", pub_context)
 
 
@@ -176,7 +180,9 @@ def validate_subscriber_entries(sub_entries, context):
         sub_context = f"{context}[{sub_idx}]"
         if not isinstance(sub, dict):
             raise ValueError(f"{sub_context}: must be an object")
-        ensure_only_allowed_keys(sub, {"topic_name", "msg_type"}, sub_context)
+        ensure_only_allowed_keys(
+            sub, {"topic_name", "msg_type", "msg_pass_by"}, sub_context
+        )
         topic_name_str = require_non_empty_string(
             sub, "topic_name", sub_context)
         if not _is_valid_identifier(topic_name_str):
@@ -194,6 +200,15 @@ def validate_subscriber_entries(sub_entries, context):
             get_message_spec(msg_type)
         except KeyError:
             raise ValueError(f"{sub_context}: unsupported msg_type '{msg_type}'")
+        msg_pass_by = sub.get("msg_pass_by", "const_shared_ptr")
+        if msg_pass_by not in (
+            "const_shared_ptr",
+            "const_shared_ptr_with_info",
+        ):
+            raise ValueError(
+                f"{sub_context}: msg_pass_by must be one of "
+                "const_shared_ptr, const_shared_ptr_with_info"
+            )
 
 
 def normalize_intermediate_entries(intermediate_value, node_name):
@@ -214,7 +229,8 @@ def normalize_intermediate_entries(intermediate_value, node_name):
             )
         if "publisher" not in entry or "subscriber" not in entry:
             raise ValueError(
-                f"node '{node_name}': intermediate[{idx}] must include both publisher and subscriber"
+                f"node '{node_name}': intermediate[{
+                    idx}] must include both publisher and subscriber"
             )
 
     return intermediate_value
@@ -304,7 +320,8 @@ def resolve_hosts_with_nodes(json_content):
         node_name = normalized["node_name"]
         if node_name in node_by_name:
             raise ValueError(
-                f"{node_context}: duplicate node_name '{node_name}' in root.nodes"
+                f"{node_context}: duplicate node_name '{
+                    node_name}' in root.nodes"
             )
         node_by_name[node_name] = normalized
 
@@ -333,18 +350,21 @@ def resolve_hosts_with_nodes(json_content):
                 )
             if stripped_name not in node_by_name:
                 raise ValueError(
-                    f"{item_context}: unknown node_name '{stripped_name}' (not found in root.nodes)"
+                    f"{item_context}: unknown node_name '{
+                        stripped_name}' (not found in root.nodes)"
                 )
             if stripped_name in seen_node_names:
                 raise ValueError(
-                    f"{item_context}: duplicate node_name '{stripped_name}' within the same host"
+                    f"{item_context}: duplicate node_name '{
+                        stripped_name}' within the same host"
                 )
             seen_node_names.add(stripped_name)
 
             existing_host = assigned_node_host.get(stripped_name)
             if existing_host is not None and existing_host != host_name:
                 raise ValueError(
-                    f"{item_context}: node_name '{stripped_name}' is already assigned to host '{existing_host}'"
+                    f"{item_context}: node_name '{
+                        stripped_name}' is already assigned to host '{existing_host}'"
                 )
             assigned_node_host[stripped_name] = host_name
 
@@ -409,7 +429,8 @@ def validate_topology_json_schema(json_content):
             for publisher in node.get("publisher", []):
                 topic_name = publisher["topic_name"]
                 msg_type = publisher["msg_type"]
-                existing_type = publisher_types.setdefault(topic_name, msg_type)
+                existing_type = publisher_types.setdefault(
+                    topic_name, msg_type)
                 if existing_type != msg_type:
                     raise ValueError(
                         f"topic '{topic_name}' has inconsistent publisher "
@@ -418,7 +439,8 @@ def validate_topology_json_schema(json_content):
             for subscriber in node.get("subscriber", []):
                 topic_name = subscriber["topic_name"]
                 msg_type = subscriber["msg_type"]
-                existing_type = subscriber_types.setdefault(topic_name, msg_type)
+                existing_type = subscriber_types.setdefault(
+                    topic_name, msg_type)
                 if existing_type != msg_type:
                     raise ValueError(
                         f"topic '{topic_name}' has inconsistent subscriber "

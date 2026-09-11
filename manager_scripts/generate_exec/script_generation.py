@@ -32,7 +32,7 @@ def append_benchmark_block(lines, node_name, pub_list, sub_list, qos_opts):
         )
         arguments.append(
             "--msg-pass-by-pub " + ",".join(
-                p["msg_pass_by"] for p in pub_list)
+                p.get("msg_pass_by", "const_ref") for p in pub_list)
         )
         for index, publisher in enumerate(pub_list):
             context = f"node '{node_name}' publishers[{index}]"
@@ -48,6 +48,10 @@ def append_benchmark_block(lines, node_name, pub_list, sub_list, qos_opts):
         )
         arguments.append(
             "--msg-types-sub " + ",".join(s["msg_type"] for s in sub_list)
+        )
+        arguments.append(
+            "--msg-pass-by-sub " + ",".join(
+                s.get("msg_pass_by", "const_shared_ptr") for s in sub_list)
         )
     lines.extend(
         [
@@ -116,7 +120,7 @@ def generate_exec_scripts(json_content, output_dir, settings):
                 args.append(
                     f'            "--msg-types-pub", "{",".join(p["msg_type"] for p in publisher_entries)}",')
                 args.append(
-                    f'            "--msg-pass-by-pub", "{",".join(p["msg_pass_by"] for p in publisher_entries)}",')
+                    f'            "--msg-pass-by-pub", "{",".join(p.get("msg_pass_by", "const_ref") for p in publisher_entries)}",')
                 for index, entry in enumerate(publisher_entries):
                     msg_size = entry.get("msg_size", 0)
                     args.append(f'            "--msg-sizes-pub", "{msg_size}",')
@@ -127,6 +131,8 @@ def generate_exec_scripts(json_content, output_dir, settings):
                     f'            "--topic-names-sub", "{",".join(s["topic_name"] for s in subscriber_entries)}",')
                 args.append(
                     f'            "--msg-types-sub", "{",".join(s["msg_type"] for s in subscriber_entries)}",')
+                args.append(
+                    f'            "--msg-pass-by-sub", "{",".join(s.get("msg_pass_by", "const_shared_ptr") for s in subscriber_entries)}",')
             args.append('            "--log-dir", log_dir,')
             node_var_lines.extend([
                 f"    {var_name} = Node(",
@@ -179,17 +185,22 @@ def generate_exec_scripts(json_content, output_dir, settings):
         lines.extend([
             "    return LaunchDescription(",
             "        [",
-            f'            DeclareLaunchArgument("eval_time", default_value=EnvironmentVariable("EVAL_TIME", default_value="{eval_time_default}")),',
+            f'            DeclareLaunchArgument("eval_time", default_value=EnvironmentVariable("EVAL_TIME", default_value="{
+                eval_time_default}")),',
             '            DeclareLaunchArgument("log_dir", default_value=EnvironmentVariable("LOG_DIR", default_value="")),',
-            f'            DeclareLaunchArgument("qos_history", default_value=EnvironmentVariable("QOS_HISTORY", default_value="{default_qos["history"]}")),',
-            f'            DeclareLaunchArgument("qos_depth", default_value=EnvironmentVariable("QOS_DEPTH", default_value="{default_qos["depth"]}")),',
-            f'            DeclareLaunchArgument("qos_reliability", default_value=EnvironmentVariable("QOS_RELIABILITY", default_value="{default_qos["reliability"]}")),',
+            f'            DeclareLaunchArgument("qos_history", default_value=EnvironmentVariable("QOS_HISTORY", default_value="{
+                default_qos["history"]}")),',
+            f'            DeclareLaunchArgument("qos_depth", default_value=EnvironmentVariable("QOS_DEPTH", default_value="{
+                default_qos["depth"]}")),',
+            f'            DeclareLaunchArgument("qos_reliability", default_value=EnvironmentVariable("QOS_RELIABILITY", default_value="{
+                default_qos["reliability"]}")),',
             "            ExecuteProcess(",
             "                cmd=[",
             '                    "python3",',
             '                    PathJoinSubstitution([project_root, "remote_hosts_scripts", "monitor_psutil.py"]),',
             '                    "0.5",',
-            f'                    PathJoinSubstitution([log_dir, "{host_name}_monitor_host.csv"]),',
+            f'                    PathJoinSubstitution([log_dir, "{
+                host_name}_monitor_host.csv"]),',
             "                ],",
             '                output="screen",',
             "            ),",
@@ -257,7 +268,8 @@ def append_common_service(
     lines.append(
         (
             '    command: [ "/bin/bash", "-lc", '
-            f'"test -x \\\"$$ROS2_NODE_IMPL_WS/install/ros2_perf_multihost_nodes/lib/ros2_perf_multihost_nodes/benchmark_node\\\" || {{ echo \\\"ERROR: benchmark_node is missing from the container image. Rebuild or pull an image that includes the current node implementation.\\\" >&2; exit 127; }}; set +u; . \\\"$$ROS2_NODE_IMPL_WS/install/setup.sh\\\"; set -u; ros2 launch /exec_scripts/{host_name}.launch.py eval_time:=\\\"$$EVAL_TIME\\\" log_dir:=\\\"$$LOG_DIR\\\" qos_history:=\\\"$$QOS_HISTORY\\\" qos_depth:=\\\"$$QOS_DEPTH\\\" qos_reliability:=\\\"$$QOS_RELIABILITY\\\"" ]'
+            f'"test -x \\\"$$ROS2_NODE_IMPL_WS/install/ros2_perf_multihost_nodes/lib/ros2_perf_multihost_nodes/benchmark_node\\\" || {{ echo \\\"ERROR: benchmark_node is missing from the container image. Rebuild or pull an image that includes the current node implementation.\\\" >&2; exit 127; }}; set +u; . \\\"$$ROS2_NODE_IMPL_WS/install/setup.sh\\\"; set -u; ros2 launch /exec_scripts/{
+                host_name}.launch.py eval_time:=\\\"$$EVAL_TIME\\\" log_dir:=\\\"$$LOG_DIR\\\" qos_history:=\\\"$$QOS_HISTORY\\\" qos_depth:=\\\"$$QOS_DEPTH\\\" qos_reliability:=\\\"$$QOS_RELIABILITY\\\"" ]'
         )
     )
 
@@ -377,7 +389,8 @@ def run_script_common_prefix(lines, rel_root, eval_time_default, settings, defau
             'SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"',
             'RUN_ROOT_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"',
             'RUN_DIR_NAME="$(basename "$RUN_ROOT_DIR")"',
-            f'# Project root: the relative path from exec_scripts/ is fixed at generation time ({rel_root})',
+            f'# Project root: the relative path from exec_scripts/ is fixed at generation time ({
+                rel_root})',
             f'PROJECT_ROOT="$(cd "$SCRIPT_DIR/{rel_root}" && pwd)"',
             'LOCAL_UID="${LOCAL_UID:-$(id -u)}"',
             'LOCAL_GID="${LOCAL_GID:-$(id -g)}"',
@@ -387,7 +400,8 @@ def run_script_common_prefix(lines, rel_root, eval_time_default, settings, defau
             'QOS_CASE_INDEX="${QOS_CASE_INDEX:-}"',
             f'QOS_HISTORY="${{QOS_HISTORY:-{default_qos["history"]}}}"',
             f'QOS_DEPTH="${{QOS_DEPTH:-{default_qos["depth"]}}}"',
-            f'QOS_RELIABILITY="${{QOS_RELIABILITY:-{default_qos["reliability"]}}}"',
+            f'QOS_RELIABILITY="${{QOS_RELIABILITY:-{
+                default_qos["reliability"]}}}"',
             "",
             'print_help() {',
             '  cat <<EOF',
@@ -487,7 +501,8 @@ def run_script_common_prefix(lines, rel_root, eval_time_default, settings, defau
             'RAW_LOGS_HOST_DIR="$RUN_RESULTS_HOST_DIR/raw_logs/trial${TRIAL_IDX}"',
             'mkdir -p "$RAW_LOGS_HOST_DIR"',
             (
-                f'LOG_DIR="${{LOG_DIR:-{settings.project_root_in_container}/{settings.perf_ws_dir}/${{RUN_DIR_NAME}}/results/${{RUN_TIMESTAMP}}/raw_logs/trial${{TRIAL_IDX}}}}"'
+                f'LOG_DIR="${{LOG_DIR:-{settings.project_root_in_container}/{
+                    settings.perf_ws_dir}/${{RUN_DIR_NAME}}/results/${{RUN_TIMESTAMP}}/raw_logs/trial${{TRIAL_IDX}}}}"'
             ),
             "",
             'cd "$PROJECT_ROOT"',
@@ -585,7 +600,8 @@ def generate_host_exec_native_scripts(json_content, output_dir, project_root, se
                 '. "${ROS2_NODE_IMPL_WS:-$PROJECT_ROOT/ros2_node_impl_ws}/install/setup.bash"',
                 "set -u",
                 "",
-                f'ros2 launch "{launch_file}" eval_time:="$EVAL_TIME" log_dir:="$LOG_DIR" qos_history:="$QOS_HISTORY" qos_depth:="$QOS_DEPTH" qos_reliability:="$QOS_RELIABILITY"',
+                f'ros2 launch "{
+                    launch_file}" eval_time:="$EVAL_TIME" log_dir:="$LOG_DIR" qos_history:="$QOS_HISTORY" qos_depth:="$QOS_DEPTH" qos_reliability:="$QOS_RELIABILITY"',
             ]
         )
 
@@ -683,7 +699,8 @@ def generate_local_run_script(json_content, output_dir, project_root, settings):
                 'ZENOH_ROUTER_CHECK_ATTEMPTS="${ZENOH_ROUTER_CHECK_ATTEMPTS:-}" '
                 'RUST_LOG="${RUST_LOG:-}" '
                 'LOG_DIR="$LOG_DIR" '
-                f'docker compose -f "$COMPOSE_FILE" up --abort-on-container-failure {host_services} || status=$?'
+                f'docker compose -f "$COMPOSE_FILE" up --abort-on-container-failure {
+                    host_services} || status=$?'
             ),
             '  echo "Stopping service_zenohd..."',
             (
@@ -717,7 +734,8 @@ def generate_local_run_script(json_content, output_dir, project_root, settings):
                 'ZENOH_ROUTER_CHECK_ATTEMPTS="${ZENOH_ROUTER_CHECK_ATTEMPTS:-}" '
                 'RUST_LOG="${RUST_LOG:-}" '
                 'LOG_DIR="$LOG_DIR" '
-                f'docker compose -f "$COMPOSE_FILE" up --abort-on-container-failure {host_services} || status=$?'
+                f'docker compose -f "$COMPOSE_FILE" up --abort-on-container-failure {
+                    host_services} || status=$?'
             ),
             'fi',
             'exit "$status"',
