@@ -30,6 +30,10 @@ def append_benchmark_block(lines, node_name, pub_list, sub_list, qos_opts):
         arguments.append(
             "--msg-types-pub " + ",".join(p["msg_type"] for p in pub_list)
         )
+        arguments.append(
+            "--msg-pass-by-pub " + ",".join(
+                p["msg_pass_by"] for p in pub_list)
+        )
         for index, publisher in enumerate(pub_list):
             context = f"node '{node_name}' publishers[{index}]"
             arguments.append(
@@ -111,6 +115,8 @@ def generate_exec_scripts(json_content, output_dir, settings):
                     f'            "--topic-names-pub", "{",".join(p["topic_name"] for p in publisher_entries)}",')
                 args.append(
                     f'            "--msg-types-pub", "{",".join(p["msg_type"] for p in publisher_entries)}",')
+                args.append(
+                    f'            "--msg-pass-by-pub", "{",".join(p["msg_pass_by"] for p in publisher_entries)}",')
                 for index, entry in enumerate(publisher_entries):
                     msg_size = entry.get("msg_size", 0)
                     args.append(f'            "--msg-sizes-pub", "{msg_size}",')

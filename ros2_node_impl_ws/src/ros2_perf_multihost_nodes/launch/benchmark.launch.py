@@ -17,6 +17,7 @@ def generate_launch_description():
             DeclareLaunchArgument(
                 "msg_types_sub", default_value="stamped_vector"),
             DeclareLaunchArgument("msg_sizes_pub", default_value="64"),
+            DeclareLaunchArgument("msg_pass_by_pub", default_value="shared_ptr"),
             DeclareLaunchArgument("period", default_value="100"),
             DeclareLaunchArgument("qos_history", default_value="KEEP_LAST"),
             DeclareLaunchArgument("qos_depth", default_value="1"),
@@ -35,6 +36,7 @@ def generate_launch_description():
                     "--msg-types-pub", LaunchConfiguration("msg_types_pub"),
                     "--msg-types-sub", LaunchConfiguration("msg_types_sub"),
                     "--msg-sizes-pub", LaunchConfiguration("msg_sizes_pub"),
+                    "--msg-pass-by-pub", LaunchConfiguration("msg_pass_by_pub"),
                     "--period", LaunchConfiguration("period"),
                     "--qos-history", LaunchConfiguration("qos_history"),
                     "--qos-depth", LaunchConfiguration("qos_depth"),

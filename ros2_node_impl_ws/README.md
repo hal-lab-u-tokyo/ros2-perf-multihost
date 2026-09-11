@@ -89,6 +89,7 @@ ignores depth when `--qos-history KEEP_ALL` is used.
 | --msg-types-pub | - | Message types for published topics (repeatable) | - |
 | --msg-types-sub | - | Message types for subscribed topics (repeatable) | - |
 | --msg-sizes-pub | - | Variable payload sizes for `stamped_vector` publisher topics | - |
+| --msg-pass-by-pub | - | Publisher message passing mode; must be `shared_ptr` for each publisher topic | - |
 | --period | -p | Publish period in milliseconds for published topics | 100 ms |
 
 If `--log-dir` is omitted, no log files or metadata files are created. Leave it unset when you only want a functional run without log collection.
@@ -134,6 +135,7 @@ ros2 run ros2_perf_multihost_nodes benchmark_node \
   --msg-types-pub stamped_vector \
   --msg-types-sub stamped_vector \
   --msg-sizes-pub 64 \
+  --msg-pass-by-pub shared_ptr \
   --period 100 \
   --qos-history KEEP_LAST \
   --qos-depth 1 \
@@ -148,6 +150,7 @@ ros2 run ros2_perf_multihost_nodes benchmark_node \
   --topic-names-pub topic_out \
   --msg-types-pub stamped_vector \
   --msg-sizes-pub 64 \
+  --msg-pass-by-pub shared_ptr \
   --period 100 \
   --log-dir logs
 ```
@@ -170,5 +173,6 @@ ros2 launch ros2_perf_multihost_nodes benchmark.launch.py \
   msg_types_pub:=stamped_vector \
   msg_types_sub:=stamped_vector \
   msg_sizes_pub:=64 \
+  msg_pass_by_pub:=shared_ptr \
   period:=100
 ```

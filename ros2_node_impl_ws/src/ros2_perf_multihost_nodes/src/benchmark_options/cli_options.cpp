@@ -37,6 +37,8 @@ void Options::parse(int argc, char** argv) {
       cxxopts::value<std::vector<std::string>>(msg_types_sub))(
       "msg-sizes-pub", "Message sizes in bytes for publisher topics",
       cxxopts::value<std::vector<int>>(msg_sizes_pub), "bytes")(
+      "msg-pass-by-pub", "Publisher message passing modes (repeatable)",
+      cxxopts::value<std::vector<std::string>>(msg_pass_by_pub))(
       "p,period", "Publish period in milliseconds for publisher topics",
       cxxopts::value<std::vector<int>>(period_ms),
       "ms")("eval-time", "Evaluation duration in seconds",
@@ -58,6 +60,7 @@ void Options::parse(int argc, char** argv) {
               << "  ros2 run ros2_perf_multihost_nodes benchmark_node \\\n"
               << "    --node-name node1 --topic-names-pub output \\\n"
               << "    --msg-types-pub stamped_vector --msg-sizes-pub 64 \\\n"
+              << "    --msg-pass-by-pub shared_ptr \\\n"
               << "    --topic-names-sub input --msg-types-sub stamped_vector \\\n"
               << "    --period 100\n";
   };
@@ -153,6 +156,19 @@ void Options::parse(int argc, char** argv) {
                    "--topic-names-pub entries.\n\n";
       print_help();
       std::exit(1);
+    }
+    if (msg_pass_by_pub.size() != topic_names_pub.size()) {
+      std::cout << "Error: --msg-pass-by-pub must match the number of "
+                   "--topic-names-pub entries.\n\n";
+      print_help();
+      std::exit(1);
+    }
+    for (const auto& msg_pass_by : msg_pass_by_pub) {
+      if (msg_pass_by != "shared_ptr") {
+        std::cout << "Error: --msg-pass-by-pub must be shared_ptr.\n\n";
+        print_help();
+        std::exit(1);
+      }
     }
     if (period_ms.empty()) {
       period_ms.assign(topic_names_pub.size(), kDefaultPeriodMs);

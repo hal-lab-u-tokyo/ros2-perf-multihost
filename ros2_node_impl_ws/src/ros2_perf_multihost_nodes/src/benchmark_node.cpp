@@ -56,7 +56,8 @@ class BenchmarkNode : public rclcpp::Node {
       publish_logs_.try_emplace(topic_name);
       const int period_ms = options_.period_ms[index];
       configure_publisher(topic_name, options_.msg_types_pub[index],
-                          options_.msg_sizes_pub[index], period_ms, qos);
+                          options_.msg_sizes_pub[index],
+                          options_.msg_pass_by_pub[index], period_ms, qos);
     }
 
     for (size_t index = 0; index < options_.topic_names_sub.size(); ++index) {
@@ -156,23 +157,25 @@ class BenchmarkNode : public rclcpp::Node {
 
   template <typename MessageType, bool VariableSize>
   void configure_publisher(const std::string& topic_name, int msg_size,
-                           int period_ms, const rclcpp::QoS& qos) {
+                           const std::string& msg_pass_by, int period_ms,
+                           const rclcpp::QoS& qos) {
     publishers_.emplace(topic_name, create_publisher<MessageType>(topic_name, qos));
     timers_.emplace(topic_name,
                     create_wall_timer(std::chrono::milliseconds(period_ms),
-                                      [this, topic_name, msg_size]() {
+                                        [this, topic_name, msg_size, msg_pass_by]() {
                                         publish_message<MessageType, VariableSize>(
-                                            topic_name, msg_size);
+                                          topic_name, msg_size, msg_pass_by);
                                       }));
   }
 
   void configure_publisher(const std::string& topic_name,
                            const std::string& msg_type, int msg_size,
-                           int period_ms, const rclcpp::QoS& qos) {
+                           const std::string& msg_pass_by, int period_ms,
+                           const rclcpp::QoS& qos) {
 #define CONFIGURE_PUBLISHER(topology_name, ros_name, variable_size, element_size, fixed_size) \
     if (msg_type == #topology_name) {                                                       \
       configure_publisher<ros2_perf_multihost_nodes::msg::ros_name,                          \
-                          variable_size>(topic_name, msg_size / element_size, period_ms, qos); \
+                          variable_size>(topic_name, msg_size / element_size, msg_pass_by, period_ms, qos); \
       return;                                                                                 \
     }
     ROS2_PERF_FOR_EACH_MESSAGE_TYPE(CONFIGURE_PUBLISHER)
@@ -204,13 +207,15 @@ class BenchmarkNode : public rclcpp::Node {
   }
 
   template <typename MessageType, bool VariableSize>
-  void publish_message(const std::string& topic_name, int msg_size) {
+  void publish_message(const std::string& topic_name, int msg_size,
+                       const std::string& msg_pass_by) {
+    (void)msg_pass_by;
     const auto now = get_clock()->now();
     if (now >= publish_end_times_.at(topic_name)) {
       timers_.at(topic_name)->cancel();
       return;
     }
-    auto message = std::make_unique<MessageType>();
+    auto message = std::make_shared<MessageType>();
     if constexpr (VariableSize) {
       message->data.assign(msg_size, 0);
     }
@@ -222,7 +227,7 @@ class BenchmarkNode : public rclcpp::Node {
     message->header.node_name = options_.node_name;
     publish_logs_[topic_name].push_back({message->header.pub_idx, now});
     std::static_pointer_cast<rclcpp::Publisher<MessageType>>(
-      publishers_.at(topic_name))->publish(std::move(message));
+      publishers_.at(topic_name))->publish(*message);
     ++publish_indices_.at(topic_name);
   }
 
