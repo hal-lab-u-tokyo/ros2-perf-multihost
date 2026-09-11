@@ -6,6 +6,7 @@
 #include <vector>
 
 #include "cxxopts.hpp"
+#include "message_registry.hpp"
 
 namespace benchmark_options {
 
@@ -18,7 +19,6 @@ Options::Options()
 Options::Options(int argc, char** argv) : Options() { parse(argc, argv); }
 
 void Options::parse(int argc, char** argv) {
-  constexpr int kDefaultPayloadSize = 64;
   constexpr int kDefaultPeriodMs = 100;
 
   cxxopts::Options options("ros2 run ros2_perf_multihost_nodes benchmark_node",
@@ -31,8 +31,14 @@ void Options::parse(int argc, char** argv) {
       cxxopts::value<std::vector<std::string>>(topic_names_pub))(
       "topic-names-sub", "Subscriber topic names (repeatable)",
       cxxopts::value<std::vector<std::string>>(topic_names_sub))(
-      "s,size", "Payload size in bytes for publisher topics",
-      cxxopts::value<std::vector<int>>(payload_size), "bytes")(
+      "msg-types-pub", "Message types for publisher topics (repeatable)",
+      cxxopts::value<std::vector<std::string>>(msg_types_pub))(
+      "msg-types-sub", "Message types for subscriber topics (repeatable)",
+      cxxopts::value<std::vector<std::string>>(msg_types_sub))(
+      "msg-sizes-pub", "Message sizes in bytes for publisher topics",
+      cxxopts::value<std::vector<int>>(msg_sizes_pub), "bytes")(
+      "msg-pass-by-pub", "Publisher message passing modes (repeatable)",
+      cxxopts::value<std::vector<std::string>>(msg_pass_by_pub))(
       "p,period", "Publish period in milliseconds for publisher topics",
       cxxopts::value<std::vector<int>>(period_ms),
       "ms")("eval-time", "Evaluation duration in seconds",
@@ -53,7 +59,10 @@ void Options::parse(int argc, char** argv) {
               << options.help() << "\nExample:\n"
               << "  ros2 run ros2_perf_multihost_nodes benchmark_node \\\n"
               << "    --node-name node1 --topic-names-pub output \\\n"
-              << "    --topic-names-sub input --size 64 --period 100\n";
+              << "    --msg-types-pub stamped_vector --msg-sizes-pub 64 \\\n"
+              << "    --msg-pass-by-pub shared_ptr \\\n"
+              << "    --topic-names-sub input --msg-types-sub stamped_vector \\\n"
+              << "    --period 100\n";
   };
 
   try {
@@ -117,8 +126,8 @@ void Options::parse(int argc, char** argv) {
         }
       }
     }
-    if (!payload_size.empty() && topic_names_pub.empty()) {
-      std::cout << "Error: --size requires --topic-names-pub.\n\n";
+    if (!msg_sizes_pub.empty() && topic_names_pub.empty()) {
+      std::cout << "Error: --msg-sizes-pub requires --topic-names-pub.\n\n";
       print_help();
       std::exit(1);
     }
@@ -128,24 +137,39 @@ void Options::parse(int argc, char** argv) {
       std::exit(1);
     }
 
-    if (payload_size.empty()) {
-      payload_size.assign(topic_names_pub.size(), kDefaultPayloadSize);
-    } else if (payload_size.size() == 1) {
-      payload_size.assign(topic_names_pub.size(), payload_size.front());
-    } else if (payload_size.size() != topic_names_pub.size()) {
-      std::cout << "Error: --size must be specified once or match the number "
-                   "of --topic-names-pub entries.\n\n";
+    if (msg_types_pub.size() != topic_names_pub.size()) {
+      std::cout << "Error: --msg-types-pub must match the number of "
+                   "--topic-names-pub entries.\n\n";
       print_help();
       std::exit(1);
     }
-    for (const int size : payload_size) {
-      if (size <= 0) {
-        std::cout << "Error: --size values must be positive.\n\n";
+    if (msg_types_sub.size() != topic_names_sub.size()) {
+      std::cout << "Error: --msg-types-sub must match the number of "
+                   "--topic-names-sub entries.\n\n";
+      print_help();
+      std::exit(1);
+    }
+    if (msg_sizes_pub.empty()) {
+      msg_sizes_pub.assign(topic_names_pub.size(), 0);
+    } else if (msg_sizes_pub.size() != topic_names_pub.size()) {
+      std::cout << "Error: --msg-sizes-pub must match the number of "
+                   "--topic-names-pub entries.\n\n";
+      print_help();
+      std::exit(1);
+    }
+    if (msg_pass_by_pub.size() != topic_names_pub.size()) {
+      std::cout << "Error: --msg-pass-by-pub must match the number of "
+                   "--topic-names-pub entries.\n\n";
+      print_help();
+      std::exit(1);
+    }
+    for (const auto& msg_pass_by : msg_pass_by_pub) {
+      if (msg_pass_by != "shared_ptr") {
+        std::cout << "Error: --msg-pass-by-pub must be shared_ptr.\n\n";
         print_help();
         std::exit(1);
       }
     }
-
     if (period_ms.empty()) {
       period_ms.assign(topic_names_pub.size(), kDefaultPeriodMs);
     } else if (period_ms.size() == 1) {
@@ -162,6 +186,51 @@ void Options::parse(int argc, char** argv) {
         print_help();
         std::exit(1);
       }
+    }
+    auto validate_message_type = [&print_help](const std::string& msg_type,
+                          int msg_size,
+                          bool requires_msg_size,
+                          const char* role) {
+      bool supported = false;
+      bool variable_size = false;
+#define FIND_MESSAGE_TYPE(topology_name, ros_name, is_variable, element_size, fixed_size) \
+      if (msg_type == #topology_name) {                                                \
+        supported = true;                                                               \
+        variable_size = is_variable;                                                    \
+        if (requires_msg_size && is_variable && msg_size % element_size != 0) {        \
+          std::cout << "Error: --msg-sizes-pub must be divisible by "                 \
+                    << element_size << " for " << msg_type << ".\n\n";              \
+          print_help();                                                                  \
+          std::exit(1);                                                                  \
+        }                                                                                \
+      }
+      ROS2_PERF_FOR_EACH_MESSAGE_TYPE(FIND_MESSAGE_TYPE)
+#undef FIND_MESSAGE_TYPE
+      if (!supported) {
+        std::cout << "Error: unsupported " << role << " message type: "
+                  << msg_type << ".\n\n";
+        print_help();
+        std::exit(1);
+      }
+      if (requires_msg_size && variable_size && msg_size <= 0) {
+        std::cout << "Error: variable-length " << role
+                  << " messages require a positive --msg-sizes-pub value.\n\n";
+        print_help();
+        std::exit(1);
+      }
+      if (requires_msg_size && !variable_size && msg_size != 0) {
+        std::cout << "Error: --msg-sizes-pub is valid only for variable-length "
+                  << role << " messages.\n\n";
+        print_help();
+        std::exit(1);
+      }
+    };
+    for (size_t index = 0; index < msg_types_pub.size(); ++index) {
+      validate_message_type(msg_types_pub[index], msg_sizes_pub[index], true,
+                            "publisher");
+    }
+    for (const auto& msg_type : msg_types_sub) {
+      validate_message_type(msg_type, 0, false, "subscriber");
     }
   } catch (const cxxopts::exceptions::exception& exception) {
     std::cout << "Error parsing options: " << exception.what() << "\n\n";

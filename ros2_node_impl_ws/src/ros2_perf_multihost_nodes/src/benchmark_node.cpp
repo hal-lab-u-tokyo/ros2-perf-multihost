@@ -13,7 +13,7 @@
 #include <vector>
 
 #include "benchmark_options/cli_options.hpp"
-#include "ros2_perf_multihost_nodes/msg/int_message.hpp"
+#include "message_registry.hpp"
 
 struct PublishLog {
   uint32_t message_idx;
@@ -25,8 +25,6 @@ struct SubscribeLog {
   uint32_t message_idx;
   rclcpp::Time time_stamp;
 };
-
-using Message = ros2_perf_multihost_nodes::msg::IntMessage;
 
 static benchmark_options::Options parse_options(int argc, char** argv) {
   auto non_ros_args = rclcpp::remove_ros_arguments(argc, argv);
@@ -56,32 +54,21 @@ class BenchmarkNode : public rclcpp::Node {
           start_time + rclcpp::Duration::from_seconds(options_.eval_time));
       publish_indices_.emplace(topic_name, 0);
       publish_logs_.try_emplace(topic_name);
-      publishers_.emplace(topic_name,
-                          create_publisher<Message>(topic_name, qos));
-
-      const int payload_size = options_.payload_size[index];
       const int period_ms = options_.period_ms[index];
-      timers_.emplace(topic_name,
-                      create_wall_timer(std::chrono::milliseconds(period_ms),
-                                        [this, topic_name, payload_size]() {
-                                          publish_message(topic_name,
-                                                          payload_size);
-                                        }));
+      configure_publisher(topic_name, options_.msg_types_pub[index],
+                          options_.msg_sizes_pub[index],
+                          options_.msg_pass_by_pub[index], period_ms, qos);
     }
 
-    for (const auto& topic_name : options_.topic_names_sub) {
+    for (size_t index = 0; index < options_.topic_names_sub.size(); ++index) {
+      const auto& topic_name = options_.topic_names_sub[index];
       const auto start_time = get_clock()->now();
       subscribe_start_times_.emplace(topic_name, start_time);
       subscribe_logs_.try_emplace(topic_name);
       subscribe_end_times_.emplace(
           topic_name,
           start_time + rclcpp::Duration::from_seconds(options_.eval_time));
-      subscribers_.emplace(
-          topic_name, create_subscription<Message>(
-                          topic_name, qos,
-                          [this, topic_name](const Message::SharedPtr message) {
-                            record_received_message(topic_name, *message);
-                          }));
+      configure_subscription(topic_name, options_.msg_types_sub[index], qos);
     }
 
     shutdown_timer_ =
@@ -127,12 +114,22 @@ class BenchmarkNode : public rclcpp::Node {
          << "NodeType: Benchmark\n"
          << "Topics(Pub): ";
     write_csv(file, options_.topic_names_pub);
+    file << "\nMsgTypes(Pub): ";
+    write_csv(file, options_.msg_types_pub);
+    file << "\nMsgSizes(Pub): ";
+    write_csv(file, options_.msg_sizes_pub);
     file << "\nPayloadSize: ";
-    write_csv(file, options_.payload_size);
+    for (size_t index = 0; index < options_.msg_types_pub.size(); ++index) {
+      file << payload_size(options_.msg_types_pub[index],
+               options_.msg_sizes_pub[index])
+           << ',';
+    }
     file << "\nPeriod: ";
     write_csv(file, options_.period_ms);
     file << "\nTopics(Sub): ";
     write_csv(file, options_.topic_names_sub);
+    file << "\nMsgTypes(Sub): ";
+    write_csv(file, options_.msg_types_sub);
     file << '\n';
   }
 
@@ -148,14 +145,80 @@ class BenchmarkNode : public rclcpp::Node {
     return std::filesystem::path(log_dir_) / (options_.node_name + "_log");
   }
 
-  void publish_message(const std::string& topic_name, int payload_size) {
+  static int payload_size(const std::string& msg_type, int msg_size) {
+#define GET_PAYLOAD_SIZE(topology_name, ros_name, variable_size, element_size, fixed_size) \
+    if (msg_type == #topology_name) {                                                    \
+      return variable_size ? msg_size : fixed_size;                                       \
+    }
+    ROS2_PERF_FOR_EACH_MESSAGE_TYPE(GET_PAYLOAD_SIZE)
+#undef GET_PAYLOAD_SIZE
+    return 0;
+  }
+
+  template <typename MessageType, bool VariableSize>
+  void configure_publisher(const std::string& topic_name, int msg_size,
+                           const std::string& msg_pass_by, int period_ms,
+                           const rclcpp::QoS& qos) {
+    publishers_.emplace(topic_name, create_publisher<MessageType>(topic_name, qos));
+    timers_.emplace(topic_name,
+                    create_wall_timer(std::chrono::milliseconds(period_ms),
+                                        [this, topic_name, msg_size, msg_pass_by]() {
+                                        publish_message<MessageType, VariableSize>(
+                                          topic_name, msg_size, msg_pass_by);
+                                      }));
+  }
+
+  void configure_publisher(const std::string& topic_name,
+                           const std::string& msg_type, int msg_size,
+                           const std::string& msg_pass_by, int period_ms,
+                           const rclcpp::QoS& qos) {
+#define CONFIGURE_PUBLISHER(topology_name, ros_name, variable_size, element_size, fixed_size) \
+    if (msg_type == #topology_name) {                                                       \
+      configure_publisher<ros2_perf_multihost_nodes::msg::ros_name,                          \
+                          variable_size>(topic_name, msg_size / element_size, msg_pass_by, period_ms, qos); \
+      return;                                                                                 \
+    }
+    ROS2_PERF_FOR_EACH_MESSAGE_TYPE(CONFIGURE_PUBLISHER)
+#undef CONFIGURE_PUBLISHER
+  }
+
+  template <typename MessageType>
+  void configure_subscription(const std::string& topic_name,
+                              const rclcpp::QoS& qos) {
+    subscribers_.emplace(
+        topic_name, create_subscription<MessageType>(
+                        topic_name, qos,
+                        [this, topic_name](const typename MessageType::SharedPtr message) {
+                          record_received_message(topic_name, *message);
+                        }));
+  }
+
+  void configure_subscription(const std::string& topic_name,
+                              const std::string& msg_type,
+                              const rclcpp::QoS& qos) {
+#define CONFIGURE_SUBSCRIPTION(topology_name, ros_name, variable_size, element_size, fixed_size) \
+  if (msg_type == #topology_name) {                                                        \
+    configure_subscription<ros2_perf_multihost_nodes::msg::ros_name>(                     \
+      topic_name, qos);                                                                  \
+    return;                                                                                \
+    }
+    ROS2_PERF_FOR_EACH_MESSAGE_TYPE(CONFIGURE_SUBSCRIPTION)
+#undef CONFIGURE_SUBSCRIPTION
+  }
+
+  template <typename MessageType, bool VariableSize>
+  void publish_message(const std::string& topic_name, int msg_size,
+                       const std::string& msg_pass_by) {
+    (void)msg_pass_by;
     const auto now = get_clock()->now();
     if (now >= publish_end_times_.at(topic_name)) {
       timers_.at(topic_name)->cancel();
       return;
     }
-    auto message = std::make_unique<Message>();
-    message->data.assign(payload_size, 0);
+    auto message = std::make_shared<MessageType>();
+    if constexpr (VariableSize) {
+      message->data.assign(msg_size, 0);
+    }
     message->header.stamp.sec = static_cast<int32_t>(
         (now - publish_start_times_.at(topic_name)).seconds());
     message->header.stamp.nanosec = static_cast<uint32_t>(
@@ -163,12 +226,14 @@ class BenchmarkNode : public rclcpp::Node {
     message->header.pub_idx = publish_indices_.at(topic_name);
     message->header.node_name = options_.node_name;
     publish_logs_[topic_name].push_back({message->header.pub_idx, now});
-    publishers_.at(topic_name)->publish(std::move(message));
+    std::static_pointer_cast<rclcpp::Publisher<MessageType>>(
+      publishers_.at(topic_name))->publish(*message);
     ++publish_indices_.at(topic_name);
   }
 
+  template <typename MessageType>
   void record_received_message(const std::string& topic_name,
-                               const Message& message) {
+                               const MessageType& message) {
     const auto now = get_clock()->now();
     if (now >= subscribe_end_times_.at(topic_name)) {
       return;
@@ -215,9 +280,8 @@ class BenchmarkNode : public rclcpp::Node {
 
   benchmark_options::Options options_;
   std::string log_dir_;
-  std::unordered_map<std::string, rclcpp::Publisher<Message>::SharedPtr>
-      publishers_;
-  std::unordered_map<std::string, rclcpp::Subscription<Message>::SharedPtr>
+    std::unordered_map<std::string, rclcpp::PublisherBase::SharedPtr> publishers_;
+    std::unordered_map<std::string, rclcpp::SubscriptionBase::SharedPtr>
       subscribers_;
   std::unordered_map<std::string, rclcpp::TimerBase::SharedPtr> timers_;
   rclcpp::TimerBase::SharedPtr shutdown_timer_;

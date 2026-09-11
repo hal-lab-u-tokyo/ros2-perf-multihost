@@ -27,10 +27,17 @@ def append_benchmark_block(lines, node_name, pub_list, sub_list, qos_opts):
         arguments.append(
             "--topic-names-pub " + ",".join(p["topic_name"] for p in pub_list)
         )
+        arguments.append(
+            "--msg-types-pub " + ",".join(p["msg_type"] for p in pub_list)
+        )
+        arguments.append(
+            "--msg-pass-by-pub " + ",".join(
+                p["msg_pass_by"] for p in pub_list)
+        )
         for index, publisher in enumerate(pub_list):
             context = f"node '{node_name}' publishers[{index}]"
             arguments.append(
-                f"--size {require_positive_int(publisher, 'payload_size', context)}"
+                f"--msg-sizes-pub {publisher.get('msg_size', 0)}"
             )
             arguments.append(
                 f"--period {require_positive_int(publisher, 'period_ms', context)}"
@@ -38,6 +45,9 @@ def append_benchmark_block(lines, node_name, pub_list, sub_list, qos_opts):
     if sub_list:
         arguments.append(
             "--topic-names-sub " + ",".join(s["topic_name"] for s in sub_list)
+        )
+        arguments.append(
+            "--msg-types-sub " + ",".join(s["msg_type"] for s in sub_list)
         )
     lines.extend(
         [
@@ -103,14 +113,20 @@ def generate_exec_scripts(json_content, output_dir, settings):
             if publisher_entries:
                 args.append(
                     f'            "--topic-names-pub", "{",".join(p["topic_name"] for p in publisher_entries)}",')
+                args.append(
+                    f'            "--msg-types-pub", "{",".join(p["msg_type"] for p in publisher_entries)}",')
+                args.append(
+                    f'            "--msg-pass-by-pub", "{",".join(p["msg_pass_by"] for p in publisher_entries)}",')
                 for index, entry in enumerate(publisher_entries):
-                    args.append(
-                        f'            "--size", "{require_positive_int(entry, "payload_size", f"node \'{node_name}\' publishers[{index}]")}",')
+                    msg_size = entry.get("msg_size", 0)
+                    args.append(f'            "--msg-sizes-pub", "{msg_size}",')
                     args.append(
                         f'            "--period", "{require_positive_int(entry, "period_ms", f"node \'{node_name}\' publishers[{index}]")}",')
             if subscriber_entries:
                 args.append(
                     f'            "--topic-names-sub", "{",".join(s["topic_name"] for s in subscriber_entries)}",')
+                args.append(
+                    f'            "--msg-types-sub", "{",".join(s["msg_type"] for s in subscriber_entries)}",')
             args.append('            "--log-dir", log_dir,')
             node_var_lines.extend([
                 f"    {var_name} = Node(",

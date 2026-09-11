@@ -40,14 +40,37 @@ Notes:
 | Key | Required | Type | Description |
 |---|---|---|---|
 | topic_name | Required | string | Topic name to publish. |
-| payload_size | Required | number | Payload size (bytes). Must be a positive integer. |
+| msg_type | Required | string | Concrete message type derived from a supported `Stamped*.msg` definition. |
+| msg_size | Required for variable-length message types | number | Size in bytes of the variable-length `data` field. Forbidden for fixed-size types. |
 | period_ms | Required | number | Publish period (ms). Must be a positive integer. |
+| msg_pass_by | Required | string | Must be `shared_ptr`, matching the iRobot Sierra Nevada topology. |
 
 ### Elements of the `subscribers` Array
 
 | Key | Required | Type | Description |
 |---|---|---|---|
 | topic_name | Required | string | Topic name to subscribe to. |
+| msg_type | Required | string | Concrete message type. It must match every publisher of the same topic. |
+
+### Adding Message Types
+
+The supported `msg_type` values are derived from the `Stamped*.msg` files in
+`ros2_node_impl_ws/src/ros2_perf_multihost_nodes/msg/`. Add a new message by
+creating a PascalCase `Stamped*.msg` file and rebuilding the package; its
+topology name is the snake_case form of the filename. For example,
+`StampedPose.msg` becomes `stamped_pose`.
+
+Each supported message must contain exactly these two fields:
+
+```text
+PerformanceHeader header
+<primitive>[<optional fixed length>] data
+```
+
+`data` may be a primitive scalar, a fixed-size primitive array, or a
+variable-length primitive array. Variable-length types require `msg_size` in
+publisher entries. Nested messages, strings, and multiple payload fields are
+not supported.
 
 ## 4. `qos` (Optional)
 
@@ -94,7 +117,9 @@ so the intended behavior is visible in the JSON itself.
       "publishers": [
         {
           "topic_name": "topic_a",
-          "payload_size": 64,
+          "msg_type": "stamped_vector",
+          "msg_size": 64,
+          "msg_pass_by": "shared_ptr",
           "period_ms": 100
         }
       ]
@@ -102,7 +127,10 @@ so the intended behavior is visible in the JSON itself.
     {
       "node_name": "sub1",
       "subscribers": [
-        { "topic_name": "topic_a" }
+        {
+          "topic_name": "topic_a",
+          "msg_type": "stamped_vector"
+        }
       ]
     }
   ],
