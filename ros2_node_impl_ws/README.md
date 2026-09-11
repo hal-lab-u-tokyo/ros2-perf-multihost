@@ -86,7 +86,9 @@ ignores depth when `--qos-history KEEP_ALL` is used.
 |---|---|---|---|
 | --topic-names-pub | - | Published topic names (repeatable) | - |
 | --topic-names-sub | - | Subscribed topic names (repeatable) | - |
-| --size | -s | Payload size in bytes for published topics | 64 bytes |
+| --msg-types-pub | - | Message types for published topics (repeatable) | - |
+| --msg-types-sub | - | Message types for subscribed topics (repeatable) | - |
+| --msg-sizes-pub | - | Variable payload sizes for `stamped_vector` publisher topics | - |
 | --period | -p | Publish period in milliseconds for published topics | 100 ms |
 
 If `--log-dir` is omitted, no log files or metadata files are created. Leave it unset when you only want a functional run without log collection.
@@ -129,7 +131,9 @@ ros2 run ros2_perf_multihost_nodes benchmark_node \
   --node-name node1 \
   --topic-names-pub topic_out \
   --topic-names-sub topic_in \
-  --size 64 \
+  --msg-types-pub stamped_vector \
+  --msg-types-sub stamped_vector \
+  --msg-sizes-pub 64 \
   --period 100 \
   --qos-history KEEP_LAST \
   --qos-depth 1 \
@@ -142,7 +146,8 @@ Add `--log-dir` when you want to save logs.
 ros2 run ros2_perf_multihost_nodes benchmark_node \
   --node-name node1 \
   --topic-names-pub topic_out \
-  --size 64 \
+  --msg-types-pub stamped_vector \
+  --msg-sizes-pub 64 \
   --period 100 \
   --log-dir logs
 ```
@@ -162,6 +167,8 @@ ros2 launch ros2_perf_multihost_nodes benchmark.launch.py \
   node_name:=node1 \
   topic_names_pub:=topic_out \
   topic_names_sub:=topic_in \
-  size:=64 \
+  msg_types_pub:=stamped_vector \
+  msg_types_sub:=stamped_vector \
+  msg_sizes_pub:=64 \
   period:=100
 ```

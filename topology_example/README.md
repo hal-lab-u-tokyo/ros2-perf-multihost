@@ -97,7 +97,9 @@ so the intended behavior is visible in the JSON itself.
       "publishers": [
         {
           "topic_name": "topic_a",
-          "payload_size": 64,
+          "msg_type": "stamped_vector",
+          "msg_size": 64,
+          "msg_pass_by": "shared_ptr",
           "period_ms": 100
         }
       ]
@@ -105,7 +107,10 @@ so the intended behavior is visible in the JSON itself.
     {
       "node_name": "sub1",
       "subscribers": [
-        { "topic_name": "topic_a" }
+        {
+          "topic_name": "topic_a",
+          "msg_type": "stamped_vector"
+        }
       ]
     }
   ],
