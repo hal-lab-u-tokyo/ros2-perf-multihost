@@ -8,20 +8,12 @@
 #include <rclcpp/rclcpp.hpp>
 #include <sstream>
 #include <string>
-#include <stdexcept>
-#include <type_traits>
 #include <unordered_map>
 #include <utility>
 #include <vector>
 
 #include "benchmark_options/cli_options.hpp"
-#include "ros2_perf_multihost_nodes/msg/stamped12_float32.hpp"
-#include "ros2_perf_multihost_nodes/msg/stamped3_float32.hpp"
-#include "ros2_perf_multihost_nodes/msg/stamped4_float32.hpp"
-#include "ros2_perf_multihost_nodes/msg/stamped4_int32.hpp"
-#include "ros2_perf_multihost_nodes/msg/stamped9_float32.hpp"
-#include "ros2_perf_multihost_nodes/msg/stamped_int64.hpp"
-#include "ros2_perf_multihost_nodes/msg/stamped_vector.hpp"
+#include "message_registry.hpp"
 
 struct PublishLog {
   uint32_t message_idx;
@@ -33,14 +25,6 @@ struct SubscribeLog {
   uint32_t message_idx;
   rclcpp::Time time_stamp;
 };
-
-using Stamped3Float32 = ros2_perf_multihost_nodes::msg::Stamped3Float32;
-using Stamped4Float32 = ros2_perf_multihost_nodes::msg::Stamped4Float32;
-using Stamped4Int32 = ros2_perf_multihost_nodes::msg::Stamped4Int32;
-using Stamped9Float32 = ros2_perf_multihost_nodes::msg::Stamped9Float32;
-using Stamped12Float32 = ros2_perf_multihost_nodes::msg::Stamped12Float32;
-using StampedInt64 = ros2_perf_multihost_nodes::msg::StampedInt64;
-using StampedVector = ros2_perf_multihost_nodes::msg::StampedVector;
 
 static benchmark_options::Options parse_options(int argc, char** argv) {
   auto non_ros_args = rclcpp::remove_ros_arguments(argc, argv);
@@ -136,7 +120,7 @@ class BenchmarkNode : public rclcpp::Node {
     file << "\nPayloadSize: ";
     for (size_t index = 0; index < options_.msg_types_pub.size(); ++index) {
       file << payload_size(options_.msg_types_pub[index],
-                           options_.msg_sizes_pub[index])
+               options_.msg_sizes_pub[index])
            << ',';
     }
     file << "\nPeriod: ";
@@ -161,46 +145,38 @@ class BenchmarkNode : public rclcpp::Node {
   }
 
   static int payload_size(const std::string& msg_type, int msg_size) {
-    if (msg_type == "stamped3_float32") return 3 * 4;
-    if (msg_type == "stamped4_float32" || msg_type == "stamped4_int32") return 4 * 4;
-    if (msg_type == "stamped9_float32") return 9 * 4;
-    if (msg_type == "stamped12_float32") return 12 * 4;
-    if (msg_type == "stamped_int64") return 8;
-    return msg_size;
+#define GET_PAYLOAD_SIZE(topology_name, ros_name, variable_size, fixed_size) \
+    if (msg_type == #topology_name) {                                        \
+      return variable_size ? msg_size : fixed_size;                           \
+    }
+    ROS2_PERF_FOR_EACH_MESSAGE_TYPE(GET_PAYLOAD_SIZE)
+#undef GET_PAYLOAD_SIZE
+    return 0;
   }
 
-  template <typename MessageType>
+  template <typename MessageType, bool VariableSize>
   void configure_publisher(const std::string& topic_name, int msg_size,
                            int period_ms, const rclcpp::QoS& qos) {
     publishers_.emplace(topic_name, create_publisher<MessageType>(topic_name, qos));
     timers_.emplace(topic_name,
                     create_wall_timer(std::chrono::milliseconds(period_ms),
                                       [this, topic_name, msg_size]() {
-                                        publish_message<MessageType>(topic_name,
-                                                                     msg_size);
+                                        publish_message<MessageType, VariableSize>(
+                                            topic_name, msg_size);
                                       }));
   }
 
   void configure_publisher(const std::string& topic_name,
                            const std::string& msg_type, int msg_size,
                            int period_ms, const rclcpp::QoS& qos) {
-    if (msg_type == "stamped3_float32") {
-      configure_publisher<Stamped3Float32>(topic_name, msg_size, period_ms, qos);
-    } else if (msg_type == "stamped4_float32") {
-      configure_publisher<Stamped4Float32>(topic_name, msg_size, period_ms, qos);
-    } else if (msg_type == "stamped4_int32") {
-      configure_publisher<Stamped4Int32>(topic_name, msg_size, period_ms, qos);
-    } else if (msg_type == "stamped9_float32") {
-      configure_publisher<Stamped9Float32>(topic_name, msg_size, period_ms, qos);
-    } else if (msg_type == "stamped12_float32") {
-      configure_publisher<Stamped12Float32>(topic_name, msg_size, period_ms, qos);
-    } else if (msg_type == "stamped_int64") {
-      configure_publisher<StampedInt64>(topic_name, msg_size, period_ms, qos);
-    } else if (msg_type == "stamped_vector") {
-      configure_publisher<StampedVector>(topic_name, msg_size, period_ms, qos);
-    } else {
-      throw std::invalid_argument("Unsupported publisher message type: " + msg_type);
+#define CONFIGURE_PUBLISHER(topology_name, ros_name, variable_size, fixed_size) \
+    if (msg_type == #topology_name) {                                           \
+      configure_publisher<ros2_perf_multihost_nodes::msg::ros_name,              \
+                          variable_size>(topic_name, msg_size, period_ms, qos);  \
+      return;                                                                     \
     }
+    ROS2_PERF_FOR_EACH_MESSAGE_TYPE(CONFIGURE_PUBLISHER)
+#undef CONFIGURE_PUBLISHER
   }
 
   template <typename MessageType>
@@ -217,26 +193,17 @@ class BenchmarkNode : public rclcpp::Node {
   void configure_subscription(const std::string& topic_name,
                               const std::string& msg_type,
                               const rclcpp::QoS& qos) {
-    if (msg_type == "stamped3_float32") {
-      configure_subscription<Stamped3Float32>(topic_name, qos);
-    } else if (msg_type == "stamped4_float32") {
-      configure_subscription<Stamped4Float32>(topic_name, qos);
-    } else if (msg_type == "stamped4_int32") {
-      configure_subscription<Stamped4Int32>(topic_name, qos);
-    } else if (msg_type == "stamped9_float32") {
-      configure_subscription<Stamped9Float32>(topic_name, qos);
-    } else if (msg_type == "stamped12_float32") {
-      configure_subscription<Stamped12Float32>(topic_name, qos);
-    } else if (msg_type == "stamped_int64") {
-      configure_subscription<StampedInt64>(topic_name, qos);
-    } else if (msg_type == "stamped_vector") {
-      configure_subscription<StampedVector>(topic_name, qos);
-    } else {
-      throw std::invalid_argument("Unsupported subscriber message type: " + msg_type);
+#define CONFIGURE_SUBSCRIPTION(topology_name, ros_name, variable_size, fixed_size) \
+    if (msg_type == #topology_name) {                                              \
+      configure_subscription<ros2_perf_multihost_nodes::msg::ros_name>(            \
+          topic_name, qos);                                                         \
+      return;                                                                       \
     }
+    ROS2_PERF_FOR_EACH_MESSAGE_TYPE(CONFIGURE_SUBSCRIPTION)
+#undef CONFIGURE_SUBSCRIPTION
   }
 
-  template <typename MessageType>
+  template <typename MessageType, bool VariableSize>
   void publish_message(const std::string& topic_name, int msg_size) {
     const auto now = get_clock()->now();
     if (now >= publish_end_times_.at(topic_name)) {
@@ -244,7 +211,7 @@ class BenchmarkNode : public rclcpp::Node {
       return;
     }
     auto message = std::make_unique<MessageType>();
-    if constexpr (std::is_same_v<MessageType, StampedVector>) {
+    if constexpr (VariableSize) {
       message->data.assign(msg_size, 0);
     }
     message->header.stamp.sec = static_cast<int32_t>(

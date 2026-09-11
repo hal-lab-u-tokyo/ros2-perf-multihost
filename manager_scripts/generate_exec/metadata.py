@@ -12,16 +12,7 @@ from .validation import (
     require_positive_int,
     resolve_hosts_with_nodes,
 )
-
-
-FIXED_MESSAGE_PAYLOAD_SIZES = {
-    "stamped3_float32": 3 * 4,
-    "stamped4_float32": 4 * 4,
-    "stamped4_int32": 4 * 4,
-    "stamped9_float32": 9 * 4,
-    "stamped12_float32": 12 * 4,
-    "stamped_int64": 8,
-}
+from .message_registry import get_message_spec
 
 
 def collect_metadata_node_names(json_content):
@@ -66,10 +57,8 @@ def collect_topic_runtime_config(json_content):
             raise ValueError(f"{context}: missing topic_name")
         msg_type = entry["msg_type"]
         msg_size = int(entry.get("msg_size", 0))
-        payload_size = (
-            msg_size if msg_type == "stamped_vector"
-            else FIXED_MESSAGE_PAYLOAD_SIZES[msg_type]
-        )
+        spec = get_message_spec(msg_type)
+        payload_size = msg_size if spec.variable_size else spec.fixed_payload_size
         period_ms = require_positive_int(entry, "period_ms", context)
 
         cfg = topic_cfg.setdefault(

@@ -3,16 +3,7 @@
 import argparse
 import os
 
-
-SUPPORTED_MESSAGE_TYPES = {
-    "stamped3_float32",
-    "stamped4_float32",
-    "stamped4_int32",
-    "stamped9_float32",
-    "stamped12_float32",
-    "stamped_int64",
-    "stamped_vector",
-}
+from .message_registry import get_message_spec
 
 
 def require_positive_int(entry, key, context):
@@ -157,9 +148,11 @@ def validate_publisher_entries(pub_entries, context):
             )
         topic_names.add(topic_name_str)
         msg_type = require_non_empty_string(pub, "msg_type", pub_context)
-        if msg_type not in SUPPORTED_MESSAGE_TYPES:
+        try:
+            spec = get_message_spec(msg_type)
+        except KeyError:
             raise ValueError(f"{pub_context}: unsupported msg_type '{msg_type}'")
-        if msg_type == "stamped_vector":
+        if spec.variable_size:
             require_positive_int(pub, "msg_size", pub_context)
         elif "msg_size" in pub:
             raise ValueError(f"{pub_context}: msg_size is only valid for stamped_vector")
@@ -192,7 +185,9 @@ def validate_subscriber_entries(sub_entries, context):
             )
         topic_names.add(topic_name_str)
         msg_type = require_non_empty_string(sub, "msg_type", sub_context)
-        if msg_type not in SUPPORTED_MESSAGE_TYPES:
+        try:
+            get_message_spec(msg_type)
+        except KeyError:
             raise ValueError(f"{sub_context}: unsupported msg_type '{msg_type}'")
 
 

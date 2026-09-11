@@ -6,6 +6,7 @@
 #include <vector>
 
 #include "cxxopts.hpp"
+#include "message_registry.hpp"
 
 namespace benchmark_options {
 
@@ -153,21 +154,6 @@ void Options::parse(int argc, char** argv) {
       print_help();
       std::exit(1);
     }
-    for (size_t index = 0; index < msg_types_pub.size(); ++index) {
-      const bool variable_size = msg_types_pub[index] == "stamped_vector";
-      if (variable_size && msg_sizes_pub[index] <= 0) {
-        std::cout << "Error: stamped_vector requires a positive --msg-sizes-pub "
-                     "value.\n\n";
-        print_help();
-        std::exit(1);
-      }
-      if (!variable_size && msg_sizes_pub[index] != 0) {
-        std::cout << "Error: --msg-sizes-pub is only valid for stamped_vector.\n\n";
-        print_help();
-        std::exit(1);
-      }
-    }
-
     if (period_ms.empty()) {
       period_ms.assign(topic_names_pub.size(), kDefaultPeriodMs);
     } else if (period_ms.size() == 1) {
@@ -185,25 +171,43 @@ void Options::parse(int argc, char** argv) {
         std::exit(1);
       }
     }
-    const std::unordered_set<std::string> supported_types = {
-        "stamped3_float32", "stamped4_float32", "stamped4_int32",
-        "stamped9_float32", "stamped12_float32", "stamped_int64",
-        "stamped_vector"};
-    for (const auto& msg_type : msg_types_pub) {
-      if (supported_types.count(msg_type) == 0) {
-        std::cout << "Error: unsupported publisher message type: " << msg_type
-                  << ".\n\n";
+    auto validate_message_type = [&print_help](const std::string& msg_type,
+                                                int msg_size,
+                                                const char* role) {
+      bool supported = false;
+      bool variable_size = false;
+#define FIND_MESSAGE_TYPE(topology_name, ros_name, is_variable, fixed_size) \
+      if (msg_type == #topology_name) {                                    \
+        supported = true;                                                   \
+        variable_size = is_variable;                                        \
+      }
+      ROS2_PERF_FOR_EACH_MESSAGE_TYPE(FIND_MESSAGE_TYPE)
+#undef FIND_MESSAGE_TYPE
+      if (!supported) {
+        std::cout << "Error: unsupported " << role << " message type: "
+                  << msg_type << ".\n\n";
         print_help();
         std::exit(1);
       }
+      if (variable_size && msg_size <= 0) {
+        std::cout << "Error: variable-length " << role
+                  << " messages require a positive --msg-sizes-pub value.\n\n";
+        print_help();
+        std::exit(1);
+      }
+      if (!variable_size && msg_size != 0) {
+        std::cout << "Error: --msg-sizes-pub is valid only for variable-length "
+                  << role << " messages.\n\n";
+        print_help();
+        std::exit(1);
+      }
+    };
+    for (size_t index = 0; index < msg_types_pub.size(); ++index) {
+      validate_message_type(msg_types_pub[index], msg_sizes_pub[index],
+                            "publisher");
     }
     for (const auto& msg_type : msg_types_sub) {
-      if (supported_types.count(msg_type) == 0) {
-        std::cout << "Error: unsupported subscriber message type: " << msg_type
-                  << ".\n\n";
-        print_help();
-        std::exit(1);
-      }
+      validate_message_type(msg_type, 0, "subscriber");
     }
   } catch (const cxxopts::exceptions::exception& exception) {
     std::cout << "Error parsing options: " << exception.what() << "\n\n";
