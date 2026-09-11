@@ -69,7 +69,7 @@ For QoS sweep runs, the Manager-side runner should expand the topology JSON
 
 ```json
 {
-  "topology": "five_hosts_qos_sweep",
+  "topology": "sierra_nevada_5hosts_qos_sweep",
   "rmw": "zenoh",
   "trial_idx": 1,
   "qos_case_idx": 0,
@@ -158,7 +158,7 @@ python3 remote_hosts_scripts/start_exec_scripts.py <topology> \
 Example for one expanded QoS sweep case:
 
 ```bash
-python3 remote_hosts_scripts/start_exec_scripts.py five_hosts_qos_sweep \
+python3 remote_hosts_scripts/start_exec_scripts.py sierra_nevada_5hosts_qos_sweep \
   --rmw zenoh \
   --exec-policy native \
   --trial-idx 1 \
