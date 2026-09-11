@@ -172,8 +172,9 @@ void Options::parse(int argc, char** argv) {
       }
     }
     auto validate_message_type = [&print_help](const std::string& msg_type,
-                                                int msg_size,
-                                                const char* role) {
+                          int msg_size,
+                          bool requires_msg_size,
+                          const char* role) {
       bool supported = false;
       bool variable_size = false;
 #define FIND_MESSAGE_TYPE(topology_name, ros_name, is_variable, fixed_size) \
@@ -189,13 +190,13 @@ void Options::parse(int argc, char** argv) {
         print_help();
         std::exit(1);
       }
-      if (variable_size && msg_size <= 0) {
+      if (requires_msg_size && variable_size && msg_size <= 0) {
         std::cout << "Error: variable-length " << role
                   << " messages require a positive --msg-sizes-pub value.\n\n";
         print_help();
         std::exit(1);
       }
-      if (!variable_size && msg_size != 0) {
+      if (requires_msg_size && !variable_size && msg_size != 0) {
         std::cout << "Error: --msg-sizes-pub is valid only for variable-length "
                   << role << " messages.\n\n";
         print_help();
@@ -203,11 +204,11 @@ void Options::parse(int argc, char** argv) {
       }
     };
     for (size_t index = 0; index < msg_types_pub.size(); ++index) {
-      validate_message_type(msg_types_pub[index], msg_sizes_pub[index],
+      validate_message_type(msg_types_pub[index], msg_sizes_pub[index], true,
                             "publisher");
     }
     for (const auto& msg_type : msg_types_sub) {
-      validate_message_type(msg_type, 0, "subscriber");
+      validate_message_type(msg_type, 0, false, "subscriber");
     }
   } catch (const cxxopts::exceptions::exception& exception) {
     std::cout << "Error parsing options: " << exception.what() << "\n\n";
