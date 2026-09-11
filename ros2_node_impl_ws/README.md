@@ -89,7 +89,8 @@ ignores depth when `--qos-history KEEP_ALL` is used.
 | --msg-types-pub | - | Message types for published topics (repeatable) | - |
 | --msg-types-sub | - | Message types for subscribed topics (repeatable) | - |
 | --msg-sizes-pub | - | Variable payload sizes for `stamped_vector` publisher topics | - |
-| --msg-pass-by-pub | - | Publisher message passing mode; must be `shared_ptr` for each publisher topic | - |
+| --msg-pass-by-pub | - | Publisher mode: `const_ref` or `unique_ptr` | `const_ref` |
+| --msg-pass-by-sub | - | Subscriber mode: `const_shared_ptr` or `const_shared_ptr_with_info` | `const_shared_ptr` |
 | --period | -p | Publish period in milliseconds for published topics | 100 ms |
 
 If `--log-dir` is omitted, no log files or metadata files are created. Leave it unset when you only want a functional run without log collection.
@@ -108,7 +109,9 @@ Publish-side and subscribe-side logs use separate file names.
         <topic_name>_sub_log.txt
 ```
 
-`metadata.txt` stores metadata such as node name, node type, topic names, payload size, and period. Each log file stores the index and timestamp of each sent or received message.
+`metadata.txt` stores metadata such as node name, node type, topic names, payload
+size, pass-by mode, and period. Each log file stores the index and timestamp of
+each sent or received message.
 
 If logging is unnecessary, omit `--log-dir`. In that case, no log directory or metadata file is created.
 
@@ -135,7 +138,8 @@ ros2 run ros2_perf_multihost_nodes benchmark_node \
   --msg-types-pub stamped_vector \
   --msg-types-sub stamped_vector \
   --msg-sizes-pub 64 \
-  --msg-pass-by-pub shared_ptr \
+  --msg-pass-by-pub unique_ptr \
+  --msg-pass-by-sub const_shared_ptr_with_info \
   --period 100 \
   --qos-history KEEP_LAST \
   --qos-depth 1 \
@@ -150,7 +154,6 @@ ros2 run ros2_perf_multihost_nodes benchmark_node \
   --topic-names-pub topic_out \
   --msg-types-pub stamped_vector \
   --msg-sizes-pub 64 \
-  --msg-pass-by-pub shared_ptr \
   --period 100 \
   --log-dir logs
 ```
@@ -173,6 +176,7 @@ ros2 launch ros2_perf_multihost_nodes benchmark.launch.py \
   msg_types_pub:=stamped_vector \
   msg_types_sub:=stamped_vector \
   msg_sizes_pub:=64 \
-  msg_pass_by_pub:=shared_ptr \
+  msg_pass_by_pub:=unique_ptr \
+  msg_pass_by_sub:=const_shared_ptr_with_info \
   period:=100
 ```

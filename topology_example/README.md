@@ -43,7 +43,7 @@ Notes:
 | msg_type | Required | string | Concrete message type derived from a supported `Stamped*.msg` definition. |
 | msg_size | Required for variable-length message types | number | Size in bytes of the variable-length `data` field. Forbidden for fixed-size types. |
 | period_ms | Required | number | Publish period (ms). Must be a positive integer. |
-| msg_pass_by | Required | string | Must be `shared_ptr`, matching the iRobot Sierra Nevada topology. |
+| msg_pass_by | Optional | string | `const_ref` (default) or `unique_ptr`. |
 
 ### Elements of the `subscribers` Array
 
@@ -51,6 +51,12 @@ Notes:
 |---|---|---|---|
 | topic_name | Required | string | Topic name to subscribe to. |
 | msg_type | Required | string | Concrete message type. It must match every publisher of the same topic. |
+| msg_pass_by | Optional | string | `const_shared_ptr` (default) or `const_shared_ptr_with_info`. |
+
+The original iRobot Sierra Nevada topology specifies publisher
+`msg_pass_by` as `shared_ptr`. That publisher API is deprecated in ROS 2 Jazzy,
+so this platform does not support it and rejects `shared_ptr`. Sierra
+Nevada-derived examples use the Jazzy-native `const_ref` mode instead.
 
 ### Adding Message Types
 
@@ -119,7 +125,7 @@ so the intended behavior is visible in the JSON itself.
           "topic_name": "topic_a",
           "msg_type": "stamped_vector",
           "msg_size": 64,
-          "msg_pass_by": "shared_ptr",
+          "msg_pass_by": "unique_ptr",
           "period_ms": 100
         }
       ]
@@ -129,7 +135,8 @@ so the intended behavior is visible in the JSON itself.
       "subscribers": [
         {
           "topic_name": "topic_a",
-          "msg_type": "stamped_vector"
+          "msg_type": "stamped_vector",
+          "msg_pass_by": "const_shared_ptr_with_info"
         }
       ]
     }

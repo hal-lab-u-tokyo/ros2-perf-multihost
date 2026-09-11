@@ -21,6 +21,7 @@ class Options {
   std::vector<std::string> msg_types_sub;
   std::vector<int> msg_sizes_pub;
   std::vector<std::string> msg_pass_by_pub;
+  std::vector<std::string> msg_pass_by_sub;
   std::vector<int> period_ms;
   int eval_time;
   std::string log_dir;
