@@ -177,10 +177,16 @@ void Options::parse(int argc, char** argv) {
                           const char* role) {
       bool supported = false;
       bool variable_size = false;
-#define FIND_MESSAGE_TYPE(topology_name, ros_name, is_variable, fixed_size) \
-      if (msg_type == #topology_name) {                                    \
-        supported = true;                                                   \
-        variable_size = is_variable;                                        \
+#define FIND_MESSAGE_TYPE(topology_name, ros_name, is_variable, element_size, fixed_size) \
+      if (msg_type == #topology_name) {                                                \
+        supported = true;                                                               \
+        variable_size = is_variable;                                                    \
+        if (requires_msg_size && is_variable && msg_size % element_size != 0) {        \
+          std::cout << "Error: --msg-sizes-pub must be divisible by "                 \
+                    << element_size << " for " << msg_type << ".\n\n";              \
+          print_help();                                                                  \
+          std::exit(1);                                                                  \
+        }                                                                                \
       }
       ROS2_PERF_FOR_EACH_MESSAGE_TYPE(FIND_MESSAGE_TYPE)
 #undef FIND_MESSAGE_TYPE

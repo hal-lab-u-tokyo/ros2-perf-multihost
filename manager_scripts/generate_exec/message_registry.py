@@ -29,6 +29,7 @@ class MessageSpec:
     ros_name: str
     header_name: str
     variable_size: bool
+    element_size: int
     fixed_payload_size: int
 
 
@@ -58,15 +59,16 @@ def load_message_specs(msg_directory=None):
         if match is None or match.group(1) not in PRIMITIVE_BYTE_SIZES:
             raise ValueError(f"{msg_path}: data must use a primitive type")
         element_type, array_size = match.groups()
+        element_size = PRIMITIVE_BYTE_SIZES[element_type]
         if array_size == "":
             variable_size = True
             fixed_payload_size = 0
         elif array_size is None:
             variable_size = False
-            fixed_payload_size = PRIMITIVE_BYTE_SIZES[element_type]
+            fixed_payload_size = element_size
         else:
             variable_size = False
-            fixed_payload_size = PRIMITIVE_BYTE_SIZES[element_type] * int(array_size)
+            fixed_payload_size = element_size * int(array_size)
 
         ros_name = msg_path.stem
         specs.append(MessageSpec(
@@ -74,6 +76,7 @@ def load_message_specs(msg_directory=None):
             ros_name=ros_name,
             header_name=_to_snake_case(ros_name),
             variable_size=variable_size,
+            element_size=element_size,
             fixed_payload_size=fixed_payload_size,
         ))
     if not specs:
@@ -110,7 +113,7 @@ def generate_cpp_header(msg_directory, output_path):
         variable_size = "true" if spec.variable_size else "false"
         lines.append(
             f"  X({spec.topology_name}, {spec.ros_name}, {variable_size}, "
-            f"{spec.fixed_payload_size}){suffix}"
+            f"{spec.element_size}, {spec.fixed_payload_size}){suffix}"
         )
     lines.extend([
         "",

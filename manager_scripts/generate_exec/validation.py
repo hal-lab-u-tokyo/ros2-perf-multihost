@@ -153,7 +153,12 @@ def validate_publisher_entries(pub_entries, context):
         except KeyError:
             raise ValueError(f"{pub_context}: unsupported msg_type '{msg_type}'")
         if spec.variable_size:
-            require_positive_int(pub, "msg_size", pub_context)
+            msg_size = require_positive_int(pub, "msg_size", pub_context)
+            if msg_size % spec.element_size != 0:
+                raise ValueError(
+                    f"{pub_context}: msg_size must be divisible by "
+                    f"{spec.element_size} for msg_type '{msg_type}'"
+                )
         elif "msg_size" in pub:
             raise ValueError(f"{pub_context}: msg_size is only valid for stamped_vector")
         if pub.get("msg_pass_by") != "shared_ptr":
@@ -274,17 +279,6 @@ def _normalize_node_roles(node, node_context):
                 f"{node_context}: publishers and subscribers cannot use the "
                 f"same topic(s): {', '.join(overlapping_topics)}"
             )
-
-        publisher_types = {entry["topic_name"]: entry["msg_type"]
-                           for entry in publisher_entries}
-        subscriber_types = {entry["topic_name"]: entry["msg_type"]
-                            for entry in subscriber_entries}
-        for topic_name in publisher_types.keys() & subscriber_types.keys():
-            if publisher_types[topic_name] != subscriber_types[topic_name]:
-                raise ValueError(
-                    f"{node_context}: publisher/subscriber msg_type mismatch "
-                    f"for topic '{topic_name}'"
-                )
 
     return normalized
 

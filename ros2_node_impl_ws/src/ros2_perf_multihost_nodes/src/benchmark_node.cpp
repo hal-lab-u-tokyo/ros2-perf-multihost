@@ -145,9 +145,9 @@ class BenchmarkNode : public rclcpp::Node {
   }
 
   static int payload_size(const std::string& msg_type, int msg_size) {
-#define GET_PAYLOAD_SIZE(topology_name, ros_name, variable_size, fixed_size) \
-    if (msg_type == #topology_name) {                                        \
-      return variable_size ? msg_size : fixed_size;                           \
+#define GET_PAYLOAD_SIZE(topology_name, ros_name, variable_size, element_size, fixed_size) \
+    if (msg_type == #topology_name) {                                                    \
+      return variable_size ? msg_size : fixed_size;                                       \
     }
     ROS2_PERF_FOR_EACH_MESSAGE_TYPE(GET_PAYLOAD_SIZE)
 #undef GET_PAYLOAD_SIZE
@@ -169,11 +169,11 @@ class BenchmarkNode : public rclcpp::Node {
   void configure_publisher(const std::string& topic_name,
                            const std::string& msg_type, int msg_size,
                            int period_ms, const rclcpp::QoS& qos) {
-#define CONFIGURE_PUBLISHER(topology_name, ros_name, variable_size, fixed_size) \
-    if (msg_type == #topology_name) {                                           \
-      configure_publisher<ros2_perf_multihost_nodes::msg::ros_name,              \
-                          variable_size>(topic_name, msg_size, period_ms, qos);  \
-      return;                                                                     \
+#define CONFIGURE_PUBLISHER(topology_name, ros_name, variable_size, element_size, fixed_size) \
+    if (msg_type == #topology_name) {                                                       \
+      configure_publisher<ros2_perf_multihost_nodes::msg::ros_name,                          \
+                          variable_size>(topic_name, msg_size / element_size, period_ms, qos); \
+      return;                                                                                 \
     }
     ROS2_PERF_FOR_EACH_MESSAGE_TYPE(CONFIGURE_PUBLISHER)
 #undef CONFIGURE_PUBLISHER
@@ -193,11 +193,11 @@ class BenchmarkNode : public rclcpp::Node {
   void configure_subscription(const std::string& topic_name,
                               const std::string& msg_type,
                               const rclcpp::QoS& qos) {
-#define CONFIGURE_SUBSCRIPTION(topology_name, ros_name, variable_size, fixed_size) \
-    if (msg_type == #topology_name) {                                              \
-      configure_subscription<ros2_perf_multihost_nodes::msg::ros_name>(            \
-          topic_name, qos);                                                         \
-      return;                                                                       \
+#define CONFIGURE_SUBSCRIPTION(topology_name, ros_name, variable_size, element_size, fixed_size) \
+  if (msg_type == #topology_name) {                                                        \
+    configure_subscription<ros2_perf_multihost_nodes::msg::ros_name>(                     \
+      topic_name, qos);                                                                  \
+    return;                                                                                \
     }
     ROS2_PERF_FOR_EACH_MESSAGE_TYPE(CONFIGURE_SUBSCRIPTION)
 #undef CONFIGURE_SUBSCRIPTION
