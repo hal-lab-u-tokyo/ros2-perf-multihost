@@ -1,6 +1,7 @@
 #include <chrono>
 #include <csignal>
 #include <cstdio>
+#include <cstdlib>
 #include <filesystem>
 #include <fstream>
 #include <map>
@@ -42,7 +43,6 @@ class BenchmarkNode : public rclcpp::Node {
       : Node(options.node_name), options_(options), log_dir_(options.log_dir) {
     create_result_directory();
     create_metadata_file();
-    const auto qos = create_qos();
 
     for (size_t index = 0; index < options_.topic_names_pub.size(); ++index) {
       const auto& topic_name = options_.topic_names_pub[index];
@@ -54,7 +54,9 @@ class BenchmarkNode : public rclcpp::Node {
       publish_logs_.try_emplace(topic_name);
       const int period_ms = options_.period_ms[index];
       configure_publisher(topic_name, options_.msg_types_pub[index], options_.msg_sizes_pub[index],
-                          options_.msg_pass_by_pub[index], period_ms, qos);
+                          options_.msg_pass_by_pub[index], period_ms,
+                          create_qos(options_.qos_history_pub[index], options_.qos_depth_pub[index],
+                                     options_.qos_reliability_pub[index]));
     }
 
     for (size_t index = 0; index < options_.topic_names_sub.size(); ++index) {
@@ -65,7 +67,10 @@ class BenchmarkNode : public rclcpp::Node {
       subscribe_end_times_.emplace(topic_name,
                                    start_time + rclcpp::Duration::from_seconds(options_.eval_time));
       configure_subscription(topic_name, options_.msg_types_sub[index],
-                             options_.msg_pass_by_sub[index], qos);
+                             options_.msg_pass_by_sub[index],
+                             create_qos(options_.qos_history_sub[index],
+                                        options_.qos_depth_sub[index],
+                                        options_.qos_reliability_sub[index]));
     }
 
     shutdown_timer_ = create_wall_timer(std::chrono::seconds(options_.eval_time + 10),
@@ -78,14 +83,15 @@ class BenchmarkNode : public rclcpp::Node {
   }
 
  private:
-  rclcpp::QoS create_qos() const {
+  static rclcpp::QoS create_qos(const std::string& history, int depth,
+                                const std::string& reliability) {
     auto qos = rclcpp::QoS(rclcpp::KeepLast(1));
-    if (options_.qos_history == "KEEP_ALL") {
+    if (history == "KEEP_ALL") {
       qos.keep_all();
     } else {
-      qos.keep_last(options_.qos_depth);
+      qos.keep_last(depth);
     }
-    if (options_.qos_reliability == "BEST_EFFORT") {
+    if (reliability == "BEST_EFFORT") {
       qos.best_effort();
     }
     return qos;
@@ -108,6 +114,8 @@ class BenchmarkNode : public rclcpp::Node {
     }
     file << "Name: " << options_.node_name << "\n"
          << "NodeType: Benchmark\n"
+          << "QosCaseIndex: "
+          << (std::getenv("QOS_CASE_INDEX") ? std::getenv("QOS_CASE_INDEX") : "N/A") << "\n"
          << "Topics(Pub): ";
     write_csv(file, options_.topic_names_pub);
     file << "\nMsgTypes(Pub): ";
@@ -116,6 +124,14 @@ class BenchmarkNode : public rclcpp::Node {
     write_csv(file, options_.msg_sizes_pub);
     file << "\nMsgPassBy(Pub): ";
     write_csv(file, options_.msg_pass_by_pub);
+    file << "\nQosHistory(Pub): ";
+    write_csv(file, options_.qos_history_pub);
+    file << "\nQosDepth(Pub): ";
+    write_csv(file, options_.qos_depth_pub);
+    file << "\nQosReliability(Pub): ";
+    write_csv(file, options_.qos_reliability_pub);
+    file << "\nQosSource(Pub): ";
+    write_csv(file, options_.qos_source_pub);
     file << "\nPayloadSize: ";
     for (size_t index = 0; index < options_.msg_types_pub.size(); ++index) {
       file << payload_size(options_.msg_types_pub[index], options_.msg_sizes_pub[index]) << ',';
@@ -128,6 +144,14 @@ class BenchmarkNode : public rclcpp::Node {
     write_csv(file, options_.msg_types_sub);
     file << "\nMsgPassBy(Sub): ";
     write_csv(file, options_.msg_pass_by_sub);
+    file << "\nQosHistory(Sub): ";
+    write_csv(file, options_.qos_history_sub);
+    file << "\nQosDepth(Sub): ";
+    write_csv(file, options_.qos_depth_sub);
+    file << "\nQosReliability(Sub): ";
+    write_csv(file, options_.qos_reliability_sub);
+    file << "\nQosSource(Sub): ";
+    write_csv(file, options_.qos_source_sub);
     file << '\n';
   }
 

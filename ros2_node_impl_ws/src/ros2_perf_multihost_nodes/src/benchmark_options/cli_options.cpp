@@ -11,7 +11,11 @@
 namespace benchmark_options {
 
 Options::Options()
-    : eval_time(60), qos_history("KEEP_LAST"), qos_depth(1), qos_reliability("RELIABLE") {}
+    : eval_time(60),
+      qos_history("KEEP_LAST"),
+      qos_depth(1),
+      qos_reliability("RELIABLE"),
+      qos_override(false) {}
 
 Options::Options(int argc, char** argv) : Options() { parse(argc, argv); }
 
@@ -42,12 +46,30 @@ void Options::parse(int argc, char** argv) {
       "ms")("eval-time", "Evaluation duration in seconds",
             cxxopts::value<int>(eval_time)->default_value("60"), "sec")(
       "log-dir", "Directory to write logs and metadata", cxxopts::value<std::string>(log_dir))(
+      "qos-history-pub", "QoS history per publisher topic",
+      cxxopts::value<std::vector<std::string>>(qos_history_pub))(
+      "qos-history-sub", "QoS history per subscriber topic",
+      cxxopts::value<std::vector<std::string>>(qos_history_sub))(
+      "qos-depth-pub", "QoS depth per publisher topic",
+      cxxopts::value<std::vector<int>>(qos_depth_pub))(
+      "qos-depth-sub", "QoS depth per subscriber topic",
+      cxxopts::value<std::vector<int>>(qos_depth_sub))(
+      "qos-reliability-pub", "QoS reliability per publisher topic",
+      cxxopts::value<std::vector<std::string>>(qos_reliability_pub))(
+      "qos-reliability-sub", "QoS reliability per subscriber topic",
+      cxxopts::value<std::vector<std::string>>(qos_reliability_sub))(
+      "qos-source-pub", "QoS source per publisher topic",
+      cxxopts::value<std::vector<std::string>>(qos_source_pub))(
+      "qos-source-sub", "QoS source per subscriber topic",
+      cxxopts::value<std::vector<std::string>>(qos_source_sub))(
       "qos-history", "QoS history policy: KEEP_LAST or KEEP_ALL",
       cxxopts::value<std::string>(qos_history)->default_value("KEEP_LAST"))(
       "qos-depth", "QoS depth when qos_history=KEEP_LAST",
       cxxopts::value<int>(qos_depth)->default_value("1"))(
       "qos-reliability", "QoS reliability: RELIABLE or BEST_EFFORT",
-      cxxopts::value<std::string>(qos_reliability)->default_value("RELIABLE"));
+      cxxopts::value<std::string>(qos_reliability)->default_value("RELIABLE"))(
+      "qos-override", "Apply global QoS options to every endpoint",
+      cxxopts::value<bool>(qos_override)->default_value("false")->implicit_value("true"));
 
   auto print_help = [&options]() {
     std::cout << "Node role:\n"
@@ -199,6 +221,76 @@ void Options::parse(int argc, char** argv) {
         print_help();
         std::exit(1);
       }
+    }
+    auto validate_qos_vectors = [&print_help](std::vector<std::string>& histories,
+                                               std::vector<int>& depths,
+                                               std::vector<std::string>& reliabilities,
+                                               size_t endpoint_count, const char* role) {
+      if (histories.empty()) {
+        histories.assign(endpoint_count, "KEEP_LAST");
+      }
+      if (depths.empty()) {
+        depths.assign(endpoint_count, 1);
+      }
+      if (reliabilities.empty()) {
+        reliabilities.assign(endpoint_count, "RELIABLE");
+      }
+      if (histories.size() != endpoint_count || depths.size() != endpoint_count ||
+          reliabilities.size() != endpoint_count) {
+        std::cout << "Error: per-" << role
+                  << " QoS options must match the number of topic entries.\n\n";
+        print_help();
+        std::exit(1);
+      }
+      for (const auto& history : histories) {
+        if (history != "KEEP_LAST" && history != "KEEP_ALL") {
+          std::cout << "Error: per-" << role
+                    << " QoS history must be KEEP_LAST or KEEP_ALL.\n\n";
+          print_help();
+          std::exit(1);
+        }
+      }
+      for (const int depth : depths) {
+        if (depth <= 0) {
+          std::cout << "Error: per-" << role << " QoS depth must be positive.\n\n";
+          print_help();
+          std::exit(1);
+        }
+      }
+      for (const auto& reliability : reliabilities) {
+        if (reliability != "RELIABLE" && reliability != "BEST_EFFORT") {
+          std::cout << "Error: per-" << role
+                    << " QoS reliability must be RELIABLE or BEST_EFFORT.\n\n";
+          print_help();
+          std::exit(1);
+        }
+      }
+    };
+    validate_qos_vectors(qos_history_pub, qos_depth_pub, qos_reliability_pub,
+                         topic_names_pub.size(), "publisher");
+    validate_qos_vectors(qos_history_sub, qos_depth_sub, qos_reliability_sub,
+                         topic_names_sub.size(), "subscriber");
+    if (qos_source_pub.empty()) {
+      qos_source_pub.assign(topic_names_pub.size(), "root_default");
+    }
+    if (qos_source_sub.empty()) {
+      qos_source_sub.assign(topic_names_sub.size(), "root_default");
+    }
+    if (qos_source_pub.size() != topic_names_pub.size() ||
+        qos_source_sub.size() != topic_names_sub.size()) {
+      std::cout << "Error: per-endpoint QoS source options must match topic entries.\n\n";
+      print_help();
+      std::exit(1);
+    }
+    if (qos_override) {
+      qos_history_pub.assign(topic_names_pub.size(), qos_history);
+      qos_depth_pub.assign(topic_names_pub.size(), qos_depth);
+      qos_reliability_pub.assign(topic_names_pub.size(), qos_reliability);
+      qos_history_sub.assign(topic_names_sub.size(), qos_history);
+      qos_depth_sub.assign(topic_names_sub.size(), qos_depth);
+      qos_reliability_sub.assign(topic_names_sub.size(), qos_reliability);
+      qos_source_pub.assign(topic_names_pub.size(), "sweep");
+      qos_source_sub.assign(topic_names_sub.size(), "sweep");
     }
     auto validate_message_type = [&print_help](const std::string& msg_type, int msg_size,
                                                bool requires_msg_size, const char* role) {
