@@ -151,16 +151,17 @@ Additional examples may be added incrementally.
 |---|---:|---|
 | [simple.json](./simple.json) | 3 | Basic quick-start topology |
 | [simple_qos_sweep.json](./simple_qos_sweep.json) | 3 | Same topology as `simple.json` with sweep `qos` array |
-| [sierra_nevada/one_host.json](./sierra_nevada/one_host.json) | 1 | Sierra Nevada-derived allocation |
-| [sierra_nevada/two_hosts.json](./sierra_nevada/two_hosts.json) | 2 | Sierra Nevada-derived allocation |
-| [sierra_nevada/three_hosts.json](./sierra_nevada/three_hosts.json) | 3 | Sierra Nevada-derived allocation |
-| [sierra_nevada/four_hosts.json](./sierra_nevada/four_hosts.json) | 4 | Sierra Nevada-derived allocation |
-| [sierra_nevada/five_hosts.json](./sierra_nevada/five_hosts.json) | 5 | Sierra Nevada-derived allocation |
-| [sierra_nevada/five_hosts_qos_sweep.json](./sierra_nevada/five_hosts_qos_sweep.json) | 5 | Same host allocation as `five_hosts.json` with sweep `qos` array |
-| [sierra_nevada/six_hosts.json](./sierra_nevada/six_hosts.json) | 6 | Sierra Nevada-derived allocation |
-| [sierra_nevada/seven_hosts.json](./sierra_nevada/seven_hosts.json) | 7 | Sierra Nevada-derived allocation |
+| [sierra_nevada.json](./sierra_nevada.json) | 3 | Based on the [iRobot Sierra Nevada topology](https://github.com/irobot-ros/ros2-performance/blob/rolling/irobot_benchmark/topology/sierra_nevada.json) |
+| [sierra_nevada_numhosts/sierra_nevada_1host.json](./sierra_nevada_numhosts/sierra_nevada_1host.json) | 1 | Sierra Nevada-derived allocation |
+| [sierra_nevada_numhosts/sierra_nevada_2hosts.json](./sierra_nevada_numhosts/sierra_nevada_2hosts.json) | 2 | Sierra Nevada-derived allocation |
+| [sierra_nevada_numhosts/sierra_nevada_3hosts.json](./sierra_nevada_numhosts/sierra_nevada_3hosts.json) | 3 | Sierra Nevada-derived allocation |
+| [sierra_nevada_numhosts/sierra_nevada_4hosts.json](./sierra_nevada_numhosts/sierra_nevada_4hosts.json) | 4 | Sierra Nevada-derived allocation |
+| [sierra_nevada_numhosts/sierra_nevada_5hosts.json](./sierra_nevada_numhosts/sierra_nevada_5hosts.json) | 5 | Sierra Nevada-derived allocation |
+| [sierra_nevada_numhosts/sierra_nevada_5hosts_qos_sweep.json](./sierra_nevada_numhosts/sierra_nevada_5hosts_qos_sweep.json) | 5 | Same host allocation as `sierra_nevada_5hosts.json` with sweep `qos` array |
+| [sierra_nevada_numhosts/sierra_nevada_6hosts.json](./sierra_nevada_numhosts/sierra_nevada_6hosts.json) | 6 | Sierra Nevada-derived allocation |
+| [sierra_nevada_numhosts/sierra_nevada_7hosts.json](./sierra_nevada_numhosts/sierra_nevada_7hosts.json) | 7 | Sierra Nevada-derived allocation |
 
 Notes:
 - `simple.json` and `simple_qos_sweep.json` use the same 3-host topology. The difference is QoS mode: object for single case vs array for sweep.
-- `sierra_nevada/*` examples are based on [iRobot's Sierra Nevada topology](https://github.com/irobot-ros/ros2-performance/tree/rolling/irobot_benchmark/topology). Theses differences are host-count allocation variants (1-7 hosts) and an explicit QoS sweep variant for `five_hosts_qos_sweep.json`.
+- `sierra_nevada.json` is the canonical 3-host reference based on iRobot's Sierra Nevada topology, while `sierra_nevada_numhosts/*` contains the same layout split into host-count variants (1-7 hosts) plus the QoS sweep variant `sierra_nevada_5hosts_qos_sweep.json`.
 
