@@ -10,6 +10,7 @@ from datetime import datetime
 from .validation import (
     normalize_qos_cases,
     require_positive_int,
+    resolve_endpoint_qos,
     resolve_hosts_with_nodes,
 )
 from .message_registry import get_message_spec
@@ -90,6 +91,31 @@ def collect_topic_runtime_config(json_content):
     return topic_cfg
 
 
+def collect_endpoint_qos_config(json_content):
+    """Collect generated effective QoS and source for every endpoint."""
+    endpoint_qos = []
+    root_qos = json_content.get("qos")
+    for host in resolve_hosts_with_nodes(json_content):
+        for node in host["nodes"]:
+            for role in ("publisher", "subscriber"):
+                for endpoint in node.get(role, []) or []:
+                    if isinstance(root_qos, list):
+                        source = "sweep"
+                    elif "qos" in endpoint:
+                        source = "endpoint"
+                    else:
+                        source = "root_default"
+                    endpoint_qos.append({
+                        "host": host["host_name"],
+                        "node": node["node_name"],
+                        "role": role,
+                        "topic": endpoint["topic_name"],
+                        "qos": resolve_endpoint_qos(endpoint, root_qos),
+                        "source": source,
+                    })
+    return endpoint_qos
+
+
 def unique_in_order(items):
     """Remove duplicates while preserving the original order."""
     return list(dict.fromkeys(items))
@@ -132,6 +158,7 @@ def generate_metadata_file(
     subscriber_names = unique_in_order(subscriber_names)
     intermediate_names = unique_in_order(intermediate_names)
     topic_runtime_cfg = collect_topic_runtime_config(json_content)
+    endpoint_qos_cfg = collect_endpoint_qos_config(json_content)
 
     all_nodes = [
         node
@@ -171,6 +198,10 @@ def generate_metadata_file(
             f"qos_history: {default_qos['history']}",
             f"qos_depth: {default_qos['depth']}",
             f"qos_reliability: {default_qos['reliability']}",
+            (
+                "endpoint_qos_json: "
+                f"{json.dumps(endpoint_qos_cfg, separators=(',', ':'), sort_keys=True)}"
+            ),
         ],
         [
             "# --- 3. topology stats ---",

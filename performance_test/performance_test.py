@@ -9,7 +9,7 @@ import sys
 import time
 
 from analyzer import aggregate_total_latency
-from qos_sweep import load_qos_cases, qos_case_label
+from qos_sweep import is_qos_sweep, load_qos_cases, qos_case_label
 from runner import collect_logs, collect_runtime_logs, prepare_run, resolve_host_list, run_test
 from zenoh_runtime import build_config_override, resolve_router_target, start_router, stop_router
 
@@ -342,7 +342,7 @@ Examples:
         print(
             f"ERROR: Failed to load QoS cases from metadata: {e}", file=sys.stderr)
         sys.exit(1)
-    is_qos_sweep = len(qos_cases) > 1
+    qos_sweep_enabled = is_qos_sweep(args.ws_dir, args.topology_name)
 
     qos_manifest_path = os.path.join(local_session_dir, "qos_cases.json")
     with open(qos_manifest_path, "w", encoding="utf-8") as f:
@@ -481,7 +481,7 @@ Examples:
     case_results = []
     try:
         for qos_case_idx, qos_case in enumerate(qos_cases):
-            if is_qos_sweep:
+            if qos_sweep_enabled:
                 label = qos_case_label(qos_case_idx)
                 case_session_dir = os.path.join(local_session_dir, label)
                 case_coordination_logs_dir = os.path.join(
@@ -506,7 +506,7 @@ Examples:
             os.makedirs(case_raw_logs_dir, exist_ok=True)
             os.makedirs(case_analysis_dir, exist_ok=True)
 
-            if is_qos_sweep:
+            if qos_sweep_enabled:
                 print(f"=== Running {label}: {qos_case} ===")
 
             prepare_run(
@@ -600,7 +600,7 @@ Examples:
                 print(
                     f"WARNING: Failed to stop Zenoh router cleanly: {exc}", file=sys.stderr)
 
-    if is_qos_sweep:
+    if qos_sweep_enabled:
         _write_qos_sweep_summary(
             os.path.join(local_analysis_dir, "qos_sweep_summary.csv"),
             case_results,

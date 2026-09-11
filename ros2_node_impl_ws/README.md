@@ -39,11 +39,15 @@ Main options are shown below.
 | --qos-history | - | QoS history: KEEP_LAST / KEEP_ALL | KEEP_LAST |
 | --qos-depth | - | QoS depth, effective only with KEEP_LAST | 1 |
 | --qos-reliability | - | QoS reliability: RELIABLE / BEST_EFFORT | RELIABLE |
+| --qos-history-pub / --qos-history-sub | - | Endpoint-aligned history vectors | KEEP_LAST per endpoint |
+| --qos-depth-pub / --qos-depth-sub | - | Endpoint-aligned depth vectors | 1 per endpoint |
+| --qos-reliability-pub / --qos-reliability-sub | - | Endpoint-aligned reliability vectors | RELIABLE per endpoint |
+| --qos-override | - | Replace endpoint vectors with global QoS options | false |
 
-These node executables receive one QoS setting per process launch. When a
-topology JSON file defines `qos` as an array for QoS sweep experiments, the
-future converter or runner should iterate over that array and pass one QoS case
-at a time to these options.
+These node executables accept endpoint-aligned QoS vectors. Generated launch
+files provide one value for each publisher and subscriber. During a root-array
+QoS sweep, the runner passes one global case at a time with `--qos-override`,
+which replaces all endpoint vectors.
 
 Example topology-side QoS sweep input:
 
