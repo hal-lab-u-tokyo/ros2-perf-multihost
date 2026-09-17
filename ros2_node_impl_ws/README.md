@@ -42,7 +42,7 @@ Main options are shown below.
 | --qos-history-pub / --qos-history-sub | - | Endpoint-aligned history vectors | KEEP_LAST per endpoint |
 | --qos-depth-pub / --qos-depth-sub | - | Endpoint-aligned depth vectors | 1 per endpoint |
 | --qos-reliability-pub / --qos-reliability-sub | - | Endpoint-aligned reliability vectors | RELIABLE per endpoint |
-| --qos-override | - | Replace endpoint vectors with global QoS options | false |
+| --qos-override | - | Replace endpoint vectors with global QoS options (`true` or `false`) | false |
 
 These node executables accept endpoint-aligned QoS vectors. Generated launch
 files provide one value for each publisher and subscriber. During a root-array
