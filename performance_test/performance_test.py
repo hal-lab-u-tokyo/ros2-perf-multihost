@@ -19,6 +19,50 @@ except ImportError:  # pragma: no cover - fallback for package-style imports
     from .table_utils import write_text_table
 
 
+SUPPORTED_RMWS = ("fastdds", "cyclonedds", "zenoh")
+
+
+def _parse_rmw_list(value):
+    rmws = [item.strip() for item in value.split(",") if item.strip()]
+    if not rmws:
+        raise ValueError("--rmw must contain at least one RMW implementation")
+
+    duplicates = sorted({rmw for rmw in rmws if rmws.count(rmw) > 1})
+    if duplicates:
+        raise ValueError(
+            "--rmw contains duplicate implementation(s): "
+            + ", ".join(duplicates)
+        )
+
+    unsupported = [rmw for rmw in rmws if rmw not in SUPPORTED_RMWS]
+    if unsupported:
+        raise ValueError(
+            "--rmw contains unsupported implementation(s): "
+            + ", ".join(unsupported)
+            + ". Choose from: "
+            + ", ".join(SUPPORTED_RMWS)
+        )
+    return rmws
+
+
+def _replace_rmw_argument(argv, rmw):
+    replaced = []
+    index = 0
+    while index < len(argv):
+        argument = argv[index]
+        if argument in ("-m", "--rmw"):
+            replaced.extend((argument, rmw))
+            index += 2
+        elif argument.startswith(("--rmw=", "-m=")):
+            option = "--rmw" if argument.startswith("--rmw=") else "-m"
+            replaced.append(f"{option}={rmw}")
+            index += 1
+        else:
+            replaced.append(argument)
+            index += 1
+    return replaced
+
+
 def _preflight_check_ssh_all_hosts(hosts, ssh_user):
     failures = []
     for host in hosts:
@@ -212,7 +256,7 @@ if __name__ == "__main__":
         description="Run performance tests using generated exec script defaults",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         usage=(
-            "%(prog)s <topology> [--rmw|-m {fastdds,cyclonedds,zenoh}] "
+            "%(prog)s <topology> [--rmw|-m {fastdds,cyclonedds,zenoh}[,...]] "
             "[--exec-policy|-p {docker,native,local}] [--eval-time|-e SEC] "
             "[--trials|-t N] [--ws-dir|-w DIR] [--remote-repo-base|-b DIR] [--ssh-user|-u USER] "
             "[--zenoh-router|-z TARGET] [--strict-analysis|-s] [--help|-h]"
@@ -222,6 +266,7 @@ Examples:
     python3 performance_test/performance_test.py simple --exec-policy local --eval-time 60 --trials 5
     python3 performance_test/performance_test.py simple --exec-policy local --eval-time 60 --trials 5 --strict-analysis
     python3 performance_test/performance_test.py simple --rmw zenoh --exec-policy local --eval-time 60 --trials 5
+    python3 performance_test/performance_test.py simple --rmw fastdds,cyclonedds,zenoh --exec-policy native --eval-time 60 --trials 5
     short: python3 performance_test/performance_test.py simple -m zenoh -p local -e 60 -t 5
 """,
     )
@@ -232,8 +277,10 @@ Examples:
         "--rmw",
         type=str,
         default="fastdds",
-        choices=["fastdds", "cyclonedds", "zenoh"],
-        help="RMW implementation used for this run (default: fastdds)",
+        help=(
+            "Comma-separated RMW implementations to run in order "
+            "(default: fastdds)"
+        ),
     )
     parser.add_argument(
         "-p",
@@ -289,6 +336,11 @@ Examples:
     )
     args = parser.parse_args()
 
+    try:
+        rmw_choices = _parse_rmw_list(args.rmw)
+    except ValueError as exc:
+        parser.error(str(exc))
+
     eval_time = args.eval_time
 
     # Resolve absolute path to start script (cwd-independent)
@@ -299,6 +351,25 @@ Examples:
         repo_root, "remote_hosts_scripts", "start_exec_scripts.py")
     distribute_exec_scripts_sh = os.path.join(
         repo_root, "manager_scripts", "distribute_exec_scripts.sh")
+
+    if len(rmw_choices) > 1:
+        print(f"Running RMW implementations in order: {', '.join(rmw_choices)}")
+        for rmw in rmw_choices:
+            print(f"=== Starting RMW run: {rmw} ===")
+            result = subprocess.run(
+                [
+                    sys.executable,
+                    os.path.abspath(__file__),
+                    *_replace_rmw_argument(sys.argv[1:], rmw),
+                ],
+                cwd=repo_root,
+            )
+            if result.returncode != 0:
+                sys.exit(result.returncode)
+        print("All requested RMW runs completed successfully.")
+        sys.exit(0)
+
+    args.rmw = rmw_choices[0]
 
     local_results_root = os.path.join(
         args.ws_dir, args.topology_name, "results")

@@ -322,7 +322,7 @@ These preflight outputs are saved under `<ws-dir>/<topology>/results/<timestamp>
 ```bash
 python3 performance_test/performance_test.py \
   <topology> \
-  [--rmw|-m <rmw>] \
+  [--rmw|-m <rmw>[,...]] \
   [--exec-policy|-p <mode>] \
   [--eval-time|-e <sec>] \
   [--trials|-t <n>] \
@@ -336,7 +336,7 @@ python3 performance_test/performance_test.py \
 Arguments:
 
 - `<topology>`: Topology directory to use (required)
-- `--rmw` (`-m`): RMW implementation (`fastdds`, `cyclonedds`, or `zenoh`) (default: `fastdds`)
+- `--rmw` (`-m`): Comma-separated RMW implementations (`fastdds`, `cyclonedds`, `zenoh`) run in the specified order (default: `fastdds`). Duplicate values are rejected.
 - `--exec-policy` (`-p`): Execution mode, one of `docker`, `native`, or `local` (default: `docker`)
 - `--eval-time` (`-e`): Override evaluation time; if omitted, the default from generated `*_exec_docker.sh` / `*_exec_native.sh` / `local_exec.sh` scripts is used
 - `--trials` (`-t`): Number of trials (default: `3`)
@@ -370,6 +370,13 @@ python3 performance_test/performance_test.py \
   simple \
   --rmw zenoh \
   --exec-policy docker \
+  --eval-time 10 --trials 3
+
+# Run multiple RMW implementations sequentially with the same execution policy
+python3 performance_test/performance_test.py \
+  simple \
+  --rmw fastdds,cyclonedds,zenoh \
+  --exec-policy native \
   --eval-time 10 --trials 3
 
 # Native execution on remote Hosts with Zenoh Router on the Manager
