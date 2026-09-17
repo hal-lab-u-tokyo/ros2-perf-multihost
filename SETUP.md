@@ -238,3 +238,117 @@ If startup sync fails because `sudo` for `chronyc` requires a password, `rest_se
 For other startup sync failures (for example, temporary NTP reachability issues), the server continues startup by default and reports the error in logs. To fail fast on any startup sync failure, set `ROS2_PERF_CHRONY_FAIL_FAST_ON_STARTUP=1`.
 
 For details on synchronization behavior and environment variables, see [remote_hosts_scripts/README.md](./remote_hosts_scripts/README.md#clock-synchronization-chrony).
+
+## Updating an existing installation
+
+The Git checkout, Docker image, native ROS 2 build, generated execution files,
+and running REST server are updated independently. Updating only one of them can
+leave a Host running stale code. After updating the repository, refresh every
+component used by the selected execution policy.
+
+### Updating `main`
+
+1. Update the repository on the Manager and every Host:
+
+  ```bash
+  cd ~/ros2-perf-multihost
+  git switch main
+  git pull --ff-only
+  ```
+
+2. On every machine that runs Docker benchmarks, pull the image selected for
+  the checkout. Commits on `main` use `latest` unless they are checked out at
+  an exact `v*` Git tag.
+
+  ```bash
+  docker pull ghcr.io/hal-lab-u-tokyo/ros2-perf-multihost:latest
+  ```
+
+3. On every Host that runs native benchmarks, rebuild the ROS 2 package:
+
+  ```bash
+  cd ~/ros2-perf-multihost
+  source /opt/ros/jazzy/setup.bash
+  cd ros2_node_impl_ws
+  colcon build --packages-select ros2_perf_multihost_nodes
+  ```
+
+4. On the Manager, regenerate and redistribute each topology used for the
+  benchmark. Omitting `--image-tag` selects `latest` or an exact `v*` tag as
+  described above.
+
+  ```bash
+  cd ~/ros2-perf-multihost
+  python3 manager_scripts/generate_exec_scripts.py \
+    topology_example/simple.json \
+    --force
+  ./manager_scripts/distribute_exec_scripts.sh simple
+  ```
+
+5. Restart the long-running REST server processes so that they load the updated
+  Python code, then verify their status:
+
+  ```bash
+  ./manager_scripts/manage_rest_servers.sh restart simple --force
+  ./manager_scripts/manage_rest_servers.sh status simple
+  ```
+
+To use a fixed release instead, run `git fetch --tags` and check out the same
+`v*` tag on the Manager and every Host. Pull that versioned Docker image rather
+than `latest`. When the generator runs at the exact tag without `--image-tag`,
+it selects the matching version automatically.
+
+### Development branch and `dev` image
+
+For development validation, first push the intended branch and publish its
+multi-architecture `dev` image as described in
+[docker/README.md](./docker/README.md#development-image-distribution). Then use
+the same revision on the Manager and every Host, pull the mutable `dev` tag on
+every machine that runs Docker benchmarks, and generate the topology with that
+tag explicitly:
+
+```bash
+# On the Manager and every Host
+cd ~/ros2-perf-multihost
+git switch <development-branch>
+git pull --ff-only
+docker pull ghcr.io/hal-lab-u-tokyo/ros2-perf-multihost:dev
+
+# On the Manager
+python3 manager_scripts/generate_exec_scripts.py \
+  topology_example/simple.json \
+  --image-tag dev \
+  --force
+./manager_scripts/distribute_exec_scripts.sh simple
+./manager_scripts/manage_rest_servers.sh restart simple --force
+./manager_scripts/manage_rest_servers.sh status simple
+```
+
+Also repeat the native `colcon build` step on every Host when testing native
+execution. Docker-only environments may skip `colcon build`; native-only
+environments may skip `docker pull`. Always regenerate and redistribute the
+execution files after generator, topology, or image-tag changes, and always
+restart the REST servers after updating their checkout. Because `dev` is a
+mutable tag, pull it again after every new development image is published.
+
+### Verify the deployed revision
+
+Before a benchmark, compare the Manager revision with every Host and confirm
+that the generated metadata records the expected source revision and image:
+
+```bash
+# On the Manager
+git rev-parse HEAD
+grep -E '^(source_git_commit|image):' performance_ws/simple/metadata.txt
+
+# Replace the Host list as needed
+for host in host1 host2; do
+  ssh "ubuntu@$host" \
+    'git -C /home/ubuntu/ros2-perf-multihost rev-parse HEAD'
+done
+
+./manager_scripts/manage_rest_servers.sh status simple
+```
+
+The commit hashes should match. For a Docker run, the `image:` entry must also
+show the tag that was pulled on every Docker benchmark machine.
