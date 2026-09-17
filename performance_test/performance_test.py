@@ -50,12 +50,11 @@ def _replace_rmw_argument(argv, rmw):
     index = 0
     while index < len(argv):
         argument = argv[index]
-        if argument in ("-m", "--rmw"):
+        if argument == "--rmw":
             replaced.extend((argument, rmw))
             index += 2
-        elif argument.startswith(("--rmw=", "-m=")):
-            option = "--rmw" if argument.startswith("--rmw=") else "-m"
-            replaced.append(f"{option}={rmw}")
+        elif argument.startswith("--rmw="):
+            replaced.append(f"--rmw={rmw}")
             index += 1
         else:
             replaced.append(argument)
@@ -255,8 +254,9 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(
         description="Run performance tests using generated exec script defaults",
         formatter_class=argparse.RawDescriptionHelpFormatter,
+        allow_abbrev=False,
         usage=(
-            "%(prog)s <topology> [--rmw|-m {fastdds,cyclonedds,zenoh}[,...]] "
+            "%(prog)s <topology> [--rmw {fastdds,cyclonedds,zenoh}[,...]] "
             "[--exec-policy|-p {docker,native,local}] [--eval-time|-e SEC] "
             "[--trials|-t N] [--ws-dir|-w DIR] [--remote-repo-base|-b DIR] [--ssh-user|-u USER] "
             "[--zenoh-router|-z TARGET] [--strict-analysis|-s] [--help|-h]"
@@ -267,13 +267,12 @@ Examples:
     python3 performance_test/performance_test.py simple --exec-policy local --eval-time 60 --trials 5 --strict-analysis
     python3 performance_test/performance_test.py simple --rmw zenoh --exec-policy local --eval-time 60 --trials 5
     python3 performance_test/performance_test.py simple --rmw fastdds,cyclonedds,zenoh --exec-policy native --eval-time 60 --trials 5
-    short: python3 performance_test/performance_test.py simple -m zenoh -p local -e 60 -t 5
+    python3 performance_test/performance_test.py simple --rmw zenoh --exec-policy local --eval-time 60 --trials 5
 """,
     )
     parser.add_argument("topology_name", metavar="topology", type=str,
                         help="Topology directory name under ws-dir")
     parser.add_argument(
-        "-m",
         "--rmw",
         type=str,
         default="fastdds",
@@ -362,7 +361,7 @@ Examples:
                     os.path.abspath(__file__),
                     *_replace_rmw_argument(sys.argv[1:], rmw),
                 ],
-                cwd=repo_root,
+                cwd=os.getcwd(),
             )
             if result.returncode != 0:
                 sys.exit(result.returncode)

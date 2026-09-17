@@ -321,7 +321,7 @@ These preflight outputs are saved under `<ws-dir>/<topology>/results/<timestamp>
 ```bash
 python3 performance_test/performance_test.py \
   <topology> \
-  [--rmw|-m <rmw>[,...]] \
+  [--rmw <rmw>[,...]] \
   [--exec-policy|-p <mode>] \
   [--eval-time|-e <sec>] \
   [--trials|-t <n>] \
