@@ -248,8 +248,7 @@ Specify the target Hosts explicitly so the long-running REST service is independ
 
 Arguments:
 
-- `--hosts`: Comma-separated target Host list; use repeated `--host` options as an alternative (required)
-- `--host`: Add one target Host; may be specified multiple times
+- `--hosts`: Comma-separated target Host list (required)
 - `--ws-dir` (`-w`): Workspace directory containing shared `runtime_logs` (default: `performance_ws`)
 - `--remote-repo-base` (`-b`): Remote repository base directory on each Host (default: `/home/ubuntu/ros2-perf-multihost`)
 - `--ssh-user` (`-u`): SSH username used to connect to each Host (default: `ubuntu`)

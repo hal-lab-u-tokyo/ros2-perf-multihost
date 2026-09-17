@@ -189,7 +189,7 @@ Example:
 ## manage_rest_servers.sh
 
 `manage_rest_servers.sh` manages `remote_hosts_scripts/rest_server.py` on all target Hosts from the Manager machine.
-It receives the target Hosts explicitly with `--hosts` or one or more `--host` options, so it is independent of the topology used by a benchmark.
+It receives the target Hosts explicitly with `--hosts`, so it is independent of the topology used by a benchmark.
 `start` launches REST servers in the background over SSH and waits until each server port is reachable.
 If command execution or readiness check fails on any Host, the script exits with a non-zero status.
 
@@ -225,8 +225,7 @@ Commands:
 | Argument | Short | Description | Default |
 |---|---|---|---|
 | `<command>` | — | One of `start`, `stop`, `restart`, `status`, `wait`, `monitor`, `logs` | required |
-| `--hosts` | — | Comma-separated target Host list | required unless `--host` is used |
-| `--host` | — | Add one target Host; may be specified multiple times | — |
+| `--hosts` | — | Comma-separated target Host list | required |
 | `--ws-dir` | `-w` | Workspace directory containing `runtime_logs` | `performance_ws` |
 | `--remote-repo-base` | `-b` | Remote repository base directory on each Host | `/home/ubuntu/ros2-perf-multihost` |
 | `--ssh-user` | `-u` | SSH user for all Hosts | `ubuntu` |
@@ -246,7 +245,7 @@ Example:
 	--hosts host1,host2,host3 \
 	--remote-repo-base /home/ubuntu/ros2-perf-multihost
 
-./manager_scripts/manage_rest_servers.sh restart --host host1 --host host2 --host host3
+./manager_scripts/manage_rest_servers.sh restart --hosts host1,host2,host3
 ./manager_scripts/manage_rest_servers.sh status --hosts host1,host2,host3
 ./manager_scripts/manage_rest_servers.sh monitor --hosts host1,host2,host3 --monitor-interval 2 --monitor-count 10
 ./manager_scripts/manage_rest_servers.sh logs --hosts host1,host2,host3 --log-lines 200
