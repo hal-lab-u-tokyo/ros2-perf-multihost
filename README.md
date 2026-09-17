@@ -173,6 +173,10 @@ For Manager/Host requirements, SSH setup, Docker and ROS 2 preparation, and chro
 
 - [SETUP.md](./SETUP.md)
 
+When updating an existing Manager/Host installation, follow the
+[existing installation update checklist](./SETUP.md#updating-an-existing-installation)
+to avoid running stale components on remote Hosts.
+
 ## Usage in Details
 
 Once you have completed the [Preliminaries](#preliminaries), you are ready to start here.
