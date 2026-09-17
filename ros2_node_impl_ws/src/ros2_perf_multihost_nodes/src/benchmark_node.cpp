@@ -1,6 +1,7 @@
 #include <chrono>
 #include <csignal>
 #include <cstdio>
+#include <cstdlib>
 #include <filesystem>
 #include <fstream>
 #include <map>
@@ -32,8 +33,9 @@ static benchmark_options::Options parse_options(int argc, char** argv) {
   for (auto& argument : non_ros_args) {
     non_ros_args_c_strings.push_back(argument.data());
   }
-  return benchmark_options::Options(static_cast<int>(non_ros_args_c_strings.size()),
-                                    non_ros_args_c_strings.data());
+  return benchmark_options::Options(
+      static_cast<int>(non_ros_args_c_strings.size()),
+      non_ros_args_c_strings.data());
 }
 
 class BenchmarkNode : public rclcpp::Node {
@@ -42,19 +44,23 @@ class BenchmarkNode : public rclcpp::Node {
       : Node(options.node_name), options_(options), log_dir_(options.log_dir) {
     create_result_directory();
     create_metadata_file();
-    const auto qos = create_qos();
 
     for (size_t index = 0; index < options_.topic_names_pub.size(); ++index) {
       const auto& topic_name = options_.topic_names_pub[index];
       const auto start_time = get_clock()->now();
       publish_start_times_.emplace(topic_name, start_time);
-      publish_end_times_.emplace(topic_name,
-                                 start_time + rclcpp::Duration::from_seconds(options_.eval_time));
+      publish_end_times_.emplace(
+          topic_name,
+          start_time + rclcpp::Duration::from_seconds(options_.eval_time));
       publish_indices_.emplace(topic_name, 0);
       publish_logs_.try_emplace(topic_name);
       const int period_ms = options_.period_ms[index];
-      configure_publisher(topic_name, options_.msg_types_pub[index], options_.msg_sizes_pub[index],
-                          options_.msg_pass_by_pub[index], period_ms, qos);
+      configure_publisher(topic_name, options_.msg_types_pub[index],
+                          options_.msg_sizes_pub[index],
+                          options_.msg_pass_by_pub[index], period_ms,
+                          create_qos(options_.qos_history_pub[index],
+                                     options_.qos_depth_pub[index],
+                                     options_.qos_reliability_pub[index]));
     }
 
     for (size_t index = 0; index < options_.topic_names_sub.size(); ++index) {
@@ -62,14 +68,19 @@ class BenchmarkNode : public rclcpp::Node {
       const auto start_time = get_clock()->now();
       subscribe_start_times_.emplace(topic_name, start_time);
       subscribe_logs_.try_emplace(topic_name);
-      subscribe_end_times_.emplace(topic_name,
-                                   start_time + rclcpp::Duration::from_seconds(options_.eval_time));
+      subscribe_end_times_.emplace(
+          topic_name,
+          start_time + rclcpp::Duration::from_seconds(options_.eval_time));
       configure_subscription(topic_name, options_.msg_types_sub[index],
-                             options_.msg_pass_by_sub[index], qos);
+                             options_.msg_pass_by_sub[index],
+                             create_qos(options_.qos_history_sub[index],
+                                        options_.qos_depth_sub[index],
+                                        options_.qos_reliability_sub[index]));
     }
 
-    shutdown_timer_ = create_wall_timer(std::chrono::seconds(options_.eval_time + 10),
-                                        []() { rclcpp::shutdown(); });
+    shutdown_timer_ =
+        create_wall_timer(std::chrono::seconds(options_.eval_time + 10),
+                          []() { rclcpp::shutdown(); });
   }
 
   ~BenchmarkNode() override {
@@ -78,14 +89,15 @@ class BenchmarkNode : public rclcpp::Node {
   }
 
  private:
-  rclcpp::QoS create_qos() const {
+  static rclcpp::QoS create_qos(const std::string& history, int depth,
+                                const std::string& reliability) {
     auto qos = rclcpp::QoS(rclcpp::KeepLast(1));
-    if (options_.qos_history == "KEEP_ALL") {
+    if (history == "KEEP_ALL") {
       qos.keep_all();
     } else {
-      qos.keep_last(options_.qos_depth);
+      qos.keep_last(depth);
     }
-    if (options_.qos_reliability == "BEST_EFFORT") {
+    if (reliability == "BEST_EFFORT") {
       qos.best_effort();
     }
     return qos;
@@ -106,8 +118,14 @@ class BenchmarkNode : public rclcpp::Node {
       RCLCPP_ERROR(get_logger(), "Failed to create metadata file.");
       return;
     }
+    const char* qos_case_index_env = std::getenv("QOS_CASE_INDEX");
+    const char* qos_case_index =
+        qos_case_index_env != nullptr && qos_case_index_env[0] != '\0'
+            ? qos_case_index_env
+            : "N/A";
     file << "Name: " << options_.node_name << "\n"
          << "NodeType: Benchmark\n"
+         << "QosCaseIndex: " << qos_case_index << "\n"
          << "Topics(Pub): ";
     write_csv(file, options_.topic_names_pub);
     file << "\nMsgTypes(Pub): ";
@@ -116,9 +134,19 @@ class BenchmarkNode : public rclcpp::Node {
     write_csv(file, options_.msg_sizes_pub);
     file << "\nMsgPassBy(Pub): ";
     write_csv(file, options_.msg_pass_by_pub);
+    file << "\nQosHistory(Pub): ";
+    write_csv(file, options_.qos_history_pub);
+    file << "\nQosDepth(Pub): ";
+    write_csv(file, options_.qos_depth_pub);
+    file << "\nQosReliability(Pub): ";
+    write_csv(file, options_.qos_reliability_pub);
+    file << "\nQosSource(Pub): ";
+    write_csv(file, options_.qos_source_pub);
     file << "\nPayloadSize: ";
     for (size_t index = 0; index < options_.msg_types_pub.size(); ++index) {
-      file << payload_size(options_.msg_types_pub[index], options_.msg_sizes_pub[index]) << ',';
+      file << payload_size(options_.msg_types_pub[index],
+                           options_.msg_sizes_pub[index])
+           << ',';
     }
     file << "\nPeriod: ";
     write_csv(file, options_.period_ms);
@@ -128,11 +156,20 @@ class BenchmarkNode : public rclcpp::Node {
     write_csv(file, options_.msg_types_sub);
     file << "\nMsgPassBy(Sub): ";
     write_csv(file, options_.msg_pass_by_sub);
+    file << "\nQosHistory(Sub): ";
+    write_csv(file, options_.qos_history_sub);
+    file << "\nQosDepth(Sub): ";
+    write_csv(file, options_.qos_depth_sub);
+    file << "\nQosReliability(Sub): ";
+    write_csv(file, options_.qos_reliability_sub);
+    file << "\nQosSource(Sub): ";
+    write_csv(file, options_.qos_source_sub);
     file << '\n';
   }
 
   template <typename ValueType>
-  static void write_csv(std::ostream& stream, const std::vector<ValueType>& values) {
+  static void write_csv(std::ostream& stream,
+                        const std::vector<ValueType>& values) {
     for (const auto& value : values) {
       stream << value << ',';
     }
@@ -143,9 +180,10 @@ class BenchmarkNode : public rclcpp::Node {
   }
 
   static int payload_size(const std::string& msg_type, int msg_size) {
-#define GET_PAYLOAD_SIZE(topology_name, ros_name, variable_size, element_size, fixed_size) \
-  if (msg_type == #topology_name) {                                                        \
-    return variable_size ? msg_size : fixed_size;                                          \
+#define GET_PAYLOAD_SIZE(topology_name, ros_name, variable_size, element_size, \
+                         fixed_size)                                           \
+  if (msg_type == #topology_name) {                                            \
+    return variable_size ? msg_size : fixed_size;                              \
   }
     ROS2_PERF_FOR_EACH_MESSAGE_TYPE(GET_PAYLOAD_SIZE)
 #undef GET_PAYLOAD_SIZE
@@ -154,55 +192,71 @@ class BenchmarkNode : public rclcpp::Node {
 
   template <typename MessageType, bool VariableSize>
   void configure_publisher(const std::string& topic_name, int msg_size,
-                           const std::string& msg_pass_by, int period_ms, const rclcpp::QoS& qos) {
-    publishers_.emplace(topic_name, create_publisher<MessageType>(topic_name, qos));
-    timers_.emplace(topic_name, create_wall_timer(std::chrono::milliseconds(period_ms),
-                                                  [this, topic_name, msg_size, msg_pass_by]() {
-                                                    publish_message<MessageType, VariableSize>(
-                                                        topic_name, msg_size, msg_pass_by);
-                                                  }));
+                           const std::string& msg_pass_by, int period_ms,
+                           const rclcpp::QoS& qos) {
+    publishers_.emplace(topic_name,
+                        create_publisher<MessageType>(topic_name, qos));
+    timers_.emplace(
+        topic_name,
+        create_wall_timer(std::chrono::milliseconds(period_ms),
+                          [this, topic_name, msg_size, msg_pass_by]() {
+                            publish_message<MessageType, VariableSize>(
+                                topic_name, msg_size, msg_pass_by);
+                          }));
   }
 
-  void configure_publisher(const std::string& topic_name, const std::string& msg_type, int msg_size,
-                           const std::string& msg_pass_by, int period_ms, const rclcpp::QoS& qos) {
-#define CONFIGURE_PUBLISHER(topology_name, ros_name, variable_size, element_size, fixed_size) \
-  if (msg_type == #topology_name) {                                                           \
-    configure_publisher<ros2_perf_multihost_nodes::msg::ros_name, variable_size>(             \
-        topic_name, msg_size / element_size, msg_pass_by, period_ms, qos);                    \
-    return;                                                                                   \
+  void configure_publisher(const std::string& topic_name,
+                           const std::string& msg_type, int msg_size,
+                           const std::string& msg_pass_by, int period_ms,
+                           const rclcpp::QoS& qos) {
+#define CONFIGURE_PUBLISHER(topology_name, ros_name, variable_size,         \
+                            element_size, fixed_size)                       \
+  if (msg_type == #topology_name) {                                         \
+    configure_publisher<ros2_perf_multihost_nodes::msg::ros_name,           \
+                        variable_size>(topic_name, msg_size / element_size, \
+                                       msg_pass_by, period_ms, qos);        \
+    return;                                                                 \
   }
     ROS2_PERF_FOR_EACH_MESSAGE_TYPE(CONFIGURE_PUBLISHER)
 #undef CONFIGURE_PUBLISHER
   }
 
   template <typename MessageType>
-  void configure_subscription(const std::string& topic_name, const std::string& msg_pass_by,
+  void configure_subscription(const std::string& topic_name,
+                              const std::string& msg_pass_by,
                               const rclcpp::QoS& qos) {
     if (msg_pass_by == "const_shared_ptr_with_info") {
       subscribers_.emplace(
-          topic_name, create_subscription<MessageType>(
-                          topic_name, qos,
-                          [this, topic_name](const typename MessageType::ConstSharedPtr message,
-                                             const rclcpp::MessageInfo&) {
-                            record_received_message(topic_name, *message);
-                          }));
+          topic_name,
+          create_subscription<MessageType>(
+              topic_name, qos,
+              [this, topic_name](
+                  const typename MessageType::ConstSharedPtr message,
+                  const rclcpp::MessageInfo&) {
+                record_received_message(topic_name, *message);
+              }));
       return;
     }
     subscribers_.emplace(
-        topic_name, create_subscription<MessageType>(
-                        topic_name, qos,
-                        [this, topic_name](const typename MessageType::ConstSharedPtr message) {
-                          record_received_message(topic_name, *message);
-                        }));
+        topic_name,
+        create_subscription<MessageType>(
+            topic_name, qos,
+            [this,
+             topic_name](const typename MessageType::ConstSharedPtr message) {
+              record_received_message(topic_name, *message);
+            }));
   }
 
-  void configure_subscription(const std::string& topic_name, const std::string& msg_type,
-                              const std::string& msg_pass_by, const rclcpp::QoS& qos) {
-#define CONFIGURE_SUBSCRIPTION(topology_name, ros_name, variable_size, element_size, fixed_size) \
-  if (msg_type == #topology_name) {                                                              \
-    configure_subscription<ros2_perf_multihost_nodes::msg::ros_name>(topic_name, msg_pass_by,    \
-                                                                     qos);                       \
-    return;                                                                                      \
+  void configure_subscription(const std::string& topic_name,
+                              const std::string& msg_type,
+                              const std::string& msg_pass_by,
+                              const rclcpp::QoS& qos) {
+#define CONFIGURE_SUBSCRIPTION(topology_name, ros_name, variable_size, \
+                               element_size, fixed_size)               \
+  if (msg_type == #topology_name) {                                    \
+    configure_subscription<ros2_perf_multihost_nodes::msg::ros_name>(  \
+        topic_name, msg_pass_by, qos);                                 \
+    return;                                                            \
   }
     ROS2_PERF_FOR_EACH_MESSAGE_TYPE(CONFIGURE_SUBSCRIPTION)
 #undef CONFIGURE_SUBSCRIPTION
@@ -216,19 +270,22 @@ class BenchmarkNode : public rclcpp::Node {
       timers_.at(topic_name)->cancel();
       return;
     }
-    auto initialize_message = [this, &topic_name, msg_size, &now](MessageType& message) {
+    auto initialize_message = [this, &topic_name, msg_size,
+                               &now](MessageType& message) {
       if constexpr (VariableSize) {
         message.data.assign(msg_size, 0);
       }
-      message.header.stamp.sec =
-          static_cast<int32_t>((now - publish_start_times_.at(topic_name)).seconds());
+      message.header.stamp.sec = static_cast<int32_t>(
+          (now - publish_start_times_.at(topic_name)).seconds());
       message.header.stamp.nanosec = static_cast<uint32_t>(
-          (now - publish_start_times_.at(topic_name)).nanoseconds() % 1000000000);
+          (now - publish_start_times_.at(topic_name)).nanoseconds() %
+          1000000000);
       message.header.pub_idx = publish_indices_.at(topic_name);
       message.header.node_name = options_.node_name;
     };
     const auto publisher =
-        std::static_pointer_cast<rclcpp::Publisher<MessageType>>(publishers_.at(topic_name));
+        std::static_pointer_cast<rclcpp::Publisher<MessageType>>(
+            publishers_.at(topic_name));
     if (msg_pass_by == "unique_ptr") {
       auto message = std::make_unique<MessageType>();
       initialize_message(*message);
@@ -244,12 +301,14 @@ class BenchmarkNode : public rclcpp::Node {
   }
 
   template <typename MessageType>
-  void record_received_message(const std::string& topic_name, const MessageType& message) {
+  void record_received_message(const std::string& topic_name,
+                               const MessageType& message) {
     const auto now = get_clock()->now();
     if (now >= subscribe_end_times_.at(topic_name)) {
       return;
     }
-    subscribe_logs_[topic_name].push_back({message.header.node_name, message.header.pub_idx, now});
+    subscribe_logs_[topic_name].push_back(
+        {message.header.node_name, message.header.pub_idx, now});
   }
 
   void write_publish_logs() const {
@@ -257,12 +316,14 @@ class BenchmarkNode : public rclcpp::Node {
       return;
     }
     for (const auto& [topic_name, logs] : publish_logs_) {
-      std::ofstream file(log_directory() / (topic_name + "_pub_log.txt"), std::ios::trunc);
+      std::ofstream file(log_directory() / (topic_name + "_pub_log.txt"),
+                         std::ios::trunc);
       file << "StartTime: " << publish_start_times_.at(topic_name).nanoseconds()
-           << "\nEndTime: " << publish_end_times_.at(topic_name).nanoseconds() << '\n';
+           << "\nEndTime: " << publish_end_times_.at(topic_name).nanoseconds()
+           << '\n';
       for (const auto& log : logs) {
-        file << "Index: " << log.message_idx << ", Timestamp: " << log.time_stamp.nanoseconds()
-             << '\n';
+        file << "Index: " << log.message_idx
+             << ", Timestamp: " << log.time_stamp.nanoseconds() << '\n';
       }
     }
   }
@@ -272,11 +333,15 @@ class BenchmarkNode : public rclcpp::Node {
       return;
     }
     for (const auto& [topic_name, logs] : subscribe_logs_) {
-      std::ofstream file(log_directory() / (topic_name + "_sub_log.txt"), std::ios::trunc);
-      file << "StartTime: " << subscribe_start_times_.at(topic_name).nanoseconds()
-           << "\nEndTime: " << subscribe_end_times_.at(topic_name).nanoseconds() << '\n';
+      std::ofstream file(log_directory() / (topic_name + "_sub_log.txt"),
+                         std::ios::trunc);
+      file << "StartTime: "
+           << subscribe_start_times_.at(topic_name).nanoseconds()
+           << "\nEndTime: " << subscribe_end_times_.at(topic_name).nanoseconds()
+           << '\n';
       for (const auto& log : logs) {
-        file << "Pub Node_Name: " << log.pub_node_name << ", Index: " << log.message_idx
+        file << "Pub Node_Name: " << log.pub_node_name
+             << ", Index: " << log.message_idx
              << ", Timestamp: " << log.time_stamp.nanoseconds() << '\n';
       }
     }
@@ -285,7 +350,8 @@ class BenchmarkNode : public rclcpp::Node {
   benchmark_options::Options options_;
   std::string log_dir_;
   std::unordered_map<std::string, rclcpp::PublisherBase::SharedPtr> publishers_;
-  std::unordered_map<std::string, rclcpp::SubscriptionBase::SharedPtr> subscribers_;
+  std::unordered_map<std::string, rclcpp::SubscriptionBase::SharedPtr>
+      subscribers_;
   std::unordered_map<std::string, rclcpp::TimerBase::SharedPtr> timers_;
   rclcpp::TimerBase::SharedPtr shutdown_timer_;
   std::unordered_map<std::string, uint32_t> publish_indices_;

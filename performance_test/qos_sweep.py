@@ -34,6 +34,11 @@ def load_qos_cases(ws_dir, topology_name):
     return [_normalize_qos_case(qos, 0)]
 
 
+def is_qos_sweep(ws_dir, topology_name):
+    metadata_path = os.path.join(ws_dir, topology_name, "metadata.txt")
+    return get_metadata_value("qos_mode", metadata_path) == "sweep"
+
+
 def _normalize_qos_case(qos, idx):
     label = qos_case_label(idx)
     if not isinstance(qos, dict):

@@ -44,6 +44,7 @@ Notes:
 | msg_size | Required for variable-length message types | number | Size in bytes of the variable-length `data` field. Forbidden for fixed-size types. |
 | period_ms | Required | number | Publish period (ms). Must be a positive integer. |
 | msg_pass_by | Optional | string | `const_ref` (default) or `unique_ptr`. |
+| qos | Optional | object | Endpoint QoS override. Supports `history`, `depth`, and `reliability`. Arrays are not allowed. |
 
 ### Elements of the `subscribers` Array
 
@@ -52,10 +53,11 @@ Notes:
 | topic_name | Required | string | Topic name to subscribe to. |
 | msg_type | Required | string | Concrete message type. It must match every publisher of the same topic. |
 | msg_pass_by | Optional | string | `const_shared_ptr` (default) or `const_shared_ptr_with_info`. |
+| qos | Optional | object | Endpoint QoS override. Supports `history`, `depth`, and `reliability`. Arrays are not allowed. |
 
 The original iRobot Sierra Nevada topology specifies publisher
-`msg_pass_by` as `shared_ptr`. That publisher API is deprecated in ROS 2 Jazzy,
-so this platform does not support it and rejects `shared_ptr`. Sierra
+`msg_pass_by` as `shared_ptr`. ROS 2 Jazzy does not provide that publisher
+overload, so this platform rejects `shared_ptr`. Sierra
 Nevada-derived examples use the Jazzy-native `const_ref` mode instead.
 
 ### Adding Message Types
@@ -90,8 +92,12 @@ not supported.
 
 ### `qos` Array for QoS Sweep
 
-You can also specify `qos` as an array of QoS objects.
-In that form, the framework treats the topology as a QoS sweep and runs the same host/node assignment once per QoS case.
+You can also specify root `qos` as an array of QoS objects.
+In that form, the framework treats the topology as a QoS sweep and runs the same host/node assignment once per QoS case. An array with one element is still a sweep. Each active sweep case replaces every publisher and subscriber endpoint QoS completely.
+
+With a root `qos` object, endpoint `qos` fields override root fields independently for each publisher and subscriber. Missing fields use the root value, or `KEEP_LAST`, depth `1`, and `RELIABLE` when no root value exists. Publisher/subscriber compatibility is not validated because incompatible QoS may be the subject of an experiment.
+
+The effective priority is: root array sweep case, endpoint `qos`, root `qos` object, framework defaults. Only `history`, `depth`, and `reliability` are supported.
 
 `hosts` and `nodes` are still required in the same format as Sections 2 and 3.
 
@@ -157,6 +163,7 @@ Additional examples may be added incrementally.
 | File | Hosts | Node allocation difference |
 |---|---:|---|
 | [simple.json](./simple.json) | 3 | Basic quick-start topology |
+| [simple_endpoint_qos.json](./simple_endpoint_qos.json) | 2 | Compatible publisher/subscriber QoS with independent depth overrides |
 | [simple_qos_sweep.json](./simple_qos_sweep.json) | 3 | Same topology as `simple.json` with sweep `qos` array |
 | [sierra_nevada.json](./sierra_nevada.json) | 3 | Based on the [iRobot Sierra Nevada topology](https://github.com/irobot-ros/ros2-performance/blob/rolling/irobot_benchmark/topology/sierra_nevada.json) |
 | [sierra_nevada_numhosts/sierra_nevada_1host.json](./sierra_nevada_numhosts/sierra_nevada_1host.json) | 1 | Sierra Nevada-derived allocation |

@@ -93,8 +93,9 @@ results/
 `<ws-dir>/<topology>/runtime_logs/rest_server.log`, so it may include entries from previous runs
 unless the REST server was restarted before benchmarking.
 
-When generated `metadata.txt` contains a QoS sweep (`qos_json` with multiple
-cases), `performance_test.py` runs all trials once per QoS case. The top-level
+When generated `metadata.txt` contains `qos_mode: sweep`,
+`performance_test.py` runs all trials once per QoS case. This includes a root
+QoS array containing only one case. Each case replaces all endpoint QoS. The top-level
 run directory keeps a `qos_cases.json` manifest and stores each case separately:
 
 ```

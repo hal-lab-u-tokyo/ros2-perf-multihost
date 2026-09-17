@@ -1,0 +1,49 @@
+{
+  "hosts": [
+    {
+      "host_name": "host1",
+      "node_names": [
+        "pub1"
+      ]
+    },
+    {
+      "host_name": "host2",
+      "node_names": [
+        "sub1"
+      ]
+    }
+  ],
+  "nodes": [
+    {
+      "node_name": "pub1",
+      "publishers": [
+        {
+          "topic_name": "sample",
+          "msg_type": "stamped_vector",
+          "msg_size": 32,
+          "period_ms": 1000,
+          "qos": {
+            "depth": 3
+          }
+        }
+      ]
+    },
+    {
+      "node_name": "sub1",
+      "subscribers": [
+        {
+          "topic_name": "sample",
+          "msg_type": "stamped_vector",
+          "qos": {
+            "depth": 5
+          }
+        }
+      ]
+    }
+  ],
+  "qos": {
+    "history": "KEEP_LAST",
+    "depth": 10,
+    "reliability": "RELIABLE"
+  }
+}
