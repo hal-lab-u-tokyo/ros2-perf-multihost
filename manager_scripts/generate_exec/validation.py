@@ -6,6 +6,13 @@ import os
 from .message_registry import get_message_spec
 
 
+DEFAULT_QOS = {
+    "history": "KEEP_LAST",
+    "depth": 1,
+    "reliability": "RELIABLE",
+}
+
+
 def require_positive_int(entry, key, context):
     """Read a required positive integer field from entry."""
     if key not in entry:
@@ -120,6 +127,28 @@ def normalize_qos_cases(qos):
     return normalized
 
 
+def resolve_endpoint_qos(endpoint, root_qos):
+    """Return the effective QoS for an endpoint outside a sweep run."""
+    if isinstance(root_qos, list):
+        return normalize_qos_cases(root_qos)[0]
+
+    effective = DEFAULT_QOS.copy()
+    if root_qos is not None:
+        effective.update(root_qos)
+    effective.update(endpoint.get("qos", {}))
+    return normalize_qos_cases(effective)[0]
+
+
+def validate_endpoint_qos(endpoint, context):
+    """Validate an optional endpoint-specific QoS object."""
+    if "qos" not in endpoint:
+        return
+    qos = endpoint["qos"]
+    if not isinstance(qos, dict):
+        raise ValueError(f"{context}.qos: must be an object")
+    validate_qos_case_schema(qos, f"{context}.qos")
+
+
 def validate_publisher_entries(pub_entries, context):
     """Validate publisher[] or intermediate[].publisher[] entries."""
     if not isinstance(pub_entries, list) or not pub_entries:
@@ -132,9 +161,17 @@ def validate_publisher_entries(pub_entries, context):
             raise ValueError(f"{pub_context}: must be an object")
         ensure_only_allowed_keys(
             pub,
-            {"topic_name", "msg_type", "msg_size", "period_ms", "msg_pass_by"},
+            {
+                "topic_name",
+                "msg_type",
+                "msg_size",
+                "period_ms",
+                "msg_pass_by",
+                "qos",
+            },
             pub_context,
         )
+        validate_endpoint_qos(pub, pub_context)
         topic_name_str = require_non_empty_string(
             pub, "topic_name", pub_context)
         if not _is_valid_identifier(topic_name_str):
@@ -181,8 +218,9 @@ def validate_subscriber_entries(sub_entries, context):
         if not isinstance(sub, dict):
             raise ValueError(f"{sub_context}: must be an object")
         ensure_only_allowed_keys(
-            sub, {"topic_name", "msg_type", "msg_pass_by"}, sub_context
+            sub, {"topic_name", "msg_type", "msg_pass_by", "qos"}, sub_context
         )
+        validate_endpoint_qos(sub, sub_context)
         topic_name_str = require_non_empty_string(
             sub, "topic_name", sub_context)
         if not _is_valid_identifier(topic_name_str):

@@ -173,6 +173,7 @@ def run_test(
 def _append_qos_args(cmd, qos_case_idx=None, qos_case=None):
     if qos_case_idx is not None:
         cmd.extend(["--qos-case-idx", str(qos_case_idx)])
+        cmd.append("--qos-override")
     if not qos_case:
         return
     cmd.extend(["--qos-history", str(qos_case["history"])])

@@ -138,6 +138,8 @@ Examples:
                         help="Comma-separated list of hosts (optional; if not provided, resolved from metadata)")
     parser.add_argument("--qos-case-idx", type=int, default=None,
                         help="QoS sweep case index from topology JSON qos array")
+    parser.add_argument("--qos-override", action="store_true",
+                        help="Apply the selected QoS case to every endpoint")
     parser.add_argument("--qos-history", choices=["KEEP_LAST", "KEEP_ALL"], default=None,
                         help="QoS history for the current sweep case")
     parser.add_argument("--qos-depth", type=int, default=None,
@@ -243,6 +245,7 @@ Examples:
                 request_body["zenoh_config_override"] = zenoh_config_override
             if args.qos_case_idx is not None and not args.prepare_run:
                 request_body["qos_case_idx"] = args.qos_case_idx
+                request_body["qos_override"] = args.qos_override
             if qos and not args.prepare_run:
                 request_body["qos"] = qos
 

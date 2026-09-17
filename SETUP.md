@@ -238,3 +238,207 @@ If startup sync fails because `sudo` for `chronyc` requires a password, `rest_se
 For other startup sync failures (for example, temporary NTP reachability issues), the server continues startup by default and reports the error in logs. To fail fast on any startup sync failure, set `ROS2_PERF_CHRONY_FAIL_FAST_ON_STARTUP=1`.
 
 For details on synchronization behavior and environment variables, see [remote_hosts_scripts/README.md](./remote_hosts_scripts/README.md#clock-synchronization-chrony).
+
+## Updating an existing installation
+
+The Git checkout, Docker image, native ROS 2 build, generated execution files,
+and running REST server are updated independently. Updating only one of them can
+leave a Host running stale code. After updating the repository, refresh every
+component used by the selected execution policy.
+
+The examples below use the default deployment values. Change these variables
+when the Host login or repository path differs from the defaults:
+
+```bash
+SSH_USER=ubuntu
+REMOTE_REPO_BASE=/home/ubuntu/ros2-perf-multihost
+HOSTS=(host1 host2)
+```
+
+### Updating `main`
+
+1. Update the Manager first and capture its exact revision:
+
+  ```bash
+  cd ~/ros2-perf-multihost
+  git switch main
+  git pull --ff-only
+  REVISION="$(git rev-parse HEAD)"
+  echo "$REVISION"
+  ```
+
+2. In the same shell, fetch that revision on every Host and check it out. This
+  prevents different machines from selecting different commits if `main`
+  moves during the update:
+
+  ```bash
+  SSH_USER=ubuntu
+  REMOTE_REPO_BASE=/home/ubuntu/ros2-perf-multihost
+  HOSTS=(host1 host2)
+
+  for host in "${HOSTS[@]}"; do
+    ssh "${SSH_USER}@${host}" \
+     "git -C '${REMOTE_REPO_BASE}' fetch origin && \
+      git -C '${REMOTE_REPO_BASE}' checkout --detach '${REVISION}'"
+  done
+  ```
+
+3. If Docker execution is used, wait until the
+  [`publish-docker.yml`](https://github.com/hal-lab-u-tokyo/ros2-perf-multihost/actions/workflows/publish-docker.yml)
+  run for `REVISION` succeeds. Then pull `latest` on every machine that will
+  run Docker benchmarks. The Manager does not need the image unless it also
+   runs a local Docker benchmark. Verify the image revision after pulling;
+   this also detects if `latest` moved to a newer commit in the meantime.
+
+  ```bash
+   EXPECTED_REVISION="<revision printed in step 1>"
+  docker pull ghcr.io/hal-lab-u-tokyo/ros2-perf-multihost:latest
+   IMAGE_REVISION="$(docker image inspect \
+     --format '{{ index .Config.Labels "org.opencontainers.image.revision" }}' \
+     ghcr.io/hal-lab-u-tokyo/ros2-perf-multihost:latest)"
+   test "$IMAGE_REVISION" = "$EXPECTED_REVISION"
+  ```
+
+4. Complete the [runtime refresh steps](#refresh-runtime-components) with
+  `<image-tag>` set to `latest`. Specifying the tag explicitly prevents an
+  exact `v*` tag at `HEAD` from changing the generated image selection.
+
+### Updating to a fixed release
+
+1. Choose a version, then fetch and check it out on the Manager:
+
+  ```bash
+  cd ~/ros2-perf-multihost
+  VERSION=v0.4.0
+  git fetch --tags
+  git switch --detach "$VERSION"
+  REVISION="$(git rev-parse HEAD)"
+  ```
+
+2. In the same shell, check out the exact revision on every Host:
+
+  ```bash
+  SSH_USER=ubuntu
+  REMOTE_REPO_BASE=/home/ubuntu/ros2-perf-multihost
+  HOSTS=(host1 host2)
+
+  for host in "${HOSTS[@]}"; do
+    ssh "${SSH_USER}@${host}" \
+     "git -C '${REMOTE_REPO_BASE}' fetch --tags origin && \
+      git -C '${REMOTE_REPO_BASE}' checkout --detach '${REVISION}'"
+  done
+  ```
+
+3. If Docker execution is used, wait until the `publish-docker.yml` run for
+  the version tag succeeds, then pull the matching image on every Docker
+  benchmark machine:
+
+  ```bash
+   EXPECTED_REVISION="<revision printed in step 1>"
+   docker pull ghcr.io/hal-lab-u-tokyo/ros2-perf-multihost:v0.4.0
+   IMAGE_REVISION="$(docker image inspect \
+     --format '{{ index .Config.Labels "org.opencontainers.image.revision" }}' \
+     ghcr.io/hal-lab-u-tokyo/ros2-perf-multihost:v0.4.0)"
+   test "$IMAGE_REVISION" = "$EXPECTED_REVISION"
+  ```
+
+4. Complete the [runtime refresh steps](#refresh-runtime-components) with
+  `<image-tag>` set to the selected version, such as `v0.4.0`. This includes
+  the native rebuild when applicable, regeneration, distribution, and REST
+  server restart.
+
+### Updating a development branch
+
+1. Push the intended branch, update the Manager, and capture its exact revision:
+
+  ```bash
+  cd ~/ros2-perf-multihost
+  git switch <development-branch>
+  git pull --ff-only
+  REVISION="$(git rev-parse HEAD)"
+  echo "$REVISION"
+  ```
+
+2. In the same shell, fetch that exact revision on every Host using the loop
+  shown in step 2 of [Updating `main`](#updating-main).
+
+3. If Docker execution is used, publish the multi-architecture `dev` image as
+  described in
+  [docker/README.md](./docker/README.md#development-image-distribution). After
+  the publish completes, pull the mutable tag on every Docker benchmark
+  machine, but not on a Manager that does not run Docker benchmarks:
+
+  ```bash
+  docker pull ghcr.io/hal-lab-u-tokyo/ros2-perf-multihost:dev
+  ```
+
+4. Complete the [runtime refresh steps](#refresh-runtime-components) with
+  `<image-tag>` set to `dev`. Pull `dev` again after every new development
+  image is published.
+
+### Refresh runtime components
+
+After synchronizing the source revision and, when applicable, the Docker image,
+refresh the components used by the benchmark.
+
+1. On every Host that runs native benchmarks, rebuild the ROS 2 package.
+  Docker-only environments may skip this step:
+
+  ```bash
+  cd ~/ros2-perf-multihost
+  source /opt/ros/jazzy/setup.bash
+  cd ros2_node_impl_ws
+  colcon build --packages-select ros2_perf_multihost_nodes
+  ```
+
+2. On the Manager, regenerate and redistribute each topology. Replace
+  `<image-tag>` with `latest`, the release version, or `dev` selected above:
+
+  ```bash
+  cd ~/ros2-perf-multihost
+  python3 manager_scripts/generate_exec_scripts.py \
+    topology_example/simple.json \
+    --image-tag <image-tag> \
+    --force
+  ./manager_scripts/distribute_exec_scripts.sh simple
+  ```
+
+3. Restart the long-running REST server processes so that they load the updated
+  Python code, then verify their status:
+
+  ```bash
+  ./manager_scripts/manage_rest_servers.sh restart simple --force
+  ./manager_scripts/manage_rest_servers.sh status simple
+  ```
+
+Native-only environments may skip the Docker image pull, but should still pass
+the intended image tag when regenerating because the same generated artifacts
+can later be used for Docker execution. Always regenerate and redistribute
+after generator, topology, or image-tag changes, and always restart the REST
+servers after updating their checkout.
+
+### Verify the deployed revision
+
+Before a benchmark, compare the Manager revision with every Host and confirm
+that the generated metadata records the expected source revision and image:
+
+```bash
+# On the Manager
+git rev-parse HEAD
+grep -E '^(source_git_commit|image):' performance_ws/simple/metadata.txt
+
+# Set these to the values used for deployment
+SSH_USER=ubuntu
+REMOTE_REPO_BASE=/home/ubuntu/ros2-perf-multihost
+HOSTS=(host1 host2)
+
+for host in "${HOSTS[@]}"; do
+  ssh "${SSH_USER}@${host}" \
+    "git -C '${REMOTE_REPO_BASE}' rev-parse HEAD"
+done
+
+./manager_scripts/manage_rest_servers.sh status simple
+```
+
+The commit hashes should match. For a Docker run, the `image:` entry must also
+show the tag that was pulled on every Docker benchmark machine.

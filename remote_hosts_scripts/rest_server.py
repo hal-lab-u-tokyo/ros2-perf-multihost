@@ -151,6 +151,11 @@ def _load_qos_cases_from_metadata(metadata_path):
 def _resolve_qos_case_request(body, metadata_path):
     raw_idx = body.get("qos_case_idx")
     qos = _resolve_qos_context(body)
+    qos_override = body.get("qos_override", False)
+    if not isinstance(qos_override, bool):
+        raise ValueError("qos_override must be a boolean")
+    if qos_override and raw_idx is None:
+        raise ValueError("qos_case_idx is required when qos_override is true")
 
     if raw_idx is None and qos is None:
         return None, None
@@ -177,9 +182,10 @@ def _resolve_qos_case_request(body, metadata_path):
     return qos_case_idx, qos
 
 
-def _apply_qos_env(env, qos, qos_case_idx=None):
+def _apply_qos_env(env, qos, qos_case_idx=None, qos_override=False):
     if qos_case_idx is not None:
         env["QOS_CASE_INDEX"] = str(qos_case_idx)
+    env["QOS_OVERRIDE"] = "true" if qos_override else "false"
     if not qos:
         return
     if "history" in qos:
@@ -558,7 +564,7 @@ def start_docker():
         env = os.environ.copy()
         env["RUN_TIMESTAMP"] = run_timestamp
         env["RMW_CHOICE"] = rmw
-        _apply_qos_env(env, qos, qos_case_idx)
+        _apply_qos_env(env, qos, qos_case_idx, body.get("qos_override", False))
         if zenoh_config_override is not None:
             env["ZENOH_CONFIG_OVERRIDE"] = str(zenoh_config_override)
 
@@ -614,7 +620,7 @@ def start_native():
         env = os.environ.copy()
         env["RUN_TIMESTAMP"] = run_timestamp
         env["RMW_CHOICE"] = rmw
-        _apply_qos_env(env, qos, qos_case_idx)
+        _apply_qos_env(env, qos, qos_case_idx, body.get("qos_override", False))
         if zenoh_config_override is not None:
             env["ZENOH_CONFIG_OVERRIDE"] = str(zenoh_config_override)
         env.setdefault("ROS2_PERF_REPO_ROOT", REPO_ROOT)

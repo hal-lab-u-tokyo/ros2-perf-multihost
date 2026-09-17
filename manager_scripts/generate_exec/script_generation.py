@@ -6,6 +6,7 @@ import os
 from .validation import (
     normalize_qos_cases,
     require_positive_int,
+    resolve_endpoint_qos,
     resolve_hosts_with_nodes,
 )
 
@@ -40,7 +41,8 @@ def append_benchmark_block(lines, node_name, pub_list, sub_list, qos_opts):
                 f"--msg-sizes-pub {publisher.get('msg_size', 0)}"
             )
             arguments.append(
-                f"--period {require_positive_int(publisher, 'period_ms', context)}"
+                f"--period {require_positive_int(publisher,
+                                                 'period_ms', context)}"
             )
     if sub_list:
         arguments.append(
@@ -60,7 +62,8 @@ def append_benchmark_block(lines, node_name, pub_list, sub_list, qos_opts):
             f"  {' '.join(arguments)} --eval-time \"$EVAL_TIME\" \\",
             f"  {qos_opts} --log-dir \"$LOG_DIR\" \\",
             ") & node_pids+=($!)",
-            f'echo "Started {node_name} benchmark node at $(date +%Y-%m-%dT%H:%M:%S.%3N%z)"',
+            f'echo "Started {
+                node_name} benchmark node at $(date +%Y-%m-%dT%H:%M:%S.%3N%z)"',
         ]
     )
 
@@ -113,26 +116,52 @@ def generate_exec_scripts(json_content, output_dir, settings):
                 '            "--qos-history", qos_history,',
                 '            "--qos-depth", qos_depth,',
                 '            "--qos-reliability", qos_reliability,',
+                '            "--qos-override", qos_override,',
             ]
             if publisher_entries:
+                publisher_qos = [
+                    resolve_endpoint_qos(entry, json_content.get("qos"))
+                    for entry in publisher_entries
+                ]
                 args.append(
                     f'            "--topic-names-pub", "{",".join(p["topic_name"] for p in publisher_entries)}",')
                 args.append(
                     f'            "--msg-types-pub", "{",".join(p["msg_type"] for p in publisher_entries)}",')
                 args.append(
                     f'            "--msg-pass-by-pub", "{",".join(p.get("msg_pass_by", "const_ref") for p in publisher_entries)}",')
+                args.append(
+                    f'            "--qos-history-pub", "{",".join(qos["history"] for qos in publisher_qos)}",')
+                args.append(
+                    f'            "--qos-depth-pub", "{",".join(str(qos["depth"]) for qos in publisher_qos)}",')
+                args.append(
+                    f'            "--qos-reliability-pub", "{",".join(qos["reliability"] for qos in publisher_qos)}",')
+                args.append(
+                    f'            "--qos-source-pub", "{",".join("sweep" if isinstance(json_content.get("qos"), list) else "endpoint" if "qos" in p else "root_default" for p in publisher_entries)}",')
                 for index, entry in enumerate(publisher_entries):
                     msg_size = entry.get("msg_size", 0)
-                    args.append(f'            "--msg-sizes-pub", "{msg_size}",')
+                    args.append(
+                        f'            "--msg-sizes-pub", "{msg_size}",')
                     args.append(
                         f'            "--period", "{require_positive_int(entry, "period_ms", f"node \'{node_name}\' publishers[{index}]")}",')
             if subscriber_entries:
+                subscriber_qos = [
+                    resolve_endpoint_qos(entry, json_content.get("qos"))
+                    for entry in subscriber_entries
+                ]
                 args.append(
                     f'            "--topic-names-sub", "{",".join(s["topic_name"] for s in subscriber_entries)}",')
                 args.append(
                     f'            "--msg-types-sub", "{",".join(s["msg_type"] for s in subscriber_entries)}",')
                 args.append(
                     f'            "--msg-pass-by-sub", "{",".join(s.get("msg_pass_by", "const_shared_ptr") for s in subscriber_entries)}",')
+                args.append(
+                    f'            "--qos-history-sub", "{",".join(qos["history"] for qos in subscriber_qos)}",')
+                args.append(
+                    f'            "--qos-depth-sub", "{",".join(str(qos["depth"]) for qos in subscriber_qos)}",')
+                args.append(
+                    f'            "--qos-reliability-sub", "{",".join(qos["reliability"] for qos in subscriber_qos)}",')
+                args.append(
+                    f'            "--qos-source-sub", "{",".join("sweep" if isinstance(json_content.get("qos"), list) else "endpoint" if "qos" in s else "root_default" for s in subscriber_entries)}",')
             args.append('            "--log-dir", log_dir,')
             node_var_lines.extend([
                 f"    {var_name} = Node(",
@@ -161,6 +190,7 @@ def generate_exec_scripts(json_content, output_dir, settings):
             '    qos_history = LaunchConfiguration("qos_history")',
             '    qos_depth = LaunchConfiguration("qos_depth")',
             '    qos_reliability = LaunchConfiguration("qos_reliability")',
+            '    qos_override = LaunchConfiguration("qos_override")',
             '    project_root = EnvironmentVariable("ROS2_PERF_REPO_ROOT", default_value=EnvironmentVariable("ROS2_PERF_WS", default_value="/workdir/ros2-perf-multihost"))',
             "",
             *node_var_lines,
@@ -194,6 +224,7 @@ def generate_exec_scripts(json_content, output_dir, settings):
                 default_qos["depth"]}")),',
             f'            DeclareLaunchArgument("qos_reliability", default_value=EnvironmentVariable("QOS_RELIABILITY", default_value="{
                 default_qos["reliability"]}")),',
+            '            DeclareLaunchArgument("qos_override", default_value=EnvironmentVariable("QOS_OVERRIDE", default_value="false")),',
             "            ExecuteProcess(",
             "                cmd=[",
             '                    "python3",',
@@ -260,6 +291,7 @@ def append_common_service(
     lines.append(f"      - EVAL_TIME=${{EVAL_TIME:-{eval_time_default}}}")
     lines.append("      - LOG_DIR=${LOG_DIR:-}")
     lines.append("      - QOS_CASE_INDEX=${QOS_CASE_INDEX:-}")
+    lines.append("      - QOS_OVERRIDE=${QOS_OVERRIDE:-false}")
     lines.append(
         f"      - QOS_HISTORY=${{QOS_HISTORY:-{default_qos['history']}}}")
     lines.append(f"      - QOS_DEPTH=${{QOS_DEPTH:-{default_qos['depth']}}}")
@@ -398,6 +430,8 @@ def run_script_common_prefix(lines, rel_root, eval_time_default, settings, defau
             'RMW_CHOICE="${RMW_CHOICE:-${RMW:-}}"',
             'TRIAL_IDX="${TRIAL_IDX:-1}"',
             'QOS_CASE_INDEX="${QOS_CASE_INDEX:-}"',
+            'QOS_OVERRIDE="${QOS_OVERRIDE:-false}"',
+            'export QOS_CASE_INDEX QOS_OVERRIDE',
             f'QOS_HISTORY="${{QOS_HISTORY:-{default_qos["history"]}}}"',
             f'QOS_DEPTH="${{QOS_DEPTH:-{default_qos["depth"]}}}"',
             f'QOS_RELIABILITY="${{QOS_RELIABILITY:-{
@@ -412,6 +446,7 @@ def run_script_common_prefix(lines, rel_root, eval_time_default, settings, defau
             '  -i, --trial-idx N         Trial index (default: $TRIAL_IDX)',
             '  -m, --rmw NAME            RMW implementation: fastdds|cyclonedds|zenoh',
             '      --qos-case-idx N      QoS sweep case index',
+            '      --qos-override        Apply global QoS to every endpoint',
             '      --qos-history NAME    QoS history: KEEP_LAST|KEEP_ALL',
             '      --qos-depth N         QoS depth, used only with KEEP_LAST',
             '      --qos-reliability NAME QoS reliability: RELIABLE|BEST_EFFORT',
@@ -434,6 +469,8 @@ def run_script_common_prefix(lines, rel_root, eval_time_default, settings, defau
             '      RMW_CHOICE="$2"; shift 2;;',
             '    --qos-case-idx)',
             '      QOS_CASE_INDEX="$2"; shift 2;;',
+            '    --qos-override)',
+            '      QOS_OVERRIDE=true; shift;;',
             '    --qos-history)',
             '      QOS_HISTORY="$2"; shift 2;;',
             '    --qos-depth)',
@@ -512,6 +549,7 @@ def run_script_common_prefix(lines, rel_root, eval_time_default, settings, defau
             'echo "EVAL_TIME=$EVAL_TIME"',
             'echo "RMW_CHOICE=$RMW_CHOICE"',
             'echo "QOS_CASE_INDEX=${QOS_CASE_INDEX:-N/A}"',
+            'echo "QOS_OVERRIDE=$QOS_OVERRIDE"',
             'echo "QOS_HISTORY=$QOS_HISTORY"',
             'echo "QOS_DEPTH=$QOS_DEPTH"',
             'echo "QOS_RELIABILITY=$QOS_RELIABILITY"',
@@ -601,7 +639,7 @@ def generate_host_exec_native_scripts(json_content, output_dir, project_root, se
                 "set -u",
                 "",
                 f'ros2 launch "{
-                    launch_file}" eval_time:="$EVAL_TIME" log_dir:="$LOG_DIR" qos_history:="$QOS_HISTORY" qos_depth:="$QOS_DEPTH" qos_reliability:="$QOS_RELIABILITY"',
+                    launch_file}" eval_time:="$EVAL_TIME" log_dir:="$LOG_DIR" qos_history:="$QOS_HISTORY" qos_depth:="$QOS_DEPTH" qos_reliability:="$QOS_RELIABILITY" qos_override:="$QOS_OVERRIDE"',
             ]
         )
 
