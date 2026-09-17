@@ -17,6 +17,11 @@ This directory contains scripts for trial automation, log collection, and CSV ag
 
 For usage of `performance_test.py`, see the [Usage in Details](../README.md#usage-in-details) section in the top-level README.
 
+`--rmw` accepts a comma-separated list of RMW implementations. They run in the
+specified order as independent runs, each with its own results directory and
+`latest-<rmw>` alias. Duplicate RMW values are rejected. `--exec-policy` remains
+a single value shared by all requested RMW runs.
+
 For `docker`/`native` runs, `performance_test.py` always executes `system_perf` preflight checks before trials:
 
 - `manager_scripts/system_perf/check_chrony_manager_sync.py`

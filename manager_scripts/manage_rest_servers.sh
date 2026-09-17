@@ -43,8 +43,7 @@ Commands:
 Options:
     -w, --ws-dir DIR            Workspace directory containing runtime_logs
                               (default: ${DEFAULT_WS_DIR})
-      --hosts HOSTS           Comma-separated host list
-      --host HOST             Add one host; may be specified multiple times
+    --hosts HOSTS           Comma-separated host list
   -b, --remote-repo-base DIR  Remote repository base directory on each Host
                               (default: ${DEFAULT_REMOTE_REPO_BASE})
   -u, --ssh-user USER         SSH username for each Host
@@ -65,7 +64,7 @@ Options:
 
 Examples:
     $(basename "$0") start --hosts host1,host2,host3
-    $(basename "$0") status --host host1 --host host2
+    $(basename "$0") status --hosts host1,host2
     $(basename "$0") stop --hosts host1,host2 -b /home/ubuntu/ros2-perf-multihost
     $(basename "$0") restart --hosts host1,host2,host3
     $(basename "$0") monitor --hosts host1,host2 --monitor-interval 2 --monitor-count 10
@@ -99,11 +98,6 @@ while [[ $# -gt 0 ]]; do
             [[ $# -ge 2 ]] || { echo "ERROR: $1 requires a value" >&2; exit 2; }
             IFS=',' read -r -a HOSTS_RAW <<< "$2"
             HOSTS_INPUT+=("${HOSTS_RAW[@]}")
-            shift 2
-            ;;
-        --host)
-            [[ $# -ge 2 ]] || { echo "ERROR: $1 requires a value" >&2; exit 2; }
-            HOSTS_INPUT+=("$2")
             shift 2
             ;;
         -b|--remote-repo-base)
@@ -195,7 +189,7 @@ if ! [[ "${LOG_LINES}" =~ ^[0-9]+$ ]] || [[ "${LOG_LINES}" -le 0 ]]; then
 fi
 
 if [[ "${#HOSTS_INPUT[@]}" -eq 0 ]]; then
-    echo "ERROR: at least one --hosts or --host value is required."
+    echo "ERROR: --hosts is required." >&2
     echo "Use --help to see usage." >&2
     exit 2
 fi
@@ -208,8 +202,8 @@ for h in "${HOSTS_INPUT[@]}"; do
     h="$(trim "$h")"
     if [[ -n "$h" ]]; then
         if [[ -n "${SEEN_HOSTS[$h]+x}" ]]; then
-            echo "WARNING: duplicate host ignored: ${h}" >&2
-            continue
+            echo "ERROR: duplicate host specified: ${h}" >&2
+            exit 2
         fi
         HOSTS+=("$h")
         SEEN_HOSTS["$h"]=1
