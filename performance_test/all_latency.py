@@ -34,6 +34,8 @@ def get_node_and_topics(logs_folder_path):
             logs_folder_path, node_folder)  # ./logs/node1
         if not os.path.isdir(node_folder_path):
             continue
+        if node_folder == "runtime_logs":
+            continue
         # ./logs/node1/metadata.txt
         metadata_path = os.path.join(node_folder_path, "metadata.txt")
         node_info = {}
