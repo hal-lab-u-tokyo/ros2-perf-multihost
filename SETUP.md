@@ -407,8 +407,8 @@ refresh the components used by the benchmark.
   Python code, then verify their status:
 
   ```bash
-  ./manager_scripts/manage_rest_servers.sh restart simple --force
-  ./manager_scripts/manage_rest_servers.sh status simple
+  ./manager_scripts/manage_rest_servers.sh restart --hosts host1,host2,host3 --force
+  ./manager_scripts/manage_rest_servers.sh status --hosts host1,host2,host3
   ```
 
 Native-only environments may skip the Docker image pull, but should still pass
@@ -437,7 +437,7 @@ for host in "${HOSTS[@]}"; do
     "git -C '${REMOTE_REPO_BASE}' rev-parse HEAD"
 done
 
-./manager_scripts/manage_rest_servers.sh status simple
+./manager_scripts/manage_rest_servers.sh status --hosts host1,host2,host3
 ```
 
 The commit hashes should match. For a Docker run, the `image:` entry must also

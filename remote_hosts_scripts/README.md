@@ -21,7 +21,7 @@ For overall usage, see the [Usage in Details](../README.md#usage-in-details) sec
 Recommended (from the Manager, starts all Hosts):
 
 ```bash
-./manager_scripts/manage_rest_servers.sh start <topology>
+./manager_scripts/manage_rest_servers.sh start --hosts host1,host2,host3
 ```
 
 Manual (needed on each Host):

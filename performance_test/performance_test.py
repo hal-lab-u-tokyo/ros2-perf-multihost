@@ -536,6 +536,24 @@ Examples:
                     qos_case_idx=active_qos_case_idx,
                     qos_case=active_qos_case,
                 )
+                if args.exec_policy != "local":
+                    trial_runtime_dir = os.path.join(
+                        case_raw_logs_dir, f"trial{trial_idx + 1}"
+                    )
+                    print(
+                        f"Collecting runtime log snapshot for trial {trial_idx + 1}..."
+                    )
+                    collect_runtime_logs(
+                        trial_runtime_dir,
+                        hosts,
+                        ssh_user=args.ssh_user,
+                        remote_repo_base=args.remote_repo_base,
+                        ws_dir=args.ws_dir,
+                        exec_policy=args.exec_policy,
+                        zenoh_router_kind=zenoh_router_kind,
+                        zenoh_router_target_host=zenoh_router_target_host,
+                        local_repo_root=repo_root,
+                    )
                 time.sleep(10)
 
             collect_logs(
@@ -568,21 +586,6 @@ Examples:
                 }
             )
     finally:
-        if args.exec_policy in ("docker", "native"):
-            print("Collecting runtime logs (rest_server, zenohd router)...")
-            collect_runtime_logs(
-                local_session_dir,
-                hosts,
-                ssh_user=args.ssh_user,
-                remote_repo_base=args.remote_repo_base,
-                ws_dir=args.ws_dir,
-                topology_name=args.topology_name,
-                exec_policy=args.exec_policy,
-                zenoh_router_kind=zenoh_router_kind,
-                zenoh_router_target_host=zenoh_router_target_host,
-                local_repo_root=repo_root,
-            )
-
         if zenoh_router_started:
             print("Stopping Zenoh router...")
             try:

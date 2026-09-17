@@ -2,10 +2,6 @@
 set -euo pipefail
 
 # Start REST servers on all hosts from the manager machine.
-# Host list is always resolved from metadata.txt.
-
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-REPO_DIR="$(cd "${SCRIPT_DIR}/.." && pwd)"
 
 DEFAULT_WS_DIR="performance_ws"
 DEFAULT_REMOTE_REPO_BASE="/home/ubuntu/ros2-perf-multihost"
@@ -17,7 +13,7 @@ DEFAULT_MONITOR_INTERVAL_SEC="5"
 DEFAULT_LOG_LINES="100"
 
 WS_DIR_INPUT="${DEFAULT_WS_DIR}"
-TOPOLOGY_INPUT=""
+HOSTS_INPUT=()
 REMOTE_REPO_BASE="${DEFAULT_REMOTE_REPO_BASE}"
 SSH_USER="${DEFAULT_SSH_USER}"
 WAIT_RETRIES="${DEFAULT_WAIT_RETRIES}"
@@ -31,7 +27,7 @@ SUBCOMMAND=""
 
 print_help() {
     cat <<EOF
-Usage: $(basename "$0") <command> <topology> [OPTIONS]
+Usage: $(basename "$0") <command> [OPTIONS]
 
 Manage remote_hosts_scripts/rest_server.py on all hosts via SSH from the manager.
 
@@ -45,8 +41,10 @@ Commands:
     logs                      Show REST server logs from all hosts
 
 Options:
-  -w, --ws-dir DIR            Workspace directory that contains topologies
+    -w, --ws-dir DIR            Workspace directory containing runtime_logs
                               (default: ${DEFAULT_WS_DIR})
+      --hosts HOSTS           Comma-separated host list
+      --host HOST             Add one host; may be specified multiple times
   -b, --remote-repo-base DIR  Remote repository base directory on each Host
                               (default: ${DEFAULT_REMOTE_REPO_BASE})
   -u, --ssh-user USER         SSH username for each Host
@@ -66,12 +64,12 @@ Options:
   -h, --help                  Show this help message and exit
 
 Examples:
-    $(basename "$0") start simple
-    $(basename "$0") status simple -w performance_ws
-    $(basename "$0") stop simple -b /home/ubuntu/ros2-perf-multihost
-    $(basename "$0") restart simple
-    $(basename "$0") monitor simple --monitor-interval 2 --monitor-count 10
-    $(basename "$0") logs simple --log-lines 200 --follow
+    $(basename "$0") start --hosts host1,host2,host3
+    $(basename "$0") status --host host1 --host host2
+    $(basename "$0") stop --hosts host1,host2 -b /home/ubuntu/ros2-perf-multihost
+    $(basename "$0") restart --hosts host1,host2,host3
+    $(basename "$0") monitor --hosts host1,host2 --monitor-interval 2 --monitor-count 10
+    $(basename "$0") logs --hosts host1,host2 --log-lines 200 --follow
 EOF
 }
 
@@ -80,12 +78,6 @@ trim() {
     s="${s#"${s%%[![:space:]]*}"}"
     s="${s%"${s##*[![:space:]]}"}"
     printf '%s' "$s"
-}
-
-get_metadata_value() {
-    local key="$1"
-    local file="$2"
-    awk -v key="$key" 'index($0, key ": ") == 1 {print substr($0, length(key) + 3); exit}' "$file"
 }
 
 while [[ $# -gt 0 ]]; do
@@ -101,6 +93,17 @@ while [[ $# -gt 0 ]]; do
         -w|--ws-dir)
             [[ $# -ge 2 ]] || { echo "ERROR: $1 requires a value" >&2; exit 2; }
             WS_DIR_INPUT="$2"
+            shift 2
+            ;;
+        --hosts)
+            [[ $# -ge 2 ]] || { echo "ERROR: $1 requires a value" >&2; exit 2; }
+            IFS=',' read -r -a HOSTS_RAW <<< "$2"
+            HOSTS_INPUT+=("${HOSTS_RAW[@]}")
+            shift 2
+            ;;
+        --host)
+            [[ $# -ge 2 ]] || { echo "ERROR: $1 requires a value" >&2; exit 2; }
+            HOSTS_INPUT+=("$2")
             shift 2
             ;;
         -b|--remote-repo-base)
@@ -161,12 +164,9 @@ while [[ $# -gt 0 ]]; do
             exit 2
             ;;
         *)
-            if [[ -n "${TOPOLOGY_INPUT}" ]]; then
-                echo "ERROR: topology is already set to '${TOPOLOGY_INPUT}', unexpected argument: $1" >&2
-                exit 2
-            fi
-            TOPOLOGY_INPUT="$1"
-            shift
+            echo "ERROR: unexpected argument: $1" >&2
+            echo "Use --help to see usage." >&2
+            exit 2
             ;;
     esac
 done
@@ -194,41 +194,25 @@ if ! [[ "${LOG_LINES}" =~ ^[0-9]+$ ]] || [[ "${LOG_LINES}" -le 0 ]]; then
     exit 2
 fi
 
-if [[ -z "${TOPOLOGY_INPUT}" ]]; then
-    echo "ERROR: topology is required." >&2
+if [[ "${#HOSTS_INPUT[@]}" -eq 0 ]]; then
+    echo "ERROR: at least one --hosts or --host value is required."
     echo "Use --help to see usage." >&2
     exit 2
 fi
 
-METADATA_PATH="${REPO_DIR}/${WS_DIR_INPUT}/${TOPOLOGY_INPUT}/metadata.txt"
-if [[ ! -f "${METADATA_PATH}" ]]; then
-    echo "ERROR: metadata file not found: ${METADATA_PATH}" >&2
-    exit 1
-fi
+REMOTE_RUNTIME_DIR="${REMOTE_REPO_BASE}/${WS_DIR_INPUT}/runtime_logs"
 
-WS_DIR="$(get_metadata_value "ws_dir" "${METADATA_PATH}")"
-TOPOLOGY_DIR="$(get_metadata_value "topology_dir" "${METADATA_PATH}")"
-HOSTS_LINE="$(get_metadata_value "hosts" "${METADATA_PATH}")"
-JSON_PATH="$(get_metadata_value "json_path" "${METADATA_PATH}")"
-
-if [[ -z "${WS_DIR}" || -z "${TOPOLOGY_DIR}" ]]; then
-    echo "ERROR: metadata is missing ws_dir/topology_dir in ${METADATA_PATH}" >&2
-    exit 1
-fi
-
-if [[ -z "${HOSTS_LINE}" ]]; then
-    echo "ERROR: no hosts found in metadata.txt (${METADATA_PATH})." >&2
-    exit 1
-fi
-
-REMOTE_RUNTIME_DIR="${REMOTE_REPO_BASE}/${WS_DIR}/${TOPOLOGY_DIR}/runtime_logs"
-
-IFS=',' read -r -a HOSTS_RAW <<< "${HOSTS_LINE}"
 HOSTS=()
-for h in "${HOSTS_RAW[@]}"; do
+declare -A SEEN_HOSTS=()
+for h in "${HOSTS_INPUT[@]}"; do
     h="$(trim "$h")"
     if [[ -n "$h" ]]; then
+        if [[ -n "${SEEN_HOSTS[$h]+x}" ]]; then
+            echo "WARNING: duplicate host ignored: ${h}" >&2
+            continue
+        fi
         HOSTS+=("$h")
+        SEEN_HOSTS["$h"]=1
     fi
 done
 
@@ -243,10 +227,7 @@ NC_TIMEOUT_OPT=(-w 1)
 REMOTE_LOG_PATH="${REMOTE_RUNTIME_DIR}/rest_server.log"
 
 echo "=== REST server command: ${SUBCOMMAND} ==="
-echo "metadata_path : ${METADATA_PATH}"
-echo "json_path     : ${JSON_PATH:-N/A}"
-echo "ws_dir        : ${WS_DIR}"
-echo "topology_dir  : ${TOPOLOGY_DIR}"
+echo "ws_dir        : ${WS_DIR_INPUT}"
 echo "hosts         : ${HOSTS[*]}"
 echo "ssh_user      : ${SSH_USER}"
 echo "remote_repo   : ${REMOTE_REPO_BASE}"
@@ -355,7 +336,7 @@ start_host() {
         fi; \
         : > \"${REMOTE_LOG_PATH}\"; \
         export ROS2_PERF_REPO_ROOT=\"${REMOTE_REPO_BASE}\"; \
-        export ROS2_PERF_WS_DIR=\"${WS_DIR}\"; \
+            export ROS2_PERF_WS_DIR=\"${WS_DIR_INPUT}\"; \
         nohup python3 remote_hosts_scripts/rest_server.py >>\"${REMOTE_LOG_PATH}\" 2>&1 < /dev/null &'"; then
         echo "[${host}] ERROR: failed to execute remote start command." >&2
         return 1
