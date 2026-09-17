@@ -11,12 +11,15 @@
 namespace benchmark_options {
 
 Options::Options()
-    : eval_time(60), qos_history("KEEP_LAST"), qos_depth(1),
-      qos_reliability("RELIABLE"), qos_override(false) {}
+    : eval_time(60),
+      qos_history("KEEP_LAST"),
+      qos_depth(1),
+      qos_reliability("RELIABLE"),
+      qos_override(false) {}
 
-Options::Options(int argc, char **argv) : Options() { parse(argc, argv); }
+Options::Options(int argc, char** argv) : Options() { parse(argc, argv); }
 
-void Options::parse(int argc, char **argv) {
+void Options::parse(int argc, char** argv) {
   constexpr int kDefaultPeriodMs = 100;
   std::string qos_override_value = "false";
 
@@ -127,24 +130,24 @@ void Options::parse(int argc, char **argv) {
       std::exit(1);
     }
 
-    auto validate_unique_topics =
-        [&print_help](const std::vector<std::string> &topics,
-                      const char *role) {
-          std::unordered_set<std::string> unique_topics;
-          for (const auto &topic : topics) {
-            if (!unique_topics.insert(topic).second) {
-              std::cout << "Error: duplicate " << role << " topic: " << topic
-                        << ".\n\n";
-              print_help();
-              std::exit(1);
-            }
-          }
-        };
+    auto validate_unique_topics = [&print_help](
+                                      const std::vector<std::string>& topics,
+                                      const char* role) {
+      std::unordered_set<std::string> unique_topics;
+      for (const auto& topic : topics) {
+        if (!unique_topics.insert(topic).second) {
+          std::cout << "Error: duplicate " << role << " topic: " << topic
+                    << ".\n\n";
+          print_help();
+          std::exit(1);
+        }
+      }
+    };
     validate_unique_topics(topic_names_pub, "publisher");
     validate_unique_topics(topic_names_sub, "subscriber");
 
-    for (const auto &publisher_topic : topic_names_pub) {
-      for (const auto &subscriber_topic : topic_names_sub) {
+    for (const auto& publisher_topic : topic_names_pub) {
+      for (const auto& subscriber_topic : topic_names_sub) {
         if (publisher_topic == subscriber_topic) {
           std::cout
               << "Error: publisher and subscriber topics must not overlap: "
@@ -193,7 +196,7 @@ void Options::parse(int argc, char **argv) {
       print_help();
       std::exit(1);
     }
-    for (const auto &msg_pass_by : msg_pass_by_pub) {
+    for (const auto& msg_pass_by : msg_pass_by_pub) {
       if (msg_pass_by != "const_ref" && msg_pass_by != "unique_ptr") {
         std::cout << "Error: --msg-pass-by-pub must be const_ref or "
                      "unique_ptr.\n\n";
@@ -209,7 +212,7 @@ void Options::parse(int argc, char **argv) {
       print_help();
       std::exit(1);
     }
-    for (const auto &msg_pass_by : msg_pass_by_sub) {
+    for (const auto& msg_pass_by : msg_pass_by_sub) {
       if (msg_pass_by != "const_shared_ptr" &&
           msg_pass_by != "const_shared_ptr_with_info") {
         std::cout << "Error: --msg-pass-by-sub must be const_shared_ptr or "
@@ -236,13 +239,13 @@ void Options::parse(int argc, char **argv) {
       }
     }
     auto validate_qos_vectors = [&print_help](
-                                    std::vector<std::string> &histories,
-                                    std::vector<int> &depths,
-                                    std::vector<std::string> &reliabilities,
-                                    size_t endpoint_count, const char *role,
-                                    const std::string &default_history,
+                                    std::vector<std::string>& histories,
+                                    std::vector<int>& depths,
+                                    std::vector<std::string>& reliabilities,
+                                    size_t endpoint_count, const char* role,
+                                    const std::string& default_history,
                                     int default_depth,
-                                    const std::string &default_reliability) {
+                                    const std::string& default_reliability) {
       if (histories.empty()) {
         histories.assign(endpoint_count, default_history);
       }
@@ -260,7 +263,7 @@ void Options::parse(int argc, char **argv) {
         print_help();
         std::exit(1);
       }
-      for (const auto &history : histories) {
+      for (const auto& history : histories) {
         if (history != "KEEP_LAST" && history != "KEEP_ALL") {
           std::cout << "Error: per-" << role
                     << " QoS history must be KEEP_LAST or KEEP_ALL.\n\n";
@@ -276,7 +279,7 @@ void Options::parse(int argc, char **argv) {
           std::exit(1);
         }
       }
-      for (const auto &reliability : reliabilities) {
+      for (const auto& reliability : reliabilities) {
         if (reliability != "RELIABLE" && reliability != "BEST_EFFORT") {
           std::cout << "Error: per-" << role
                     << " QoS reliability must be RELIABLE or BEST_EFFORT.\n\n";
@@ -315,21 +318,21 @@ void Options::parse(int argc, char **argv) {
       qos_source_sub.assign(topic_names_sub.size(), "sweep");
     }
     auto validate_message_type = [&print_help](
-                                     const std::string &msg_type, int msg_size,
-                                     bool requires_msg_size, const char *role) {
+                                     const std::string& msg_type, int msg_size,
+                                     bool requires_msg_size, const char* role) {
       bool supported = false;
       bool variable_size = false;
-#define FIND_MESSAGE_TYPE(topology_name, ros_name, is_variable, element_size,  \
-                          fixed_size)                                          \
-  if (msg_type == #topology_name) {                                            \
-    supported = true;                                                          \
-    variable_size = is_variable;                                               \
-    if (requires_msg_size && is_variable && msg_size % element_size != 0) {    \
-      std::cout << "Error: --msg-sizes-pub must be divisible by "              \
-                << element_size << " for " << msg_type << ".\n\n";             \
-      print_help();                                                            \
-      std::exit(1);                                                            \
-    }                                                                          \
+#define FIND_MESSAGE_TYPE(topology_name, ros_name, is_variable, element_size, \
+                          fixed_size)                                         \
+  if (msg_type == #topology_name) {                                           \
+    supported = true;                                                         \
+    variable_size = is_variable;                                              \
+    if (requires_msg_size && is_variable && msg_size % element_size != 0) {   \
+      std::cout << "Error: --msg-sizes-pub must be divisible by "             \
+                << element_size << " for " << msg_type << ".\n\n";            \
+      print_help();                                                           \
+      std::exit(1);                                                           \
+    }                                                                         \
   }
       ROS2_PERF_FOR_EACH_MESSAGE_TYPE(FIND_MESSAGE_TYPE)
 #undef FIND_MESSAGE_TYPE
@@ -356,17 +359,17 @@ void Options::parse(int argc, char **argv) {
       validate_message_type(msg_types_pub[index], msg_sizes_pub[index], true,
                             "publisher");
     }
-    for (const auto &msg_type : msg_types_sub) {
+    for (const auto& msg_type : msg_types_sub) {
       validate_message_type(msg_type, 0, false, "subscriber");
     }
-  } catch (const cxxopts::exceptions::exception &exception) {
+  } catch (const cxxopts::exceptions::exception& exception) {
     std::cout << "Error parsing options: " << exception.what() << "\n\n";
     print_help();
     std::exit(1);
   }
 }
 
-std::ostream &operator<<(std::ostream &os, const Options &options) {
+std::ostream& operator<<(std::ostream& os, const Options& options) {
   os << "Node Name: " << options.node_name << '\n'
      << "Evaluation time: " << options.eval_time << "s\n"
      << "Log output: "
@@ -374,4 +377,4 @@ std::ostream &operator<<(std::ostream &os, const Options &options) {
   return os;
 }
 
-} // namespace benchmark_options
+}  // namespace benchmark_options
