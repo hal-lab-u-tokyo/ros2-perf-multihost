@@ -23,7 +23,7 @@
           "msg_size": 32,
           "period_ms": 1000,
           "qos": {
-            "reliability": "BEST_EFFORT"
+            "depth": 3
           }
         }
       ]

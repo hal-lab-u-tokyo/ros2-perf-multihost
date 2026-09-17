@@ -163,7 +163,7 @@ Additional examples may be added incrementally.
 | File | Hosts | Node allocation difference |
 |---|---:|---|
 | [simple.json](./simple.json) | 3 | Basic quick-start topology |
-| [simple_endpoint_qos.json](./simple_endpoint_qos.json) | 2 | Independent publisher and subscriber QoS overrides |
+| [simple_endpoint_qos.json](./simple_endpoint_qos.json) | 2 | Compatible publisher/subscriber QoS with independent depth overrides |
 | [simple_qos_sweep.json](./simple_qos_sweep.json) | 3 | Same topology as `simple.json` with sweep `qos` array |
 | [sierra_nevada.json](./sierra_nevada.json) | 3 | Based on the [iRobot Sierra Nevada topology](https://github.com/irobot-ros/ros2-performance/blob/rolling/irobot_benchmark/topology/sierra_nevada.json) |
 | [sierra_nevada_numhosts/sierra_nevada_1host.json](./sierra_nevada_numhosts/sierra_nevada_1host.json) | 1 | Sierra Nevada-derived allocation |
