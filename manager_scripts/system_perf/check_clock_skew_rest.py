@@ -74,7 +74,7 @@ def classify_url_error(exc: urllib.error.URLError) -> tuple[str, str, str]:
             "connection_refused",
             detail,
             "REST server is not running or not listening on the target port. "
-            "Start it with manager_scripts/manage_rest_servers.sh start <topology>.",
+            "Start it with manager_scripts/manage_rest_servers.sh start --hosts <host1,host2,...>.",
         )
     if isinstance(reason, socket.timeout):
         return (

@@ -312,13 +312,12 @@ def collect_runtime_logs(
     ssh_user="ubuntu",
     remote_repo_base="/home/ubuntu/ros2-perf-multihost",
     ws_dir="performance_ws",
-    topology_name=None,
     exec_policy="docker",
     zenoh_router_kind=None,
     zenoh_router_target_host=None,
     local_repo_root=None,
 ):
-    """Collect rest_server.log and zenohd_router.log from remote hosts into runtime_logs/."""
+    """Snapshot shared runtime logs into the current trial directory."""
     if exec_policy == "local":
         return
 
@@ -326,9 +325,7 @@ def collect_runtime_logs(
     os.makedirs(runtime_logs_dir, exist_ok=True)
 
     remote_repo_root = os.environ.get("ROS2_PERF_REPO_ROOT", remote_repo_base)
-    remote_runtime_dir = (
-        f"{remote_repo_root}/{ws_dir}/{topology_name}/runtime_logs"
-    )
+    remote_runtime_dir = f"{remote_repo_root}/{ws_dir}/runtime_logs"
 
     for host in hosts:
         dst = os.path.join(runtime_logs_dir, f"{host}_rest_server.log")
@@ -390,11 +387,11 @@ def collect_runtime_logs(
                     f"  WARNING: Could not collect zenohd_router.log (docker logs) from {zenoh_router_target_host}: {last_error}",
                     file=sys.stderr,
                 )
-    elif zenoh_router_kind == "manager" and local_repo_root and topology_name:
+    elif zenoh_router_kind == "manager" and local_repo_root:
         dst = os.path.join(runtime_logs_dir, "zenohd_router.log")
         if exec_policy == "native":
             src = os.path.join(
-                local_repo_root, ws_dir, topology_name, "runtime_logs", "zenohd_router.log"
+                local_repo_root, ws_dir, "runtime_logs", "zenohd_router.log"
             )
             if os.path.exists(src):
                 shutil.copy2(src, dst)

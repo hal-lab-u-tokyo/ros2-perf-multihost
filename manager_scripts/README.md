@@ -189,13 +189,13 @@ Example:
 ## manage_rest_servers.sh
 
 `manage_rest_servers.sh` manages `remote_hosts_scripts/rest_server.py` on all target Hosts from the Manager machine.
-It resolves host names from `<ws-dir>/<topology>/metadata.txt`.
+It receives the target Hosts explicitly with `--hosts` or one or more `--host` options, so it is independent of the topology used by a benchmark.
 `start` launches REST servers in the background over SSH and waits until each server port is reachable.
 If command execution or readiness check fails on any Host, the script exits with a non-zero status.
 
 Runtime log files created by this script are stored on each Host under:
 
-- `<remote-repo-base>/<ws-dir>/<topology>/runtime_logs/rest_server.log`
+- `<remote-repo-base>/<ws-dir>/runtime_logs/rest_server.log`
 
 The `logs` subcommand reads `rest_server.log`.
 `start` / `stop` / `status` operate on the process listening on fixed REST port `5000` (no PID file management).
@@ -203,7 +203,7 @@ The `logs` subcommand reads `rest_server.log`.
 ```bash
 ./manager_scripts/manage_rest_servers.sh \
 	<command> \
-	<topology> \
+	--hosts <host1,host2,...> \
 	[--ws-dir|-w <dir>] \
 	[--remote-repo-base|-b <dir>] \
 	[--ssh-user|-u <user>] \
@@ -225,8 +225,9 @@ Commands:
 | Argument | Short | Description | Default |
 |---|---|---|---|
 | `<command>` | — | One of `start`, `stop`, `restart`, `status`, `wait`, `monitor`, `logs` | required |
-| `<topology>` | — | Topology directory under `ws-dir` | required |
-| `--ws-dir` | `-w` | Workspace directory that contains generated topologies | `performance_ws` |
+| `--hosts` | — | Comma-separated target Host list | required unless `--host` is used |
+| `--host` | — | Add one target Host; may be specified multiple times | — |
+| `--ws-dir` | `-w` | Workspace directory containing `runtime_logs` | `performance_ws` |
 | `--remote-repo-base` | `-b` | Remote repository base directory on each Host | `/home/ubuntu/ros2-perf-multihost` |
 | `--ssh-user` | `-u` | SSH user for all Hosts | `ubuntu` |
 | `--force` | `-f` | Skip confirmation prompts for process termination | off |
@@ -242,15 +243,15 @@ Example:
 ```bash
 ./manager_scripts/manage_rest_servers.sh \
 	start \
-	simple \
+	--hosts host1,host2,host3 \
 	--remote-repo-base /home/ubuntu/ros2-perf-multihost
 
-./manager_scripts/manage_rest_servers.sh restart simple
-./manager_scripts/manage_rest_servers.sh status simple
-./manager_scripts/manage_rest_servers.sh monitor simple --monitor-interval 2 --monitor-count 10
-./manager_scripts/manage_rest_servers.sh logs simple --log-lines 200
-./manager_scripts/manage_rest_servers.sh logs simple --follow
-./manager_scripts/manage_rest_servers.sh stop simple
+./manager_scripts/manage_rest_servers.sh restart --host host1 --host host2 --host host3
+./manager_scripts/manage_rest_servers.sh status --hosts host1,host2,host3
+./manager_scripts/manage_rest_servers.sh monitor --hosts host1,host2,host3 --monitor-interval 2 --monitor-count 10
+./manager_scripts/manage_rest_servers.sh logs --hosts host1,host2,host3 --log-lines 200
+./manager_scripts/manage_rest_servers.sh logs --hosts host1,host2,host3 --follow
+./manager_scripts/manage_rest_servers.sh stop --hosts host1,host2,host3
 ```
 
 ## system_perf

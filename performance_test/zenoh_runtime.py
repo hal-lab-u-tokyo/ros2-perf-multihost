@@ -70,8 +70,8 @@ def build_config_override(connect_host):
     return f'mode="client";connect/endpoints=["tcp/{ip}:7447"]'
 
 
-def _zenoh_router_runtime_dir(base_dir, ws_dir, topology_name):
-    return os.path.join(base_dir, ws_dir, topology_name, "runtime_logs")
+def _zenoh_router_runtime_dir(base_dir, ws_dir):
+    return os.path.join(base_dir, ws_dir, "runtime_logs")
 
 
 def _find_local_pid_by_port(port):
@@ -149,8 +149,7 @@ def start_router(
                     f"Zenoh router compose up failed: {detail}") from exc
             print("zenohd container started via compose.")
         else:
-            runtime_dir = _zenoh_router_runtime_dir(
-                repo_root, ws_dir, topology_name)
+            runtime_dir = _zenoh_router_runtime_dir(repo_root, ws_dir)
             os.makedirs(runtime_dir, exist_ok=True)
             log_file = os.path.join(runtime_dir, "zenohd_router.log")
             legacy_pid_file = os.path.join(runtime_dir, "zenoh_router.pid")
@@ -198,8 +197,7 @@ def start_router(
                 "echo 'zenohd container started via compose'"
             )
         else:
-            runtime_dir = _zenoh_router_runtime_dir(
-                remote_repo_base, ws_dir, topology_name)
+            runtime_dir = _zenoh_router_runtime_dir(remote_repo_base, ws_dir)
             log_file = os.path.join(runtime_dir, "zenohd_router.log")
             legacy_pid_file = os.path.join(runtime_dir, "zenoh_router.pid")
             start_cmd = (
@@ -272,7 +270,7 @@ def stop_router(
             print("Stopped zenoh router container (compose down).")
         else:
             legacy_pid_file = os.path.join(
-                _zenoh_router_runtime_dir(repo_root, ws_dir, topology_name),
+                _zenoh_router_runtime_dir(repo_root, ws_dir),
                 "zenoh_router.pid",
             )
             pid = _find_local_pid_by_port(_ROUTER_PORT)
@@ -295,8 +293,7 @@ def stop_router(
             )
         else:
             legacy_pid_file = os.path.join(
-                _zenoh_router_runtime_dir(
-                    remote_repo_base, ws_dir, topology_name),
+                _zenoh_router_runtime_dir(remote_repo_base, ws_dir),
                 "zenoh_router.pid",
             )
             stop_cmd = (

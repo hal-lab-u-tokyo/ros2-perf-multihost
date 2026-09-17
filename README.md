@@ -235,12 +235,12 @@ For generator options, Docker image version selection, generated files in
 #### Start REST Servers
 
 Start the REST server on all Hosts from the Manager in one command.
-Note that the target Hosts are automatically resolved from `<ws-dir>/<topology>/metadata.txt`.
+Specify the target Hosts explicitly so the long-running REST service is independent of the active topology.
 
 ```bash
 ./manager_scripts/manage_rest_servers.sh \
   start \
-  <topology> \
+  --hosts <host1,host2,...> \
   [--ws-dir|-w <dir>] \
   [--remote-repo-base|-b <dir>] \
   [--ssh-user|-u <user>]
@@ -248,8 +248,9 @@ Note that the target Hosts are automatically resolved from `<ws-dir>/<topology>/
 
 Arguments:
 
-- `<topology>`: Topology directory to use (required)
-- `--ws-dir` (`-w`): Workspace directory that contains generated topologies (default: `performance_ws`)
+- `--hosts`: Comma-separated target Host list; use repeated `--host` options as an alternative (required)
+- `--host`: Add one target Host; may be specified multiple times
+- `--ws-dir` (`-w`): Workspace directory containing shared `runtime_logs` (default: `performance_ws`)
 - `--remote-repo-base` (`-b`): Remote repository base directory on each Host (default: `/home/ubuntu/ros2-perf-multihost`)
 - `--ssh-user` (`-u`): SSH username used to connect to each Host (default: `ubuntu`)
 
@@ -258,17 +259,17 @@ Example:
 ```bash
 ./manager_scripts/manage_rest_servers.sh \
   start \
-  simple \
+  --hosts host1,host2,host3 \
   --remote-repo-base /home/ubuntu/ros2-perf-multihost
 
 # Optional: check status, stop and restart
-./manager_scripts/manage_rest_servers.sh status simple
-./manager_scripts/manage_rest_servers.sh stop simple
-./manager_scripts/manage_rest_servers.sh restart simple
+./manager_scripts/manage_rest_servers.sh status --hosts host1,host2,host3
+./manager_scripts/manage_rest_servers.sh stop --hosts host1,host2,host3
+./manager_scripts/manage_rest_servers.sh restart --hosts host1,host2,host3
 ```
 
 If SSH startup or readiness check fails on any Host, this command exits with a non-zero status.
-The REST server log is stored on each Host under `<remote-repo-base>/<ws-dir>/<topology>/runtime_logs/rest_server.log`.
+The REST server log is stored on each Host under `<remote-repo-base>/<ws-dir>/runtime_logs/rest_server.log`.
 For full subcommand and option details (including `wait`, `monitor`, `logs`, and related options), see [manager_scripts/README.md](./manager_scripts/README.md#manage_rest_serverssh).
 
 If the server exits at startup with a chrony sudo permission error, check the chrony sudo setup in [Clock synchronization for REST benchmark (chrony)](#clock-synchronization-for-rest-benchmark-chrony).
@@ -426,8 +427,8 @@ For a single QoS case, the result layout is the original flat layout:
 - In `docker`/`native` modes, coordination logs are written under `<ws-dir>/<topology>/results/latest-<rmw>/coordination_logs/`.
 - Trial logs are collected under `<ws-dir>/<topology>/results/latest-<rmw>/raw_logs/trial<N>/`.
 - Aggregated outputs such as `total_latency.csv`, `throughput.csv`, `host_trials_usage.csv`, and `host_usage_summary.csv` are written under `<ws-dir>/<topology>/results/latest-<rmw>/analysis/`.
-- In `docker`/`native` modes, runtime service logs are collected under `<ws-dir>/<topology>/results/latest-<rmw>/runtime_logs/` (for example, `<host>_rest_server.log`; and `zenohd_router.log` for Zenoh router runs).
-  - Note: `<host>_rest_server.log` is copied from the long-lived REST service log (`<ws-dir>/<topology>/runtime_logs/rest_server.log`), so it may include entries from earlier benchmark runs unless the REST server was restarted.
+- In `docker`/`native` modes, runtime service log snapshots are collected under `<ws-dir>/<topology>/results/latest-<rmw>/raw_logs/trial<N>/runtime_logs/` (for example, `<host>_rest_server.log` and `zenohd_router.log` for Zenoh router runs).
+  - Note: `<host>_rest_server.log` is copied from the long-lived REST service log (`<ws-dir>/runtime_logs/rest_server.log`), so it may include entries from earlier benchmark runs unless the REST server was restarted.
 
 For QoS sweep runs, `performance_test.py` stores each case in its own directory:
 
@@ -469,7 +470,7 @@ Common issues and fixes:
 
 - `python3 manager_scripts/generate_exec_scripts.py ...` fails because output exists: rerun with `--force` or remove the existing topology directory under `performance_ws/`.
 - `distribute_exec_scripts.sh` fails with SSH/SCP errors: verify hostnames, SSH keys, and that repository paths are identical across Hosts.
-- REST benchmark does not start remote execution: ensure REST servers are running on every target Host (for example, run `./manager_scripts/manage_rest_servers.sh start <topology>` from the Manager before calling `performance_test.py`).
+- REST benchmark does not start remote execution: ensure REST servers are running on every target Host (for example, run `./manager_scripts/manage_rest_servers.sh start --hosts host1,host2,host3` from the Manager before calling `performance_test.py`).
 - Clock skew should be measured more strictly before latency trials: run `python3 manager_scripts/system_perf/check_clock_skew_rest.py --hosts host1,host2,host3 --samples 30 --interval 0.05` and review `performance_ws/system_perf/clock_skew/<timestamp>/{summary,pairwise}.csv`.
 - Docker mode fails on remote Hosts: pull the image tag selected when generating artifacts (normally `latest`) and confirm Docker permissions on each Host.
 - Native mode cannot find workspace paths: set `ROS2_PERF_WS` to the project root before running `<host_name>_exec_native.sh`.

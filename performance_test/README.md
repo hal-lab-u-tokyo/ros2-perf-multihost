@@ -30,15 +30,15 @@ Use this mode for CI or formal evaluations where partially valid totals are not 
 
 ## Output Structure
 
-`performance_test.py` creates run-scoped outputs under `<ws-dir>/<topology>/results/<timestamp>-<rmw>/`, and related tools may also manage shared runtime logs under `<ws-dir>/<topology>/runtime_logs/`:
+`performance_test.py` creates run-scoped outputs under `<ws-dir>/<topology>/results/<timestamp>-<rmw>/`. Each Host keeps long-lived service logs under `<ws-dir>/runtime_logs/`, independent of the active topology:
 
 `latest-<rmw>` is updated only after a run completes successfully (all trials, log collection, and aggregation).
 If a run fails before completion, the existing `latest-<rmw>` target is preserved.
 
 ```
-runtime_logs/
+<ws-dir>/runtime_logs/
 ├── rest_server.log                  # managed by manage_rest_servers.sh
-└── zenohd_router.log                # created when rmw_zenohd is started natively
+└── zenohd_router.log                # native Zenoh router log when applicable
 
 results/
 ├── latest-fastdds -> 2026-04-26_13-21-45-fastdds/   # symlink per RMW
@@ -69,7 +69,11 @@ results/
     │   │   ├── <node>_log/          # per-node log directory
     │   │   │   └── <topic>_log.txt  # raw latency log per topic
     │   │   ├── <host>_monitor_host.csv # per-Host resource usage time series
-    │   │   └── ...
+    │   │   ├── ...
+    │   │   └── runtime_logs/        # snapshots collected in docker/native mode
+    │   │       ├── host1_rest_server.log
+    │   │       ├── host2_rest_server.log
+    │   │       └── zenohd_router.log
     │   ├── trial2/
     │   └── ...
     ├── analysis/
@@ -82,16 +86,11 @@ results/
     │   ├── host_trials_usage.csv
     │   ├── host_usage_summary.txt
     │   └── host_usage_summary.csv
-    └── runtime_logs/                # created in docker/native mode
-        ├── host1_rest_server.log
-        ├── host2_rest_server.log
-        ├── ...
-        └── zenohd_router.log        # when zenoh router logs are collectable
 ```
 
-`runtime_logs/<host>_rest_server.log` is a snapshot copy of each Host's long-lived
-`<ws-dir>/<topology>/runtime_logs/rest_server.log`, so it may include entries from previous runs
-unless the REST server was restarted before benchmarking.
+`raw_logs/trial<N>/runtime_logs/` contains snapshot copies of the long-lived
+service logs. The REST server log may include entries from previous runs unless
+the REST server was restarted before benchmarking.
 
 When generated `metadata.txt` contains `qos_mode: sweep`,
 `performance_test.py` runs all trials once per QoS case. This includes a root
