@@ -41,7 +41,8 @@ def append_benchmark_block(lines, node_name, pub_list, sub_list, qos_opts):
                 f"--msg-sizes-pub {publisher.get('msg_size', 0)}"
             )
             arguments.append(
-                f"--period {require_positive_int(publisher, 'period_ms', context)}"
+                f"--period {require_positive_int(publisher,
+                                                 'period_ms', context)}"
             )
     if sub_list:
         arguments.append(
@@ -61,7 +62,8 @@ def append_benchmark_block(lines, node_name, pub_list, sub_list, qos_opts):
             f"  {' '.join(arguments)} --eval-time \"$EVAL_TIME\" \\",
             f"  {qos_opts} --log-dir \"$LOG_DIR\" \\",
             ") & node_pids+=($!)",
-            f'echo "Started {node_name} benchmark node at $(date +%Y-%m-%dT%H:%M:%S.%3N%z)"',
+            f'echo "Started {
+                node_name} benchmark node at $(date +%Y-%m-%dT%H:%M:%S.%3N%z)"',
         ]
     )
 
@@ -137,7 +139,8 @@ def generate_exec_scripts(json_content, output_dir, settings):
                     f'            "--qos-source-pub", "{",".join("sweep" if isinstance(json_content.get("qos"), list) else "endpoint" if "qos" in p else "root_default" for p in publisher_entries)}",')
                 for index, entry in enumerate(publisher_entries):
                     msg_size = entry.get("msg_size", 0)
-                    args.append(f'            "--msg-sizes-pub", "{msg_size}",')
+                    args.append(
+                        f'            "--msg-sizes-pub", "{msg_size}",')
                     args.append(
                         f'            "--period", "{require_positive_int(entry, "period_ms", f"node \'{node_name}\' publishers[{index}]")}",')
             if subscriber_entries:
@@ -428,7 +431,7 @@ def run_script_common_prefix(lines, rel_root, eval_time_default, settings, defau
             'TRIAL_IDX="${TRIAL_IDX:-1}"',
             'QOS_CASE_INDEX="${QOS_CASE_INDEX:-}"',
             'QOS_OVERRIDE="${QOS_OVERRIDE:-false}"',
-            'export QOS_OVERRIDE',
+            'export QOS_CASE_INDEX QOS_OVERRIDE',
             f'QOS_HISTORY="${{QOS_HISTORY:-{default_qos["history"]}}}"',
             f'QOS_DEPTH="${{QOS_DEPTH:-{default_qos["depth"]}}}"',
             f'QOS_RELIABILITY="${{QOS_RELIABILITY:-{
