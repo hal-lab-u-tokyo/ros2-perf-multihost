@@ -197,6 +197,14 @@ Runtime log files created by this script are stored on each Host under:
 
 - `<remote-repo-base>/<ws-dir>/runtime_logs/rest_server.log`
 
+This is a long-lived Host-side log and is independent of the topology being
+benchmarked. `performance_test.py` copies it into each trial's result directory
+in `docker` and `native` modes. For Zenoh, native router output is written to
+`<ws-dir>/runtime_logs/zenohd_router.log` on the Manager when the router target
+is `Manager`, or to `<remote-repo-base>/<ws-dir>/runtime_logs/zenohd_router.log`
+on a remote router Host. Docker router output is collected from the router
+container with `docker logs`.
+
 The `logs` subcommand reads `rest_server.log`.
 `start` / `stop` / `status` operate on the process listening on fixed REST port `5000` (no PID file management).
 
