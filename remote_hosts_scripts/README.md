@@ -56,6 +56,7 @@ All endpoints accept a JSON body. Common request fields:
 | `qos_case_idx` | integer | QoS sweep case index from the topology JSON `qos` array (optional) |
 | `qos` | object | One QoS case from the topology JSON `qos` array (optional) |
 | `zenoh_config_override` | string | Optional `ZENOH_CONFIG_OVERRIDE` value forwarded to the execution script environment |
+| `ros_discovery_server` | string | Optional `ROS_DISCOVERY_SERVER` value (`<ip>:11811`) forwarded to the execution script environment when `--fastdds-discovery-server` is set |
 
 `/clock_probe` accepts an empty JSON body (`{}`) and returns:
 

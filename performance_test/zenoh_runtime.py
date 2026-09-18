@@ -9,7 +9,7 @@ import time
 _ROUTER_PORT = 7447
 
 
-def _looks_like_ipv4(value):
+def looks_like_ipv4(value):
     try:
         socket.inet_aton(value)
         return True
@@ -17,7 +17,7 @@ def _looks_like_ipv4(value):
         return False
 
 
-def _detect_manager_ip(host_hint):
+def detect_manager_ip(host_hint):
     # Determine the local source IP used to reach one of the test hosts.
     try:
         with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as sock:
@@ -37,9 +37,9 @@ def resolve_router_target(target, hosts):
         return "host", hosts[0], hosts[0]
     normalized = target.strip()
     if normalized == "Manager":
-        return "manager", None, _detect_manager_ip(hosts[0])
+        return "manager", None, detect_manager_ip(hosts[0])
 
-    if normalized in hosts or _looks_like_ipv4(normalized):
+    if normalized in hosts or looks_like_ipv4(normalized):
         return "host", normalized, normalized
 
     raise ValueError(
@@ -47,26 +47,26 @@ def resolve_router_target(target, hosts):
     )
 
 
-def _hostname_to_ip(hostname):
+def hostname_to_ip(hostname, purpose="zenoh router"):
     """Resolve a hostname to an IPv4 address.
 
     Docker containers do not inherit the host's /etc/hosts even with
-    network_mode: host, so ZENOH_CONFIG_OVERRIDE must use a routable IP
+    network_mode: host, so config overrides must use a routable IP
     address rather than a hostname that may only appear in /etc/hosts.
     """
-    if _looks_like_ipv4(hostname):
+    if looks_like_ipv4(hostname):
         return hostname
     try:
         return socket.gethostbyname(hostname)
     except socket.gaierror as exc:
         raise RuntimeError(
-            "Failed to resolve zenoh router hostname to IPv4 address: "
+            f"Failed to resolve {purpose} hostname to IPv4 address: "
             f"'{hostname}'. Use a resolvable hostname or an explicit IPv4."
         ) from exc
 
 
 def build_config_override(connect_host):
-    ip = _hostname_to_ip(connect_host)
+    ip = hostname_to_ip(connect_host)
     return f'mode="client";connect/endpoints=["tcp/{ip}:7447"]'
 
 

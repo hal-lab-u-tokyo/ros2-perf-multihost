@@ -50,6 +50,7 @@ python3 performance_test/performance_test.py \
     [--remote-repo-base|-b DIR] \
     [--ssh-user|-u USER] \
     [--zenoh-router|-z TARGET] \
+    [--fastdds-discovery-server|-d TARGET] \
     [--strict-analysis|-s]
 ```
 
@@ -63,6 +64,71 @@ Host execution. Start and verify the REST servers before using `docker` or
 For `docker` and `native`, generated execution files are distributed
 automatically before the run. Use `distribute_exec_scripts.sh` only when manual
 distribution or redistribution is needed.
+
+## Zenoh Router and Fast DDS Discovery Server
+
+`--zenoh-router` and `--fastdds-discovery-server` each select an optional
+central node used by one specific RMW implementation. They are independent
+options: mixing one with an unrelated `--rmw` selection only produces a
+warning, and each option is silently ignored for the other RMW runs in a
+multi-RMW command (`--rmw fastdds,cyclonedds,zenoh`).
+
+### Zenoh Router [`zenoh` only]
+
+Zenoh always requires a router, so `performance_test.py` manages `rmw_zenohd`
+automatically for every `--rmw zenoh` run, even if `--zenoh-router` is omitted.
+
+- (default, `docker`/`native`): first host in the JSON topology (e.g., `host1`)
+- `<host-name>` / `<ipv4>`: explicit hostname or IPv4 address
+- `Manager`: the machine running `performance_test.py`
+- `local` exec-policy: always managed internally by `local_exec.sh` via the
+  `service_zenohd` service in `local_compose.yaml`; `--zenoh-router` is ignored
+  for this policy since there is only one machine involved
+
+The resolved target is turned into an IPv4 address and used to set
+`ZENOH_CONFIG_OVERRIDE=mode="client";connect/endpoints=["tcp/<ip>:7447"]` for
+every bench node.
+
+| exec-policy | zenohd placement | How it is managed |
+|---|---|---|
+| `local` | Manager (Docker container) | Managed internally by `local_exec.sh` via the `service_zenohd` service in `local_compose.yaml`; `performance_test.py` does not start or stop it separately |
+| `docker` | Router target host (Docker container) | `performance_test.py` runs `docker compose -f zenohd_compose.yaml up/down service_zenohd` on the target. No native ROS 2 installation required on the target host |
+| `native` | Router target host (native process) | `performance_test.py` SSHes to the target and starts/stops `rmw_zenohd` directly; requires ROS 2 and `rmw_zenoh_cpp` to be installed natively on the target host |
+
+### Fast DDS Discovery Server [`fastdds` only, opt-in]
+
+Unlike Zenoh, Fast DDS works with its default SIMPLE discovery without any
+central node, so the Discovery Server is **disabled unless
+`--fastdds-discovery-server` is explicitly given** (it does not default to
+`host1` the way `--zenoh-router` does). This mirrors the
+[ROS 2 Discovery Server tutorial](https://docs.ros.org/en/jazzy/Tutorials/Advanced/Discovery-Server/Discovery-Server.html).
+
+- (no default): omitting the option keeps the run on SIMPLE discovery
+- `<host-name>` / `<ipv4>`: explicit hostname or IPv4 address
+- `Manager`: the machine running `performance_test.py`
+- `local` exec-policy: giving any value enables `service_fastdds_discoveryd` in
+  `local_compose.yaml`, managed internally by `local_exec.sh`
+
+The resolved target is turned into an IPv4 address and used to set
+`ROS_DISCOVERY_SERVER=<ip>:11811` (Fast DDS's default Discovery Server UDP
+port) for every bench node. Redundant/backup servers and Super Client mode are
+not supported.
+
+| exec-policy | discovery server placement | How it is managed |
+|---|---|---|
+| `local` | Manager (Docker container) | Managed internally by `local_exec.sh` via the `service_fastdds_discoveryd` service in `local_compose.yaml`, only when `--fastdds-discovery-server` is set |
+| `docker` | Target host (Docker container) | `performance_test.py` runs `docker compose -f fastdds_discoveryd_compose.yaml up/down service_fastdds_discoveryd` on the target |
+| `native` | Target host (native process) | `performance_test.py` SSHes to the target and starts/stops the `fastdds discovery` process directly; requires ROS 2 (`rmw_fastrtps_cpp`, which bundles the `fastdds` CLI) to be installed natively on the target host |
+
+Each run also records the resolved router/discovery-server target in
+`<ws-dir>/<topology>/results/<timestamp>-<rmw>/run_config.txt` for
+reproducibility.
+
+### CycloneDDS
+
+CycloneDDS has no equivalent central Discovery Server node. Its closest
+feature is a static peer list (`Discovery/Peers` in `CYCLONEDDS_URI` XML) to
+avoid multicast discovery, which is not implemented here.
 
 ## Output Structure
 
@@ -105,7 +171,8 @@ If a run fails before completion, the existing `latest-<rmw>` target is preserve
     │   │   └── runtime_logs/        # snapshots collected in docker/native mode
     │   │       ├── host1_rest_server.log
     │   │       ├── host2_rest_server.log
-    │   │       └── rmw_zenohd.log
+    │   │       ├── rmw_zenohd.log          # only for zenoh runs
+    │   │       └── fastdds_discoveryd.log  # only when --fastdds-discovery-server is set
     │   ├── trial2/
     │   └── ...
     ├── analysis/
@@ -125,9 +192,11 @@ Long-lived service logs are separate from this result tree:
 ```text
 <remote-repo-base>/<ws-dir>/runtime_logs/       # remote Hosts
 ├── rest_server.log                  # on each remote Host
-└── rmw_zenohd.log                   # native router, if the router is remote
-<manager-repo-root>/<ws-dir>/runtime_logs/      # native router target: Manager
-└── rmw_zenohd.log
+├── rmw_zenohd.log                   # native router, if the router is remote
+└── fastdds_discoveryd.log           # native discovery server, if it is remote
+<manager-repo-root>/<ws-dir>/runtime_logs/      # native router/discovery-server target: Manager
+├── rmw_zenohd.log
+└── fastdds_discoveryd.log
 ```
 
 `raw_logs/trial<N>/runtime_logs/` contains snapshot copies of the long-lived

@@ -164,10 +164,11 @@ for host in "${HOSTS[@]}"; do
     host_exec_native="${host}_exec_native.sh"
     host_compose="${host}_compose.yaml"
     zenohd_compose="zenohd_compose.yaml"
+    fastdds_discoveryd_compose="fastdds_discoveryd_compose.yaml"
 
     echo "=== Validating local files for ${host} ==="
     local_files_ok=true
-    for file in "${host_launch}" "${host_exec_docker}" "${host_exec_native}" "${host_compose}" "${zenohd_compose}"; do
+    for file in "${host_launch}" "${host_exec_docker}" "${host_exec_native}" "${host_compose}" "${zenohd_compose}" "${fastdds_discoveryd_compose}"; do
         if [[ ! -f "${LOCAL_EXEC_DIR}/${file}" ]]; then
             echo "ERROR: missing local file: ${LOCAL_EXEC_DIR}/${file}" >&2
             failed_hosts+=("${host}")
@@ -199,6 +200,7 @@ for host in "${HOSTS[@]}"; do
         "${LOCAL_EXEC_DIR}/${host_exec_native}" \
         "${LOCAL_EXEC_DIR}/${host_compose}" \
         "${LOCAL_EXEC_DIR}/${zenohd_compose}" \
+        "${LOCAL_EXEC_DIR}/${fastdds_discoveryd_compose}" \
         "${SSH_USER}@${host}:${REMOTE_EXEC_DIR}/" 2>&1)"; then
         echo "ERROR: Failed to copy scripts to ${host}" >&2
         if [[ -n "${err}" ]]; then

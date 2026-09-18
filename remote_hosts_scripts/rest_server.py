@@ -542,6 +542,7 @@ def start_docker():
     eval_time = body.get("eval_time")
     rmw = body.get("rmw")
     zenoh_config_override = body.get("zenoh_config_override")
+    ros_discovery_server = body.get("ros_discovery_server")
     try:
         trial_idx = _to_int(trial_idx, "trial_idx")
         if eval_time is not None:
@@ -567,6 +568,8 @@ def start_docker():
         _apply_qos_env(env, qos, qos_case_idx, body.get("qos_override", False))
         if zenoh_config_override is not None:
             env["ZENOH_CONFIG_OVERRIDE"] = str(zenoh_config_override)
+        if ros_discovery_server is not None:
+            env["ROS_DISCOVERY_SERVER"] = str(ros_discovery_server)
 
         app.logger.info(
             "[start_docker] host=%s topology=%s rmw=%s trial=%s qos_case=%s qos=%s timestamp=%s script=%s",
@@ -598,6 +601,7 @@ def start_native():
     eval_time = body.get("eval_time")
     rmw = body.get("rmw")
     zenoh_config_override = body.get("zenoh_config_override")
+    ros_discovery_server = body.get("ros_discovery_server")
     try:
         trial_idx = _to_int(trial_idx, "trial_idx")
         if eval_time is not None:
@@ -623,6 +627,8 @@ def start_native():
         _apply_qos_env(env, qos, qos_case_idx, body.get("qos_override", False))
         if zenoh_config_override is not None:
             env["ZENOH_CONFIG_OVERRIDE"] = str(zenoh_config_override)
+        if ros_discovery_server is not None:
+            env["ROS_DISCOVERY_SERVER"] = str(ros_discovery_server)
         env.setdefault("ROS2_PERF_REPO_ROOT", REPO_ROOT)
         env.setdefault("ROS2_PERF_WS", REPO_ROOT)
 

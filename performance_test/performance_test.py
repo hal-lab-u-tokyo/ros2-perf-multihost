@@ -3,6 +3,7 @@ import csv
 from datetime import datetime
 import json
 import os
+import shlex
 import socket
 import subprocess
 import sys
@@ -12,6 +13,12 @@ from analyzer import aggregate_total_latency
 from qos_sweep import is_qos_sweep, load_qos_cases, qos_case_label
 from runner import collect_logs, collect_runtime_logs, prepare_run, resolve_host_list, run_test
 from zenoh_runtime import build_config_override, resolve_router_target, start_router, stop_router
+from fastdds_discovery_server_runtime import (
+    build_ros_discovery_server_env,
+    resolve_server_target,
+    start_server,
+    stop_server,
+)
 
 try:
     from table_utils import write_text_table
@@ -235,6 +242,35 @@ def _write_qos_sweep_summary(summary_path, case_results):
     print(f"QoS sweep summary TXT saved: {summary_txt_path}")
 
 
+def _write_run_config(
+    local_session_dir,
+    args,
+    zenoh_router_kind,
+    zenoh_router_target_host,
+    zenoh_config_override,
+    discovery_server_kind,
+    discovery_server_target_host,
+    ros_discovery_server,
+):
+    """Record the runtime router/discovery-server configuration for reproducibility."""
+    lines = [
+        f"command: {shlex.join(sys.argv)}",
+        f"rmw: {args.rmw}",
+        f"exec_policy: {args.exec_policy}",
+    ]
+    if args.rmw == "zenoh":
+        target_label = "manager" if zenoh_router_kind == "manager" else zenoh_router_target_host
+        lines.append(f"zenoh_router_target: {target_label or 'local'}")
+        lines.append(f"zenoh_config_override: {zenoh_config_override}")
+    if args.rmw == "fastdds" and args.fastdds_discovery_server:
+        target_label = "manager" if discovery_server_kind == "manager" else discovery_server_target_host
+        lines.append(
+            f"fastdds_discovery_server_target: {target_label or 'local'}")
+        lines.append(f"ros_discovery_server: {ros_discovery_server}")
+    with open(os.path.join(local_session_dir, "run_config.txt"), "w") as f:
+        f.write("\n".join(lines) + "\n")
+
+
 def _update_latest_alias(results_root, rmw, run_timestamp):
     latest_link = os.path.join(results_root, f"latest-{rmw}")
     if os.path.lexists(latest_link):
@@ -259,7 +295,8 @@ if __name__ == "__main__":
             "%(prog)s <topology> [--rmw {fastdds,cyclonedds,zenoh}[,...]] "
             "[--exec-policy|-p {docker,native,local}] [--eval-time|-e SEC] "
             "[--trials|-t N] [--ws-dir|-w DIR] [--remote-repo-base|-b DIR] [--ssh-user|-u USER] "
-            "[--zenoh-router|-z TARGET] [--strict-analysis|-s] [--help|-h]"
+            "[--zenoh-router|-z TARGET] [--fastdds-discovery-server|-d TARGET] "
+            "[--strict-analysis|-s] [--help|-h]"
         ),
         epilog="""
 Examples:
@@ -268,6 +305,7 @@ Examples:
     python3 performance_test/performance_test.py simple --rmw zenoh --exec-policy local --eval-time 60 --trials 5
     python3 performance_test/performance_test.py simple --rmw fastdds,cyclonedds,zenoh --exec-policy native --eval-time 60 --trials 5
     python3 performance_test/performance_test.py simple --rmw zenoh --exec-policy local --eval-time 60 --trials 5
+    python3 performance_test/performance_test.py simple --rmw fastdds --fastdds-discovery-server host1 --exec-policy native --eval-time 60 --trials 5
 """,
     )
     parser.add_argument("topology_name", metavar="topology", type=str,
@@ -325,6 +363,18 @@ Examples:
         ),
     )
     parser.add_argument(
+        "-d",
+        "--fastdds-discovery-server",
+        type=str,
+        default=None,
+        help=(
+            "Discovery Server target for --rmw fastdds: Manager | <host-name> | <ipv4> "
+            "(default: disabled; Fast DDS uses its default SIMPLE discovery unless set). "
+            "Examples: --fastdds-discovery-server Manager | --fastdds-discovery-server host2 | "
+            "--fastdds-discovery-server 192.168.1.10"
+        ),
+    )
+    parser.add_argument(
         "-s",
         "--strict-analysis",
         action="store_true",
@@ -339,6 +389,20 @@ Examples:
         rmw_choices = _parse_rmw_list(args.rmw)
     except ValueError as exc:
         parser.error(str(exc))
+
+    if not os.environ.get("ROS2_PERF_MULTIRMW_CHILD"):
+        if args.zenoh_router and "zenoh" not in rmw_choices:
+            print(
+                "WARNING: --zenoh-router is set but 'zenoh' is not among --rmw selections; "
+                "it will be ignored for the other RMW implementation(s).",
+                file=sys.stderr,
+            )
+        if args.fastdds_discovery_server and "fastdds" not in rmw_choices:
+            print(
+                "WARNING: --fastdds-discovery-server is set but 'fastdds' is not among --rmw selections; "
+                "it will be ignored for the other RMW implementation(s).",
+                file=sys.stderr,
+            )
 
     eval_time = args.eval_time
 
@@ -356,6 +420,7 @@ Examples:
             f"Running RMW implementations in order: {', '.join(rmw_choices)}")
         successful_rmws = []
         failed_rmws = []
+        child_env = dict(os.environ, ROS2_PERF_MULTIRMW_CHILD="1")
         for rmw in rmw_choices:
             print(f"=== Starting RMW run: {rmw} ===")
             result = subprocess.run(
@@ -365,6 +430,7 @@ Examples:
                     *_replace_rmw_argument(sys.argv[1:], rmw),
                 ],
                 cwd=os.getcwd(),
+                env=child_env,
             )
             if result.returncode != 0:
                 failed_rmws.append(rmw)
@@ -504,6 +570,35 @@ Examples:
     else:
         os.environ.pop("ZENOH_CONFIG_OVERRIDE", None)
 
+    ros_discovery_server = None
+    discovery_server_started = False
+    discovery_server_kind = None
+    discovery_server_target_host = None
+    discovery_connect_host = None
+
+    if args.rmw == "fastdds" and args.fastdds_discovery_server:
+        if args.exec_policy == "local":
+            # For local exec-policy, the discovery server is managed internally
+            # by local_exec.sh via the service_fastdds_discoveryd Docker container.
+            discovery_connect_host = "localhost"
+        else:
+            try:
+                discovery_server_kind, discovery_server_target_host, discovery_connect_host = resolve_server_target(
+                    args.fastdds_discovery_server,
+                    hosts,
+                )
+            except (ValueError, RuntimeError) as exc:
+                print(f"ERROR: {exc}", file=sys.stderr)
+                sys.exit(1)
+
+        ros_discovery_server = build_ros_discovery_server_env(
+            discovery_connect_host)
+        os.environ["ROS_DISCOVERY_SERVER"] = ros_discovery_server
+        os.environ["FASTDDS_DISCOVERY_SERVER_ENABLED"] = "1"
+    else:
+        os.environ.pop("ROS_DISCOVERY_SERVER", None)
+        os.environ.pop("FASTDDS_DISCOVERY_SERVER_ENABLED", None)
+
     if args.exec_policy in ("docker", "native"):
         distribute_cmd = [
             distribute_exec_scripts_sh,
@@ -565,6 +660,44 @@ Examples:
             except RuntimeError as exc:
                 print(f"ERROR: {exc}", file=sys.stderr)
                 sys.exit(1)
+
+    if args.rmw == "fastdds" and args.fastdds_discovery_server:
+        print(f"ROS_DISCOVERY_SERVER={ros_discovery_server}")
+        if args.exec_policy == "local":
+            print(
+                "Fast DDS discovery server will be started by local_exec.sh "
+                "(service_fastdds_discoveryd container).")
+        else:
+            target_label = "manager" if discovery_server_kind == "manager" else discovery_server_target_host
+            print(f"Fast DDS discovery server target: {target_label}")
+            print("Starting Fast DDS discovery server automatically...")
+            try:
+                start_server(
+                    discovery_server_kind,
+                    discovery_server_target_host,
+                    repo_root,
+                    args.remote_repo_base,
+                    args.ssh_user,
+                    args.ws_dir,
+                    args.topology_name,
+                    exec_policy=args.exec_policy,
+                )
+                discovery_server_started = True
+            except RuntimeError as exc:
+                print(f"ERROR: {exc}", file=sys.stderr)
+                sys.exit(1)
+
+    _write_run_config(
+        local_session_dir,
+        args,
+        zenoh_router_kind,
+        zenoh_router_target_host,
+        zenoh_config_override,
+        discovery_server_kind,
+        discovery_server_target_host,
+        ros_discovery_server,
+    )
+
     case_results = []
     try:
         for qos_case_idx, qos_case in enumerate(qos_cases):
@@ -620,6 +753,7 @@ Examples:
                     run_timestamp=case_run_timestamp,
                     coordination_log_dir=case_coordination_logs_dir,
                     zenoh_config_override=zenoh_config_override,
+                    ros_discovery_server=ros_discovery_server,
                     qos_case_idx=active_qos_case_idx,
                     qos_case=active_qos_case,
                 )
@@ -639,6 +773,8 @@ Examples:
                         exec_policy=args.exec_policy,
                         zenoh_router_kind=zenoh_router_kind,
                         zenoh_router_target_host=zenoh_router_target_host,
+                        discovery_server_kind=discovery_server_kind,
+                        discovery_server_target_host=discovery_server_target_host,
                         local_repo_root=repo_root,
                     )
                 time.sleep(10)
@@ -689,6 +825,22 @@ Examples:
             except RuntimeError as exc:
                 print(
                     f"WARNING: Failed to stop Zenoh router cleanly: {exc}", file=sys.stderr)
+        if discovery_server_started:
+            print("Stopping Fast DDS discovery server...")
+            try:
+                stop_server(
+                    discovery_server_kind,
+                    discovery_server_target_host,
+                    repo_root,
+                    args.remote_repo_base,
+                    args.ssh_user,
+                    args.ws_dir,
+                    args.topology_name,
+                    exec_policy=args.exec_policy,
+                )
+            except RuntimeError as exc:
+                print(
+                    f"WARNING: Failed to stop Fast DDS discovery server cleanly: {exc}", file=sys.stderr)
 
     if qos_sweep_enabled:
         _write_qos_sweep_summary(

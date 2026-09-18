@@ -16,6 +16,7 @@ from generate_exec.script_generation import (
     generate_compose,
     generate_compose_per_host,
     generate_exec_scripts,
+    generate_fastdds_discoveryd_compose,
     generate_host_exec_native_scripts,
     generate_host_exec_scripts,
     generate_local_run_script,
@@ -135,6 +136,7 @@ Examples:
         generate_local_run_script(
             json_content, tmp_dir, project_root, settings)
         generate_zenohd_compose(tmp_dir, settings)
+        generate_fastdds_discoveryd_compose(tmp_dir, settings)
 
         # Generation succeeded; replace the existing directory atomically.
         if overwrite:
@@ -156,7 +158,7 @@ Examples:
 
     print(
         f"Generated host*.launch.py, host*_exec_docker.sh, host*_exec_native.sh, host*_compose.yaml, "
-        f"local_exec.sh, local_compose.yaml, zenohd_compose.yaml "
+        f"local_exec.sh, local_compose.yaml, zenohd_compose.yaml, fastdds_discoveryd_compose.yaml "
         f"in {settings.perf_ws_dir}/{topology_dir}/exec_scripts "
         f"for {len(json_content['hosts'])} host(s) "
         f"and {len(normalize_qos_cases(json_content.get('qos')))} QoS case(s)"

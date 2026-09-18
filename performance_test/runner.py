@@ -61,6 +61,7 @@ def run_test(
     run_timestamp=None,
     coordination_log_dir=None,
     zenoh_config_override=None,
+    ros_discovery_server=None,
     qos_case_idx=None,
     qos_case=None,
 ):
@@ -89,6 +90,8 @@ def run_test(
             env["RUN_TIMESTAMP"] = str(run_timestamp)
         if zenoh_config_override is not None:
             env["ZENOH_CONFIG_OVERRIDE"] = str(zenoh_config_override)
+        if ros_discovery_server is not None:
+            env["ROS_DISCOVERY_SERVER"] = str(ros_discovery_server)
 
         result = subprocess.run(
             cmd,
@@ -131,6 +134,8 @@ def run_test(
         env["EVAL_TIME"] = str(eval_time)
     if zenoh_config_override is not None:
         env["ZENOH_CONFIG_OVERRIDE"] = str(zenoh_config_override)
+    if ros_discovery_server is not None:
+        env["ROS_DISCOVERY_SERVER"] = str(ros_discovery_server)
 
     if coordination_log_dir is not None:
         prefix = (
@@ -315,6 +320,8 @@ def collect_runtime_logs(
     exec_policy="docker",
     zenoh_router_kind=None,
     zenoh_router_target_host=None,
+    discovery_server_kind=None,
+    discovery_server_target_host=None,
     local_repo_root=None,
 ):
     """Snapshot shared runtime logs into the current trial directory."""
@@ -421,5 +428,85 @@ def collect_runtime_logs(
             if not collected:
                 print(
                     f"  WARNING: Could not collect rmw_zenohd.log (docker logs) on manager: {last_error}",
+                    file=sys.stderr,
+                )
+
+    if discovery_server_kind == "host" and discovery_server_target_host:
+        dst = os.path.join(runtime_logs_dir, "fastdds_discoveryd.log")
+        if exec_policy == "native":
+            remote_path = (
+                f"{ssh_user}@{discovery_server_target_host}:{remote_runtime_dir}/fastdds_discoveryd.log"
+            )
+            result = subprocess.run(
+                ["scp", remote_path, dst],
+                text=True,
+                capture_output=True,
+            )
+            if result.returncode == 0:
+                print(f"  runtime log -> {dst}")
+            else:
+                print(
+                    f"  WARNING: Could not collect fastdds_discoveryd.log from {discovery_server_target_host}: "
+                    + (result.stderr or result.stdout or "").strip(),
+                    file=sys.stderr,
+                )
+        else:  # docker
+            collected = False
+            last_error = ""
+            for container_name in ("fastdds_discoveryd-service_fastdds_discoveryd-1", "service_fastdds_discoveryd"):
+                docker_logs_cmd = f"docker logs {shlex.quote(container_name)}"
+                result = subprocess.run(
+                    ["ssh", f"{ssh_user}@{discovery_server_target_host}",
+                     f"bash -lc {shlex.quote(docker_logs_cmd)}"],
+                    text=True,
+                    capture_output=True,
+                )
+                if result.returncode == 0:
+                    with open(dst, "w", encoding="utf-8") as f:
+                        f.write((result.stdout or "") + (result.stderr or ""))
+                    print(f"  runtime log -> {dst}")
+                    collected = True
+                    break
+                last_error = (result.stderr or result.stdout or "").strip()
+
+            if not collected:
+                print(
+                    f"  WARNING: Could not collect fastdds_discoveryd.log (docker logs) from {discovery_server_target_host}: {last_error}",
+                    file=sys.stderr,
+                )
+    elif discovery_server_kind == "manager" and local_repo_root:
+        dst = os.path.join(runtime_logs_dir, "fastdds_discoveryd.log")
+        if exec_policy == "native":
+            src = os.path.join(
+                local_repo_root, ws_dir, "runtime_logs", "fastdds_discoveryd.log"
+            )
+            if os.path.exists(src):
+                shutil.copy2(src, dst)
+                print(f"  runtime log -> {dst}")
+            else:
+                print(
+                    f"  WARNING: fastdds_discoveryd.log not found at {src}",
+                    file=sys.stderr,
+                )
+        else:  # docker
+            collected = False
+            last_error = ""
+            for container_name in ("fastdds_discoveryd-service_fastdds_discoveryd-1", "service_fastdds_discoveryd"):
+                result = subprocess.run(
+                    ["docker", "logs", container_name],
+                    text=True,
+                    capture_output=True,
+                )
+                if result.returncode == 0:
+                    with open(dst, "w", encoding="utf-8") as f:
+                        f.write((result.stdout or "") + (result.stderr or ""))
+                    print(f"  runtime log -> {dst}")
+                    collected = True
+                    break
+                last_error = (result.stderr or result.stdout or "").strip()
+
+            if not collected:
+                print(
+                    f"  WARNING: Could not collect fastdds_discoveryd.log (docker logs) on manager: {last_error}",
                     file=sys.stderr,
                 )
