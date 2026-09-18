@@ -29,13 +29,12 @@ This script writes detailed CSV outputs for sample-level and host-level analysis
 Prerequisite: start `remote_hosts_scripts/rest_server.py` on each target Host before running this checker.
 If REST is not running/reachable, probes fail with timeout/connection errors and the Host is recorded as `error`.
 
-This tool is benchmark-independent and resolves targets from `--hosts` and/or `--topology`.
-When both are specified, host lists must match exactly; otherwise the tool prints a warning and aborts without running evaluation.
+This tool is benchmark-independent and requires the target Hosts explicitly
+through `--hosts`. It does not start or stop REST servers.
 
 ```bash
 python3 manager_scripts/system_perf/check_clock_skew_rest.py \
-  [--hosts <host1,host2,...>] \
-  [--topology <path/to/topology.json>] \
+  --hosts <host1,host2,...> \
   [--port|-p <port>] \
   [--samples <n>] \
   [--interval <sec>] \
@@ -46,8 +45,7 @@ python3 manager_scripts/system_perf/check_clock_skew_rest.py \
 
 | Argument | Short | Description | Default |
 |---|---|---|---|
-| `--hosts` | — | Comma-separated host list | — |
-| `--topology` | — | Topology JSON path; resolves hosts from `hosts[].host_name` | — |
+| `--hosts` | — | Comma-separated host list | required |
 | `--port` | `-p` | REST server port | `5000` |
 | `--samples` | — | Samples per Host | `15` |
 | `--interval` | — | Sleep interval between samples (seconds) | `0.1` |
@@ -55,13 +53,12 @@ python3 manager_scripts/system_perf/check_clock_skew_rest.py \
 | `--output-dir` | — | Output root directory (relative to repository root or absolute path) | `performance_ws/system_perf/clock_skew` |
 | `--csv-prefix` | — | Prefix for generated CSV filenames | `clock_skew_rest_<timestamp>` |
 
-Requirement: specify at least one of `--hosts` or `--topology`.
+Requirement: specify `--hosts`.
 
 Example:
 
 ```bash
 python3 manager_scripts/system_perf/check_clock_skew_rest.py --hosts host1,host2,host3 --samples 30 --interval 0.05
-python3 manager_scripts/system_perf/check_clock_skew_rest.py --topology topology_example/simple.json --samples 30
 python3 manager_scripts/system_perf/check_clock_skew_rest.py --hosts host1,host2,host3 --samples 30 --output-dir performance_ws/system_perf/clock_skew
 ```
 
@@ -89,14 +86,13 @@ It is useful to detect issues such as:
 - chrony service not active on a Host
 - Manager source exists but is not reachable (`reach=0`) due to possible `allow` CIDR/firewall mismatch
 
-`--hosts` is the primary input for target selection.
-`--topology` is optional and can be used to resolve host names from topology JSON.
+`--hosts` is the required input for target selection. This check does not start
+or stop REST servers; start them explicitly before running it.
 
 ```bash
 python3 manager_scripts/system_perf/check_chrony_manager_sync.py \
   [--manager-ip <manager_lan_ip>] \
-  [--hosts <host1,host2,...>] \
-  [--topology <path/to/topology.json>] \
+  --hosts <host1,host2,...> \
   [--ssh-user <user>] \
   [--chrony-conf </etc/chrony/chrony.conf>] \
   [--output-dir <dir>]
@@ -105,16 +101,14 @@ python3 manager_scripts/system_perf/check_chrony_manager_sync.py \
 | Argument | Description | Default |
 |---|---|---|
 | `--manager-ip` | Manager LAN IP expected as chrony source (if omitted, auto-detected from route to target Hosts) | auto |
-| `--hosts` | Comma-separated host list (primary input) | — |
-| `--topology` | Topology JSON path; resolves hosts from `hosts[].host_name` | — |
+| `--hosts` | Comma-separated host list | required |
 | `--ssh-user` | SSH user for all Hosts | `ubuntu` |
 | `--chrony-conf` | Chrony config path on Hosts | `/etc/chrony/chrony.conf` |
 | `--output-dir` | Output root directory | `performance_ws/system_perf/chrony_check` |
 
 Requirements:
 
-- Specify at least one of `--hosts` or `--topology`.
-- If both are specified, host lists must match exactly.
+- Specify `--hosts`.
 - If auto-detection resolves multiple Manager IPs (multi-NIC/routes), specify `--manager-ip` explicitly.
 
 Outputs:
@@ -129,9 +123,6 @@ Example:
 ```bash
 python3 manager_scripts/system_perf/check_chrony_manager_sync.py \
   --hosts host1,host2,host3
-
-python3 manager_scripts/system_perf/check_chrony_manager_sync.py \
-  --topology topology_example/simple.json
 
 python3 manager_scripts/system_perf/check_chrony_manager_sync.py \
   --manager-ip 192.168.0.10 \

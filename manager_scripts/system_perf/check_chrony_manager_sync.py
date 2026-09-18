@@ -9,7 +9,6 @@ from __future__ import annotations
 
 import argparse
 import csv
-import json
 import re
 import socket
 import subprocess
@@ -55,10 +54,9 @@ def parse_args() -> argparse.Namespace:
         ),
     )
     parser.add_argument(
-        "--hosts", help="Comma-separated host list (e.g. host1,host2,host3)")
-    parser.add_argument(
-        "--topology",
-        help="Topology JSON path to resolve hosts from hosts[].host_name",
+        "--hosts",
+        required=True,
+        help="Comma-separated host list (e.g. host1,host2,host3)",
     )
     parser.add_argument("--ssh-user", default=DEFAULT_SSH_USER,
                         help=f"SSH user (default: {DEFAULT_SSH_USER})")
@@ -112,41 +110,6 @@ def detect_manager_ip(hosts: list[str]) -> tuple[str, dict[str, str]]:
         )
 
     return unique_ips[0], by_host
-
-
-def resolve_topology_path(repo_root: Path, topology_arg: str) -> Path:
-    path = Path(topology_arg)
-    if path.is_absolute():
-        return path
-    return repo_root / path
-
-
-def parse_hosts_from_topology(topology_path: Path) -> list[str]:
-    try:
-        with topology_path.open("r", encoding="utf-8") as fh:
-            data = json.load(fh)
-    except OSError as exc:
-        raise ValueError(
-            f"failed to read topology file: {topology_path} ({exc})") from exc
-    except json.JSONDecodeError as exc:
-        raise ValueError(
-            f"invalid topology JSON: {topology_path} ({exc})") from exc
-
-    hosts_raw = data.get("hosts")
-    if not isinstance(hosts_raw, list) or not hosts_raw:
-        raise ValueError("topology JSON must contain non-empty 'hosts' array")
-
-    hosts: list[str] = []
-    for idx, item in enumerate(hosts_raw):
-        if not isinstance(item, dict):
-            raise ValueError(f"topology hosts[{idx}] must be an object")
-        host_name = str(item.get("host_name", "")).strip()
-        if not host_name:
-            raise ValueError(
-                f"topology hosts[{idx}].host_name is missing or empty")
-        hosts.append(host_name)
-
-    return hosts
 
 
 def resolve_output_dir(repo_root: Path, output_dir_arg: str) -> Path:
@@ -411,41 +374,11 @@ def main() -> int:
     args = parse_args()
     repo_root = Path(__file__).resolve().parents[2]
 
-    hosts_from_arg: list[str] = []
-    if args.hosts:
-        try:
-            hosts_from_arg = parse_hosts_csv(args.hosts)
-        except ValueError as exc:
-            print(f"ERROR: {exc}", file=sys.stderr)
-            return 1
-
-    hosts_from_topology: list[str] = []
-    topology_path: Path | None = None
-    if args.topology:
-        topology_path = resolve_topology_path(repo_root, args.topology)
-        try:
-            hosts_from_topology = parse_hosts_from_topology(topology_path)
-        except ValueError as exc:
-            print(f"ERROR: {exc}", file=sys.stderr)
-            return 1
-
-    if not hosts_from_arg and not hosts_from_topology:
-        print("ERROR: either --hosts or --topology must be specified", file=sys.stderr)
-        return 2
-
-    if hosts_from_arg and hosts_from_topology and hosts_from_arg != hosts_from_topology:
-        print(
-            "WARNING: --hosts and --topology host list mismatch; check is aborted.",
-            file=sys.stderr,
-        )
-        print(f"  --hosts    : {', '.join(hosts_from_arg)}", file=sys.stderr)
-        print(
-            f"  --topology : {', '.join(hosts_from_topology)} (from {topology_path})",
-            file=sys.stderr,
-        )
+    try:
+        hosts = parse_hosts_csv(args.hosts)
+    except ValueError as exc:
+        print(f"ERROR: {exc}", file=sys.stderr)
         return 1
-
-    hosts = hosts_from_arg if hosts_from_arg else hosts_from_topology
 
     manager_ip = args.manager_ip
     auto_detected = False
@@ -483,14 +416,7 @@ def main() -> int:
                 out(f"  {host} -> {detected_map.get(host, 'N/A')}")
         else:
             out(f"manager_ip    : {args.manager_ip}")
-        if hosts_from_arg and hosts_from_topology:
-            out("host_source   : hosts+topology (validated)")
-            out(f"topology      : {topology_path}")
-        elif hosts_from_arg:
-            out("host_source   : hosts")
-        else:
-            out("host_source   : topology")
-            out(f"topology      : {topology_path}")
+        out("host_source   : hosts")
         out(f"hosts         : {' '.join(hosts)}")
         out(f"ssh_user      : {args.ssh_user}")
         out(f"chrony_conf   : {args.chrony_conf}")

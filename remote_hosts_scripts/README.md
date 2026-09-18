@@ -24,7 +24,8 @@ Recommended (from the Manager, starts all Hosts):
 ./manager_scripts/manage_rest_servers.sh start --hosts host1,host2,host3
 ```
 
-Manual (needed on each Host):
+If central SSH fan-out is unavailable or a single Host needs debugging, start the server
+directly on that Host:
 
 ```bash
 # on the Manager
