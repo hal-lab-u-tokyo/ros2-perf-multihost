@@ -431,7 +431,7 @@ For a single QoS case, the result layout is the original flat layout:
 Long-lived service logs and result snapshots are separate:
 
 - Host-side `<remote-repo-base>/<ws-dir>/runtime_logs/rest_server.log` is used to diagnose the running REST server.
-- Native Zenoh writes `<ws-dir>/runtime_logs/zenohd_router.log` on the Manager when `--zenoh-router Manager`, or `<remote-repo-base>/<ws-dir>/runtime_logs/zenohd_router.log` on a remote router Host. Docker Zenoh output is collected from the router container with `docker logs` instead of requiring a Host-side file.
+- Zenoh router logs are the logs of the `rmw_zenohd` process.
 - `raw_logs/trial<N>/runtime_logs/` stores the service-log snapshot captured for that trial. Local execution does not collect remote Host snapshots.
 - Each RMW has an independent result directory and `latest-<rmw>` symlink, which is updated only after that RMW run succeeds.
 

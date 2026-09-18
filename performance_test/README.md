@@ -131,10 +131,12 @@ Long-lived service logs are separate from this result tree:
 ```
 
 `raw_logs/trial<N>/runtime_logs/` contains snapshot copies of the long-lived
-service logs. In Docker Zenoh runs, `zenohd_router.log` is captured from the
-router container's `docker logs`; it is not necessarily present in the Host's
-shared `runtime_logs/` directory. The REST server snapshot may include entries
-from previous runs unless the REST server was restarted before benchmarking.
+service logs. In native Zenoh runs, `zenohd_router.log` is a copy of the
+`rmw_zenohd` process stdout/stderr file from the router location. In Docker
+Zenoh runs, it contains the `service_zenohd` container's stdout/stderr captured
+with `docker logs`; it is not necessarily present in the Host's shared
+`runtime_logs/` directory. The REST server snapshot may include entries from
+previous runs unless the REST server was restarted before benchmarking.
 
 For `local` execution, remote Host runtime-log snapshots are not collected.
 
