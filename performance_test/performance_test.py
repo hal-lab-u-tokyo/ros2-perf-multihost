@@ -352,7 +352,8 @@ Examples:
         repo_root, "manager_scripts", "distribute_exec_scripts.sh")
 
     if len(rmw_choices) > 1:
-        print(f"Running RMW implementations in order: {', '.join(rmw_choices)}")
+        print(
+            f"Running RMW implementations in order: {', '.join(rmw_choices)}")
         for rmw in rmw_choices:
             print(f"=== Starting RMW run: {rmw} ===")
             result = subprocess.run(
