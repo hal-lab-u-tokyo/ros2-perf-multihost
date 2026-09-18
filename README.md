@@ -425,13 +425,13 @@ For a single QoS case, the result layout is the original flat layout:
 - In `docker`/`native` modes, coordination logs are written under `<ws-dir>/<topology>/results/latest-<rmw>/coordination_logs/`.
 - Trial logs are collected under `<ws-dir>/<topology>/results/latest-<rmw>/raw_logs/trial<N>/`.
 - Aggregated outputs such as `total_latency.csv`, `throughput.csv`, `host_trials_usage.csv`, and `host_usage_summary.csv` are written under `<ws-dir>/<topology>/results/latest-<rmw>/analysis/`.
-- In `docker`/`native` modes, runtime service log snapshots are collected under `<ws-dir>/<topology>/results/latest-<rmw>/raw_logs/trial<N>/runtime_logs/` (for example, `<host>_rest_server.log` and `zenohd_router.log` for Zenoh router runs).
+- In `docker`/`native` modes, runtime service log snapshots are collected under `<ws-dir>/<topology>/results/latest-<rmw>/raw_logs/trial<N>/runtime_logs/` (for example, `<host>_rest_server.log` and `rmw_zenohd.log` for Zenoh runs).
   - Note: `<host>_rest_server.log` is copied from the long-lived REST service log (`<remote-repo-base>/<ws-dir>/runtime_logs/rest_server.log`), so it may include entries from earlier benchmark runs unless the REST server was restarted.
 
 Long-lived service logs and result snapshots are separate:
 
 - Host-side `<remote-repo-base>/<ws-dir>/runtime_logs/rest_server.log` is used to diagnose the running REST server.
-- Native Zenoh writes `<ws-dir>/runtime_logs/zenohd_router.log` on the Manager when `--zenoh-router Manager`, or `<remote-repo-base>/<ws-dir>/runtime_logs/zenohd_router.log` on a remote router Host. Docker Zenoh output is collected from the router container with `docker logs` instead of requiring a Host-side file.
+- Native Zenoh router logs are written to `<manager-repo-root>/<ws-dir>/runtime_logs/rmw_zenohd.log` when `--zenoh-router Manager`, or to `<remote-repo-base>/<ws-dir>/runtime_logs/rmw_zenohd.log` when the router runs on a remote Host. Docker Zenoh output is captured from the `service_zenohd` container with `docker logs` and saved as `rmw_zenohd.log` in the per-trial snapshot directory.
 - `raw_logs/trial<N>/runtime_logs/` stores the service-log snapshot captured for that trial. Local execution does not collect remote Host snapshots.
 - Each RMW has an independent result directory and `latest-<rmw>` symlink, which is updated only after that RMW run succeeds.
 
