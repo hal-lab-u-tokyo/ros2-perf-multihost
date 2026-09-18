@@ -27,6 +27,9 @@ except ImportError:  # pragma: no cover - fallback for package-style imports
 
 
 SUPPORTED_RMWS = ("fastdds", "cyclonedds", "zenoh")
+DEFAULT_EVAL_TIME = 60
+DEFAULT_WARMUP_TIME = 1
+DEFAULT_RUN_PADDING_TIME = 5
 
 
 def _parse_rmw_list(value):
@@ -245,6 +248,9 @@ def _write_qos_sweep_summary(summary_path, case_results):
 def _write_run_config(
     local_session_dir,
     args,
+    measurement_time,
+    run_padding_time,
+    node_run_time,
     zenoh_router_kind,
     zenoh_router_target_host,
     zenoh_config_override,
@@ -257,6 +263,10 @@ def _write_run_config(
         f"command: {shlex.join(sys.argv)}",
         f"rmw: {args.rmw}",
         f"exec_policy: {args.exec_policy}",
+        f"eval_time: {measurement_time}",
+        f"warmup_time: {args.warmup_time}",
+        f"run_padding_time: {run_padding_time}",
+        f"node_run_time: {node_run_time}",
     ]
     if args.rmw == "zenoh":
         target_label = "manager" if zenoh_router_kind == "manager" else zenoh_router_target_host
@@ -294,7 +304,7 @@ if __name__ == "__main__":
         usage=(
             "%(prog)s <topology> [--rmw {fastdds,cyclonedds,zenoh}[,...]] "
             "[--exec-policy|-p {docker,native,local}] [--eval-time|-e SEC] "
-            "[--trials|-t N] [--ws-dir|-w DIR] [--remote-repo-base|-b DIR] [--ssh-user|-u USER] "
+            "[--warmup-time SEC] [--trials|-t N] [--ws-dir|-w DIR] [--remote-repo-base|-b DIR] [--ssh-user|-u USER] "
             "[--zenoh-router|-z TARGET] [--fastdds-discovery-server|-d TARGET] "
             "[--strict-analysis|-s] [--help|-h]"
         ),
@@ -327,7 +337,16 @@ Examples:
         help="Execution mode (default: docker). local runs exec_scripts/local_exec.sh on this machine",
     )
     parser.add_argument("-e", "--eval-time", type=int, default=None,
-                        help="Evaluation duration in seconds; if omitted, use the generated script default (60)")
+                        help="Measurement duration in seconds (default: 60)")
+    parser.add_argument(
+        "--warmup-time",
+        type=int,
+        default=DEFAULT_WARMUP_TIME,
+        help=(
+            "Warmup duration in seconds excluded from analysis (default: 1). "
+            "Benchmark nodes run for warmup-time + eval-time plus internal padding."
+        ),
+    )
     parser.add_argument("-t", "--trials", type=int, default=3,
                         help="Number of trials (default: 3)")
     parser.add_argument(
@@ -404,7 +423,14 @@ Examples:
                 file=sys.stderr,
             )
 
-    eval_time = args.eval_time
+    if args.eval_time is not None and args.eval_time <= 0:
+        parser.error("--eval-time must be > 0")
+    if args.warmup_time < 0:
+        parser.error("--warmup-time must be >= 0")
+
+    eval_time = args.eval_time if args.eval_time is not None else DEFAULT_EVAL_TIME
+    run_padding_time = DEFAULT_RUN_PADDING_TIME
+    node_run_time = eval_time + args.warmup_time + run_padding_time
 
     # Resolve absolute path to start script (cwd-independent)
     script_dir = os.path.dirname(os.path.abspath(__file__))
@@ -505,7 +531,11 @@ Examples:
     print(f"Using QoS case(s): {len(qos_cases)}")
     for idx, qos_case in enumerate(qos_cases):
         print(f"  qos_case{idx}: {qos_case}")
-    print("Note: payload_size and period_ms are determined by topology JSON; eval_time can be overridden")
+    print("Note: payload_size and period_ms are determined by topology JSON; eval_time controls the post-warmup analysis window")
+    print(f"Warmup time: {args.warmup_time}s")
+    print(f"Measurement time: {eval_time}s")
+    print(f"Run padding time: {run_padding_time}s")
+    print(f"Benchmark node run time: {node_run_time}s")
     print(f"Local coordination logs dir: {local_coordination_logs_dir}")
     print(f"Local raw logs dir: {local_raw_logs_dir}")
     print(f"Local analysis dir: {local_analysis_dir}")
@@ -690,6 +720,9 @@ Examples:
     _write_run_config(
         local_session_dir,
         args,
+        eval_time,
+        run_padding_time,
+        node_run_time,
         zenoh_router_kind,
         zenoh_router_target_host,
         zenoh_config_override,
@@ -749,7 +782,7 @@ Examples:
                     args.topology_name,
                     rmw=args.rmw,
                     exec_policy=args.exec_policy,
-                    eval_time=eval_time,
+                    eval_time=node_run_time,
                     run_timestamp=case_run_timestamp,
                     coordination_log_dir=case_coordination_logs_dir,
                     zenoh_config_override=zenoh_config_override,
@@ -797,6 +830,7 @@ Examples:
                 args.trials,
                 hosts,
                 eval_time=eval_time,
+                warmup_time=args.warmup_time,
                 ws_dir=args.ws_dir,
                 topology_name=args.topology_name,
                 strict_analysis=args.strict_analysis,

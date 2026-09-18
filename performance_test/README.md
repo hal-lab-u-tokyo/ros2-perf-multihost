@@ -45,6 +45,7 @@ python3 performance_test/performance_test.py \
     [--rmw <rmw>[,...]] \
     [--exec-policy|-p {docker,native,local}] \
     [--eval-time|-e SEC] \
+    [--warmup-time SEC] \
     [--trials|-t N] \
     [--ws-dir|-w DIR] \
     [--remote-repo-base|-b DIR] \
@@ -64,6 +65,13 @@ Host execution. Start and verify the REST servers before using `docker` or
 For `docker` and `native`, generated execution files are distributed
 automatically before the run. Use `distribute_exec_scripts.sh` only when manual
 distribution or redistribution is needed.
+
+`--eval-time` is the measurement duration used for latency and throughput
+aggregation. `--warmup-time` controls how many seconds are excluded from the
+start of each trial before aggregation (default: `1`). Benchmark nodes run
+longer than `warmup-time + eval-time` by a small internal padding to absorb
+host start skew. Aggregation then uses exactly the `eval-time` window after
+warmup. Use `--warmup-time 0` to include startup samples in the results.
 
 ## Zenoh Router and Fast DDS Discovery Server
 

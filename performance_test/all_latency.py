@@ -75,7 +75,7 @@ def get_node_and_topics(logs_folder_path):
     return all_node_info
 
 
-def cal_all_latency(all_node_info, logs_folder_path):
+def cal_all_latency(all_node_info, logs_folder_path, warmup_time=1, measurement_time=None):
     # make log.txt -> [("StartTime, 1111"), ("EndTime, 2222"), (0, 1120), (1, 1125)...]
     def get_log(logdata_path, type):
         logdata_list = []
@@ -121,7 +121,12 @@ def cal_all_latency(all_node_info, logs_folder_path):
             return None, None
         return int(start_time), int(end_time)
 
-    warmup_ns = 1_000_000_000
+    warmup_ns = int(warmup_time * 1_000_000_000)
+    measurement_ns = (
+        int(measurement_time * 1_000_000_000)
+        if measurement_time is not None
+        else None
+    )
     all_latency_results = []
     sub_all_node_statics = []
     for sub_node_info in all_node_info:
@@ -196,15 +201,29 @@ def cal_all_latency(all_node_info, logs_folder_path):
                         # The overlapping time window is the measurement target.
                         common_start_time = max(
                             pub_start_time, sub_start_time) + warmup_ns
-                        common_end_time = min(pub_end_time, sub_end_time)
+                        available_end_time = min(pub_end_time, sub_end_time)
+                        if measurement_ns is None:
+                            common_end_time = available_end_time
+                        else:
+                            common_end_time = common_start_time + measurement_ns
+                            if common_end_time > available_end_time:
+                                raise RuntimeError(
+                                    f"Insufficient common time window: node={sub_node_name}, topic={sub_topic} "
+                                    f"pub_node={pub_node_name}, pub_path={pub_logdata_path}, sub_path={sub_logdata_path} "
+                                    f"(pub:[{pub_start_time},{pub_end_time}] sub:[{sub_start_time},{sub_end_time}] "
+                                    f"warmup={warmup_ns} measurement={measurement_ns})"
+                                )
 
                         # Warn and skip if no overlapping time window exists.
                         if common_start_time >= common_end_time:
-                            print(
-                                f"[WARN] No common time window: node={sub_node_name}, topic={sub_topic} "
+                            message = (
+                                f"No common time window: node={sub_node_name}, topic={sub_topic} "
                                 f"pub_node={pub_node_name}, pub_path={pub_logdata_path}, sub_path={sub_logdata_path} "
                                 f"(pub:[{pub_start_time},{pub_end_time}] sub:[{sub_start_time},{sub_end_time}] warmup={warmup_ns})"
                             )
+                            if measurement_ns is not None:
+                                raise RuntimeError(message)
+                            print(f"[WARN] {message}")
                             continue
 
                         # Exclude indices that fall outside the overlapping time window.
@@ -212,7 +231,7 @@ def cal_all_latency(all_node_info, logs_folder_path):
                             item[0] if len(item) == 2 else item[1]: item[1] if len(item) == 2 else item[2]
                             for item in pub_logdata_list
                             if int(item[1] if len(item) == 2 else item[2]) >= common_start_time
-                            and int(item[1] if len(item) == 2 else item[2]) <= common_end_time
+                            and int(item[1] if len(item) == 2 else item[2]) < common_end_time
                         }
                         pub_indices = set(pub_entries.keys())
                         sub_entries = {
@@ -220,7 +239,7 @@ def cal_all_latency(all_node_info, logs_folder_path):
                             for item in sub_logdata_list
                             if item[0] == pub_node_name
                             and int(item[2]) >= common_start_time
-                            and int(item[2]) <= common_end_time
+                            and int(item[2]) < common_end_time
                         }
                         sub_indices = set(sub_entries.keys())
 
@@ -349,7 +368,13 @@ def write_total_latency(sub_all_node_statics, all_latency_results, result_dir):
     )
 
 
-def process_log_directory(log_dir_name, logs_base_path, results_base_path):
+def process_log_directory(
+    log_dir_name,
+    logs_base_path,
+    results_base_path,
+    warmup_time=1,
+    measurement_time=None,
+):
     """Analyze the specified log directory and save the results."""
     logs_folder_path = os.path.join(logs_base_path, log_dir_name)
     result_dir = os.path.join(results_base_path, log_dir_name)
@@ -366,7 +391,7 @@ def process_log_directory(log_dir_name, logs_base_path, results_base_path):
     print(f"  Nodes found: {[n['name'] for n in all_node_info]}")
 
     sub_all_node_statics, all_latency_results = cal_all_latency(
-        all_node_info, logs_folder_path)
+        all_node_info, logs_folder_path, warmup_time, measurement_time)
     write_all_latency(sub_all_node_statics, result_dir)
     write_total_latency(sub_all_node_statics, all_latency_results, result_dir)
 
@@ -377,21 +402,39 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(
         description="Process log directories and save latency results.",
         formatter_class=argparse.RawDescriptionHelpFormatter,
-        usage="%(prog)s [--logs|-l DIR] [--results|-r DIR] [--help|-h]",
+        usage="%(prog)s [--logs|-l DIR] [--results|-r DIR] [--warmup-time SEC] [--measurement-time SEC] [--help|-h]",
         epilog="""
 Examples:
-  python3 performance_test/all_latency.py --logs ./logs --results ./results
-  short: python3 performance_test/all_latency.py -l ./logs -r ./results
+    python3 performance_test/all_latency.py --logs ./logs --results ./results --warmup-time 1
+    short: python3 performance_test/all_latency.py -l ./logs -r ./results --warmup-time 0
 """,
     )
     parser.add_argument("-l", "--logs", type=str, default="./logs",
                         help="Base path for logs")
     parser.add_argument("-r", "--results", type=str,
                         default="./results", help="Base path for results")
+    parser.add_argument(
+        "--warmup-time",
+        type=int,
+        default=1,
+        help="Seconds to exclude from the start of each common measurement window (default: 1; use 0 to disable warmup exclusion)",
+    )
+    parser.add_argument(
+        "--measurement-time",
+        type=int,
+        default=None,
+        help="Exact measurement duration in seconds after warmup; if omitted, use the whole remaining common window",
+    )
     args = parser.parse_args()
+    if args.warmup_time < 0:
+        parser.error("--warmup-time must be >= 0")
+    if args.measurement_time is not None and args.measurement_time <= 0:
+        parser.error("--measurement-time must be > 0")
 
     logs_base_path = args.logs
     results_base_path = args.results
+    warmup_time = args.warmup_time
+    measurement_time = args.measurement_time
 
     # Create the results directory if it does not exist.
     os.makedirs(results_base_path, exist_ok=True)
@@ -428,14 +471,25 @@ Examples:
     print()
 
     # Process each pending log directory.
+    failed_dirs = []
     for log_dir_name in sorted(pending_dirs):
         try:
             process_log_directory(
-                log_dir_name, logs_base_path, results_base_path)
+                log_dir_name,
+                logs_base_path,
+                results_base_path,
+                warmup_time,
+                measurement_time,
+            )
         except Exception as e:
             print(
                 f"  Error processing {log_dir_name}: {type(e).__name__}: {e}"
             )
+            failed_dirs.append(log_dir_name)
         print()
+
+    if failed_dirs:
+        print(f"Failed to process {len(failed_dirs)} log directory(ies): {sorted(failed_dirs)}")
+        exit(1)
 
     print("All processing complete.")
