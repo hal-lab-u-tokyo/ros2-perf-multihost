@@ -462,6 +462,7 @@ For details on output directory structure and CSV column definitions, see [perfo
 For detailed usage in subdomains, see the following documents:
 
 - [SETUP.md](./SETUP.md): One-time Manager/Host setup, SSH, Docker/ROS2, and chrony configuration.
+- [DEVELOPER.md](./DEVELOPER.md): Source changes, generated artifacts, development images, validation, and deployment updates.
 - [topology_example/README.md](./topology_example/README.md): Topology JSON format, including single QoS and QoS sweep array guidance.
 - [manager_scripts/README.md](./manager_scripts/README.md): Script usage, generated file details, `metadata.txt` QoS fields, and runtime QoS options.
 - [manager_scripts/system_perf/README.md](./manager_scripts/system_perf/README.md): Chrony synchronization and REST clock-skew checks.
