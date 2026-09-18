@@ -205,6 +205,7 @@ Generated launch and execution scripts receive the active case at runtime via
 python3 manager_scripts/generate_exec_scripts.py \
   <topology.json> \
   [--ws-dir|-w <dir>] \
+  [--image-repo <repo>] \
   [--image-tag <tag>] \
   [--force|-f]
 ```
@@ -213,6 +214,7 @@ Arguments:
 
 - `<topology.json>`: Path to the topology definition JSON file
 - `--ws-dir` (`-w`): Base directory for generated artifacts (default: `performance_ws`)
+- `--image-repo`: Docker image repository to embed in generated artifacts (default: the published project image)
 - `--image-tag`: Docker image tag to use. Usually unnecessary; use it when
   validating a development image such as `dev`. The default is the exact `v*`
   tag at `HEAD`, or `latest` when no such tag exists.

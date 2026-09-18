@@ -23,17 +23,19 @@ Generate execution scripts and Docker Compose files from a topology JSON file.
 python3 manager_scripts/generate_exec_scripts.py \
 	<topology.json> \
 	[--ws-dir|-w <dir>] \
+	[--image-repo <repo>] \
 	[--image-tag <tag>] \
 	[--force|-f]
 ```
 
 - `<topology.json>`: Path to the input topology definition JSON file
 - `--ws-dir` (`-w`): Base directory for generated artifacts (default: `performance_ws`)
+- `--image-repo`: Docker image repository to embed in generated artifacts (default: `ghcr.io/hal-lab-u-tokyo/ros2-perf-multihost`)
 - `--image-tag`: Docker image tag to use. Usually this option is not needed:
 	the generator selects the exact `v*` tag at `HEAD`, or `latest` when no such
 	tag exists. Specify it for development images such as `dev`; the selected tag
 	is embedded in the generated Compose files and must be available on every
-	benchmark Host.
+	machine that runs Docker benchmarks.
 - `--force` (`-f`): Overwrite existing output directory without confirmation
 
 ### Docker Image Version
@@ -55,9 +57,10 @@ python3 manager_scripts/generate_exec_scripts.py \
 For a development image:
 
 ```bash
-docker pull ghcr.io/hal-lab-u-tokyo/ros2-perf-multihost:dev
+docker pull ghcr.io/my-user/ros2-perf-multihost:dev
 python3 manager_scripts/generate_exec_scripts.py \
 	topology_example/simple.json \
+	--image-repo ghcr.io/my-user/ros2-perf-multihost \
 	--image-tag dev
 ```
 

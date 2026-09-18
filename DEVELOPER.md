@@ -36,23 +36,26 @@ Restart the long-running REST servers after updating their checkout:
 
 ## Development Docker Image
 
-For a development branch that changes Docker-executed code or dependencies, build and publish the mutable `:dev` image as described in [docker/README.md](./docker/README.md#development-image-distribution):
+For a development branch that changes Docker-executed code or dependencies, build and publish the mutable `:dev` image as described in [docker/README.md](./docker/README.md#development-image-distribution). For a private fork, replace `ghcr.io/my-user/ros2-perf-multihost` below with your image repository:
 
 ```bash
 docker buildx build \
   --platform linux/amd64,linux/arm64 \
   --file docker/Dockerfile \
-  --tag ghcr.io/hal-lab-u-tokyo/ros2-perf-multihost:dev \
+  --tag ghcr.io/my-user/ros2-perf-multihost:dev \
   --push \
   .
 ```
 
-Pull the image on every Docker benchmark Host, then regenerate artifacts with `--image-tag dev`:
+Pull the image on every machine that runs Docker benchmarks, including the
+Manager when `--exec-policy local` is used. Then regenerate artifacts with
+`--image-repo` and `--image-tag dev`:
 
 ```bash
-docker pull ghcr.io/hal-lab-u-tokyo/ros2-perf-multihost:dev
+docker pull ghcr.io/my-user/ros2-perf-multihost:dev
 python3 manager_scripts/generate_exec_scripts.py \
   topology_example/simple.json \
+  --image-repo ghcr.io/my-user/ros2-perf-multihost \
   --image-tag dev \
   --force
 ```
