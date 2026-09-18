@@ -22,6 +22,10 @@ specified order as independent runs, each with its own results directory and
 `latest-<rmw>` alias. Duplicate RMW values are rejected. `--exec-policy` remains
 a single value shared by all requested RMW runs.
 
+The command stops when an RMW run fails; later RMW values are not started.
+Each completed RMW is reported and stored independently. The behavior for
+continuing after a failed RMW may be expanded separately in the future.
+
 For `docker`/`native` runs, `performance_test.py` always executes `system_perf` preflight checks before trials:
 
 - `manager_scripts/system_perf/check_chrony_manager_sync.py`
@@ -33,19 +37,42 @@ Per-run outputs are stored under `<ws-dir>/<topology>/results/<timestamp>-<rmw>/
 When `performance_test.py` is run with `--strict-analysis`, aggregation fails if any trial summary (`analysis/trialN/total_latency.csv`, or legacy `analysis/trialN/total_latency.txt`) contains malformed, `N/A`, `NaN`, or `inf` values.
 Use this mode for CI or formal evaluations where partially valid totals are not acceptable.
 
+## performance_test.py
+
+```bash
+python3 performance_test/performance_test.py \
+    <topology> \
+    [--rmw <rmw>[,...]] \
+    [--exec-policy|-p {docker,native,local}] \
+    [--eval-time|-e SEC] \
+    [--trials|-t N] \
+    [--ws-dir|-w DIR] \
+    [--remote-repo-base|-b DIR] \
+    [--ssh-user|-u USER] \
+    [--zenoh-router|-z TARGET] \
+    [--strict-analysis|-s]
+```
+
+`--rmw` accepts `fastdds`, `cyclonedds`, and `zenoh` as a comma-separated
+list. Runs execute in the specified order; duplicate values are rejected.
+`--exec-policy` is one value shared by all requested RMW runs. Supported modes
+are `local` for the Quick Start workflow, and `docker` or `native` for remote
+Host execution. Start and verify the REST servers before using `docker` or
+`native`.
+
+For `docker` and `native`, generated execution files are distributed
+automatically before the run. Use `distribute_exec_scripts.sh` only when manual
+distribution or redistribution is needed.
+
 ## Output Structure
 
-`performance_test.py` creates run-scoped outputs under `<ws-dir>/<topology>/results/<timestamp>-<rmw>/`. Each Host keeps long-lived service logs under `<ws-dir>/runtime_logs/`, independent of the active topology:
+`performance_test.py` creates run-scoped outputs under `<ws-dir>/<topology>/results/<timestamp>-<rmw>/`. Each remote Host keeps long-lived service logs under `<remote-repo-base>/<ws-dir>/runtime_logs/`, independent of the active topology:
 
 `latest-<rmw>` is updated only after a run completes successfully (all trials, log collection, and aggregation).
 If a run fails before completion, the existing `latest-<rmw>` target is preserved.
 
 ```
-<ws-dir>/runtime_logs/
-├── rest_server.log                  # managed by manage_rest_servers.sh
-└── zenohd_router.log                # native Zenoh router log when applicable
-
-results/
+<ws-dir>/<topology>/results/
 ├── latest-fastdds -> 2026-04-26_13-21-45-fastdds/   # symlink per RMW
 ├── latest-zenoh   -> 2026-04-26_14-02-10-zenoh/
 └── 2026-04-26_13-21-45-fastdds/
@@ -93,9 +120,23 @@ results/
     │   └── host_usage_summary.csv
 ```
 
+Long-lived service logs are separate from this result tree:
+
+```text
+<remote-repo-base>/<ws-dir>/runtime_logs/       # remote Hosts
+├── rest_server.log                  # on each remote Host
+└── zenohd_router.log                # native router, if the router is remote
+<manager-repo-root>/<ws-dir>/runtime_logs/      # native router target: Manager
+└── zenohd_router.log
+```
+
 `raw_logs/trial<N>/runtime_logs/` contains snapshot copies of the long-lived
-service logs. The REST server log may include entries from previous runs unless
-the REST server was restarted before benchmarking.
+service logs. In Docker Zenoh runs, `zenohd_router.log` is captured from the
+router container's `docker logs`; it is not necessarily present in the Host's
+shared `runtime_logs/` directory. The REST server snapshot may include entries
+from previous runs unless the REST server was restarted before benchmarking.
+
+For `local` execution, remote Host runtime-log snapshots are not collected.
 
 When generated `metadata.txt` contains `qos_mode: sweep`,
 `performance_test.py` runs all trials once per QoS case. This includes a root

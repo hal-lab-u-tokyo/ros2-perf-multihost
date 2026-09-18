@@ -268,7 +268,9 @@ Example:
 ```
 
 If SSH startup or readiness check fails on any Host, this command exits with a non-zero status.
-The REST server log is stored on each Host under `<remote-repo-base>/<ws-dir>/runtime_logs/rest_server.log`.
+Start and verify the REST servers before running a `docker` or `native` benchmark.
+The long-lived REST server log is stored on each Host under
+`<remote-repo-base>/<ws-dir>/runtime_logs/rest_server.log`.
 For full subcommand and option details (including `wait`, `monitor`, `logs`, and related options), see [manager_scripts/README.md](./manager_scripts/README.md#manage_rest_serverssh).
 
 If the server exits at startup with a chrony sudo permission error, check the chrony sudo setup in [Clock synchronization for REST benchmark (chrony)](#clock-synchronization-for-rest-benchmark-chrony).
@@ -332,21 +334,19 @@ python3 performance_test/performance_test.py \
   [--strict-analysis|-s]
 ```
 
-Arguments:
+Arguments are summarized here; see [performance_test/README.md](./performance_test/README.md)
+for detailed option behavior and output handling.
 
-- `<topology>`: Topology directory to use (required)
-- `--rmw` (`-m`): Comma-separated RMW implementations (`fastdds`, `cyclonedds`, `zenoh`) run in the specified order (default: `fastdds`). Duplicate values are rejected.
-- `--exec-policy` (`-p`): Execution mode, one of `docker`, `native`, or `local` (default: `docker`)
-- `--eval-time` (`-e`): Override evaluation time; if omitted, the default from generated `*_exec_docker.sh` / `*_exec_native.sh` / `local_exec.sh` scripts is used
-- `--trials` (`-t`): Number of trials (default: `3`)
-- `--ws-dir` (`-w`): Base directory that contains generated execution scripts (default: `performance_ws`)
-- `--remote-repo-base` (`-b`): Remote repository base directory used for automatic distribution and log collection in `docker`/`native` modes (default: `/home/ubuntu/ros2-perf-multihost`)
-- `--ssh-user` (`-u`): SSH username used for distribution and log collection in `docker`/`native` modes (default: `ubuntu`)
-- `--zenoh-router` (`-z`): Router target used only when `--rmw zenoh`.
-  - (default): first host listed in the JSON topology file (e.g., `host1`)
-  - `<host-name>` / `<ipv4>`: explicit host name or IPv4 address (e.g., `host2` / `192.168.1.10`)
-  - `Manager`: the manager machine running `performance_test.py`
-- `--strict-analysis` (`-s`): Fail analysis when any trial summary contains malformed, `N/A`, `NaN`, or `inf` values (default: disabled)
+- `<topology>`: Generated topology directory (required)
+- `--rmw`: Comma-separated RMW implementations, run in order (default: `fastdds`)
+- `--exec-policy` (`-p`): `docker`, `native`, or `local` (default: `docker`)
+- `--eval-time` (`-e`): Evaluation duration override
+- `--trials` (`-t`): Number of trials per RMW and QoS case (default: `3`)
+- `--ws-dir` (`-w`): Workspace containing generated artifacts (default: `performance_ws`)
+- `--remote-repo-base` (`-b`): Remote repository root for `docker`/`native`
+- `--ssh-user` (`-u`): SSH user for `docker`/`native`
+- `--zenoh-router` (`-z`): Zenoh router target; used only for Zenoh runs
+- `--strict-analysis` (`-s`): Reject malformed or non-finite analysis values
 
 QoS sweep execution does not require an extra command-line option. It is driven
 by the topology JSON used during `generate_exec_scripts.py`.
@@ -434,7 +434,14 @@ For a single QoS case, the result layout is the original flat layout:
 - Trial logs are collected under `<ws-dir>/<topology>/results/latest-<rmw>/raw_logs/trial<N>/`.
 - Aggregated outputs such as `total_latency.csv`, `throughput.csv`, `host_trials_usage.csv`, and `host_usage_summary.csv` are written under `<ws-dir>/<topology>/results/latest-<rmw>/analysis/`.
 - In `docker`/`native` modes, runtime service log snapshots are collected under `<ws-dir>/<topology>/results/latest-<rmw>/raw_logs/trial<N>/runtime_logs/` (for example, `<host>_rest_server.log` and `zenohd_router.log` for Zenoh router runs).
-  - Note: `<host>_rest_server.log` is copied from the long-lived REST service log (`<ws-dir>/runtime_logs/rest_server.log`), so it may include entries from earlier benchmark runs unless the REST server was restarted.
+  - Note: `<host>_rest_server.log` is copied from the long-lived REST service log (`<remote-repo-base>/<ws-dir>/runtime_logs/rest_server.log`), so it may include entries from earlier benchmark runs unless the REST server was restarted.
+
+Long-lived service logs and result snapshots are separate:
+
+- Host-side `<remote-repo-base>/<ws-dir>/runtime_logs/rest_server.log` is used to diagnose the running REST server.
+- Native Zenoh writes `<ws-dir>/runtime_logs/zenohd_router.log` on the Manager when `--zenoh-router Manager`, or `<remote-repo-base>/<ws-dir>/runtime_logs/zenohd_router.log` on a remote router Host. Docker Zenoh output is collected from the router container with `docker logs` instead of requiring a Host-side file.
+- `raw_logs/trial<N>/runtime_logs/` stores the service-log snapshot captured for that trial. Local execution does not collect remote Host snapshots.
+- Each RMW has an independent result directory and `latest-<rmw>` symlink, which is updated only after that RMW run succeeds.
 
 For QoS sweep runs, `performance_test.py` stores each case in its own directory:
 
@@ -465,6 +472,7 @@ For detailed usage in subdomains, see the following documents:
 - [SETUP.md](./SETUP.md): One-time Manager/Host setup, SSH, Docker/ROS2, and chrony configuration.
 - [topology_example/README.md](./topology_example/README.md): Topology JSON format, including single QoS and QoS sweep array guidance.
 - [manager_scripts/README.md](./manager_scripts/README.md): Script usage, generated file details, `metadata.txt` QoS fields, and runtime QoS options.
+- [manager_scripts/system_perf/README.md](./manager_scripts/system_perf/README.md): Chrony synchronization and REST clock-skew checks.
 - [remote_hosts_scripts/README.md](./remote_hosts_scripts/README.md): REST server endpoints, QoS case forwarding, environment variables, and monitor CSV format.
 - [performance_test/README.md](./performance_test/README.md): Output directory structure, QoS sweep result layout, CSV formats, and analysis script descriptions.
 - [docker/README.md](./docker/README.md): Docker image build/push details and container workflow notes.
