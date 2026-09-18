@@ -354,6 +354,8 @@ Examples:
     if len(rmw_choices) > 1:
         print(
             f"Running RMW implementations in order: {', '.join(rmw_choices)}")
+        successful_rmws = []
+        failed_rmws = []
         for rmw in rmw_choices:
             print(f"=== Starting RMW run: {rmw} ===")
             result = subprocess.run(
@@ -365,9 +367,23 @@ Examples:
                 cwd=os.getcwd(),
             )
             if result.returncode != 0:
-                sys.exit(result.returncode)
-        print("All requested RMW runs completed successfully.")
-        sys.exit(0)
+                failed_rmws.append(rmw)
+                print(
+                    f"=== RMW run failed: {rmw} (exit code {result.returncode}) ===",
+                    file=sys.stderr,
+                )
+            else:
+                successful_rmws.append(rmw)
+
+        print(
+            "Successful RMW runs: "
+            + (", ".join(successful_rmws) if successful_rmws else "none")
+        )
+        print(
+            "Failed RMW runs: "
+            + (", ".join(failed_rmws) if failed_rmws else "none")
+        )
+        sys.exit(1 if failed_rmws else 0)
 
     args.rmw = rmw_choices[0]
 

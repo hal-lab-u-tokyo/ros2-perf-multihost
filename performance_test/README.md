@@ -22,9 +22,9 @@ specified order as independent runs, each with its own results directory and
 `latest-<rmw>` alias. Duplicate RMW values are rejected. `--exec-policy` remains
 a single value shared by all requested RMW runs.
 
-The command stops when an RMW run fails; later RMW values are not started.
-Each completed RMW is reported and stored independently. The behavior for
-continuing after a failed RMW may be expanded separately in the future.
+If an RMW run fails, later RMW values still run. At the end, the command
+reports both successful and failed RMW runs. The overall command exits nonzero
+if any requested RMW run fails.
 
 For `docker`/`native` runs, `performance_test.py` always executes `system_perf` preflight checks before trials:
 
