@@ -283,33 +283,23 @@ When you need stricter one-way latency interpretation, evaluate inter-host clock
 
 Stricter REST-based check (recommended for REST benchmark runs):
 
-Prerequisite: start `remote_hosts_scripts/rest_server.py` on each target Host first. If REST is not running/reachable, clock probe requests fail (timeout/connection error) and that Host is recorded as `error`.
+Prerequisite: start and verify the REST server on each target Host with
+`manager_scripts/manage_rest_servers.sh` first. If REST is not running/reachable,
+clock probe requests fail (timeout/connection error) and that Host is recorded as
+`error`.
 
 ```bash
 python3 manager_scripts/system_perf/check_clock_skew_rest.py --hosts host1,host2,host3 --samples 30 --interval 0.05
-python3 manager_scripts/system_perf/check_clock_skew_rest.py --topology topology_example/simple.json --samples 30 --interval 0.05
 ```
 
-You can specify `--hosts`, `--topology`, or both.
-If both are specified and the host lists do not match, the script prints a warning and aborts without evaluation.
+The REST server is not started or stopped by this check. Start it explicitly
+with `manage_rest_servers.sh` before running the check.
 
 `check_clock_skew_rest.py` saves CSV files under `performance_ws/system_perf/clock_skew/<timestamp>/` by default.
 For option details and output field definitions, see:
 
 - [manager_scripts/system_perf/README.md#check_clock_skew_restpy](./manager_scripts/system_perf/README.md#check_clock_skew_restpy)
 - [remote_hosts_scripts/README.md#rest_serverpy](./remote_hosts_scripts/README.md#rest_serverpy)
-
-##### Alternative method (manual startup on each Host):
-
-If you prefer to control startup host by host (for example, when debugging a specific Host or when centralized SSH fan-out is not available), you can start `rest_server.py` manually on each target Host.
-
-```bash
-# on the Manager
-ssh ubuntu@hostX
-# now on hostX
-cd ros2-perf-multihost
-python3 remote_hosts_scripts/rest_server.py
-```
 
 #### Run Benchmark
 
@@ -393,6 +383,8 @@ python3 performance_test/performance_test.py \
   --eval-time 10 --trials 3 \
   --strict-analysis
 ```
+
+### Note: Manual distribution
 
 If you want to distribute the generated host-specific execution files to each Host manually in advance, use `manager_scripts/distribute_exec_scripts.sh` as documented in [manager_scripts/README.md](./manager_scripts/README.md), then run `performance_test.py` normally.
 
@@ -485,6 +477,7 @@ Common issues and fixes:
 - `python3 manager_scripts/generate_exec_scripts.py ...` fails because output exists: rerun with `--force` or remove the existing topology directory under `performance_ws/`.
 - `distribute_exec_scripts.sh` fails with SSH/SCP errors: verify hostnames, SSH keys, and that repository paths are identical across Hosts.
 - REST benchmark does not start remote execution: ensure REST servers are running on every target Host (for example, run `./manager_scripts/manage_rest_servers.sh start --hosts host1,host2,host3` from the Manager before calling `performance_test.py`).
+- A Host's REST server cannot be managed centrally: see the manual startup procedure in [remote_hosts_scripts/README.md#start-the-server](./remote_hosts_scripts/README.md#start-the-server).
 - Clock skew should be measured more strictly before latency trials: run `python3 manager_scripts/system_perf/check_clock_skew_rest.py --hosts host1,host2,host3 --samples 30 --interval 0.05` and review `performance_ws/system_perf/clock_skew/<timestamp>/{summary,pairwise}.csv`.
 - Docker mode fails on remote Hosts: pull the image tag selected when generating artifacts (normally `latest`) and confirm Docker permissions on each Host.
 - Native mode cannot find workspace paths: set `ROS2_PERF_WS` to the project root before running `<host_name>_exec_native.sh`.
