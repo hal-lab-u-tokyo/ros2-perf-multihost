@@ -199,6 +199,7 @@ Examples:
         sys.exit(1)
     eval_time = str(eval_time_value) if eval_time_value is not None else None
     zenoh_config_override = os.environ.get("ZENOH_CONFIG_OVERRIDE")
+    ros_discovery_server = os.environ.get("ROS_DISCOVERY_SERVER")
 
     # Determine endpoint and timeout based on mode
     if args.prepare_run:
@@ -243,6 +244,8 @@ Examples:
                 request_body["eval_time"] = eval_time
             if zenoh_config_override is not None and not args.prepare_run:
                 request_body["zenoh_config_override"] = zenoh_config_override
+            if ros_discovery_server is not None and not args.prepare_run:
+                request_body["ros_discovery_server"] = ros_discovery_server
             if args.qos_case_idx is not None and not args.prepare_run:
                 request_body["qos_case_idx"] = args.qos_case_idx
                 request_body["qos_override"] = args.qos_override

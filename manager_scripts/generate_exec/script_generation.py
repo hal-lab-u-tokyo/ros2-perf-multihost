@@ -287,6 +287,8 @@ def append_common_service(
         "      - ZENOH_CONFIG_OVERRIDE=${ZENOH_CONFIG_OVERRIDE:-}")
     lines.append(
         "      - ZENOH_ROUTER_CHECK_ATTEMPTS=${ZENOH_ROUTER_CHECK_ATTEMPTS:-}")
+    lines.append(
+        "      - ROS_DISCOVERY_SERVER=${ROS_DISCOVERY_SERVER:-}")
     lines.append("      - RUST_LOG=${RUST_LOG:-}")
     lines.append(f"      - EVAL_TIME=${{EVAL_TIME:-{eval_time_default}}}")
     lines.append("      - LOG_DIR=${LOG_DIR:-}")
@@ -354,6 +356,52 @@ def generate_zenohd_compose(output_dir, settings):
         f.write("\n".join(lines) + "\n")
 
 
+def append_fastdds_discoveryd_service(lines, project_root, output_dir, settings):
+    """Append the central discovery server service used only for Fast DDS."""
+    rel_project_root = os.path.relpath(project_root, output_dir)
+    lines.append("  service_fastdds_discoveryd:")
+    lines.append(f"    image: {settings.image_name}")
+    lines.append("    network_mode: host")
+    lines.append("    ipc: host")
+    lines.append('    user: "${LOCAL_UID:-1000}:${LOCAL_GID:-1000}"')
+    lines.append("    volumes:")
+    lines.append(
+        f'      - "{rel_project_root}/{settings.perf_ws_dir}:{settings.project_root_in_container}/{settings.perf_ws_dir}"')
+    lines.append("    environment:")
+    lines.append(f"      - ROS2_PERF_WS={settings.project_root_in_container}")
+    lines.append(f"      - ROS2_NODE_IMPL_WS={settings.ros_ws_in_container}")
+    lines.append("      - RMW_IMPLEMENTATION=rmw_fastrtps_cpp")
+    lines.append("    healthcheck:")
+    lines.append(
+        "      test: [\"CMD-SHELL\", \"pgrep -f '[f]ast-discovery-server' >/dev/null\"]"
+    )
+    lines.append("      interval: 1s")
+    lines.append("      timeout: 1s")
+    lines.append("      retries: 30")
+    lines.append(
+        '    command: [ "/bin/bash", "-lc", "fastdds discovery -i 0 -p 11811" ]'
+    )
+
+
+def generate_fastdds_discoveryd_compose(output_dir, settings):
+    """Generate standalone fastdds_discoveryd_compose.yaml for use with --exec-policy docker."""
+    lines = [
+        # Use a dedicated project name so that 'docker compose down --remove-orphans'
+        # in host exec scripts does not treat service_fastdds_discoveryd as an orphan.
+        "name: fastdds_discoveryd",
+        "services:",
+        "  service_fastdds_discoveryd:",
+        f"    image: {settings.image_name}",
+        "    network_mode: host",
+        "    environment:",
+        "      - RMW_IMPLEMENTATION=rmw_fastrtps_cpp",
+        '    command: ["fastdds", "discovery", "-i", "0", "-p", "11811"]',
+    ]
+    compose_path = os.path.join(output_dir, "fastdds_discoveryd_compose.yaml")
+    with open(compose_path, "w") as f:
+        f.write("\n".join(lines) + "\n")
+
+
 def generate_compose(json_content, output_dir, project_root, settings):
     """Generate local_compose.yaml for validation on a development machine."""
     eval_time_default = settings.default_eval_time
@@ -376,6 +424,8 @@ def generate_compose(json_content, output_dir, project_root, settings):
         )
 
     append_zenohd_service(lines, project_root, output_dir, settings)
+    append_fastdds_discoveryd_service(
+        lines, project_root, output_dir, settings)
 
     compose_path = os.path.join(output_dir, "local_compose.yaml")
     with open(compose_path, "w") as f:
@@ -509,6 +559,7 @@ def run_script_common_prefix(lines, rel_root, eval_time_default, settings, defau
             '  fastdds)',
             '    export RMW_IMPLEMENTATION=rmw_fastrtps_cpp',
             '    unset ZENOH_ROUTER_CHECK_ATTEMPTS ZENOH_CONFIG_OVERRIDE',
+            '    export ROS_DISCOVERY_SERVER=${ROS_DISCOVERY_SERVER:-}',
             '    export RUST_LOG=${RUST_LOG:-}',
             '    ;;',
             '  zenoh)',
@@ -516,10 +567,11 @@ def run_script_common_prefix(lines, rel_root, eval_time_default, settings, defau
             '    export ZENOH_ROUTER_CHECK_ATTEMPTS=5',
             '    export RUST_LOG=${RUST_LOG:-zenoh=warn,zenoh_transport=warn}',
             '    export ZENOH_CONFIG_OVERRIDE=${ZENOH_CONFIG_OVERRIDE:-}',
+            '    unset ROS_DISCOVERY_SERVER',
             '    ;;',
             '  cyclonedds)',
             '    export RMW_IMPLEMENTATION=rmw_cyclonedds_cpp',
-            '    unset ZENOH_ROUTER_CHECK_ATTEMPTS ZENOH_CONFIG_OVERRIDE',
+            '    unset ZENOH_ROUTER_CHECK_ATTEMPTS ZENOH_CONFIG_OVERRIDE ROS_DISCOVERY_SERVER',
             '    export RUST_LOG=${RUST_LOG:-}',
             '    ;;',
             '  *)',
@@ -586,6 +638,7 @@ def generate_host_exec_scripts(json_content, output_dir, project_root, settings)
                     'QOS_RELIABILITY="$QOS_RELIABILITY" '
                     'ZENOH_CONFIG_OVERRIDE="${ZENOH_CONFIG_OVERRIDE:-}" '
                     'ZENOH_ROUTER_CHECK_ATTEMPTS="${ZENOH_ROUTER_CHECK_ATTEMPTS:-}" '
+                    'ROS_DISCOVERY_SERVER="${ROS_DISCOVERY_SERVER:-}" '
                     'RUST_LOG="${RUST_LOG:-}" '
                     'LOG_DIR="$LOG_DIR" '
                     'docker compose -f "$COMPOSE_FILE" down --remove-orphans >/dev/null 2>&1 || true'
@@ -601,6 +654,7 @@ def generate_host_exec_scripts(json_content, output_dir, project_root, settings)
                     'QOS_RELIABILITY="$QOS_RELIABILITY" '
                     'ZENOH_CONFIG_OVERRIDE="${ZENOH_CONFIG_OVERRIDE:-}" '
                     'ZENOH_ROUTER_CHECK_ATTEMPTS="${ZENOH_ROUTER_CHECK_ATTEMPTS:-}" '
+                    'ROS_DISCOVERY_SERVER="${ROS_DISCOVERY_SERVER:-}" '
                     'RUST_LOG="${RUST_LOG:-}" '
                     'LOG_DIR="$LOG_DIR" '
                     f'docker compose -f "$COMPOSE_FILE" up service_{host_name}'
@@ -681,12 +735,13 @@ def generate_local_run_script(json_content, output_dir, project_root, settings):
                 'QOS_RELIABILITY="$QOS_RELIABILITY" '
                 'ZENOH_CONFIG_OVERRIDE="${ZENOH_CONFIG_OVERRIDE:-}" '
                 'ZENOH_ROUTER_CHECK_ATTEMPTS="${ZENOH_ROUTER_CHECK_ATTEMPTS:-}" '
+                'ROS_DISCOVERY_SERVER="${ROS_DISCOVERY_SERVER:-}" '
                 'RUST_LOG="${RUST_LOG:-}" '
                 'LOG_DIR="$LOG_DIR" '
                 'docker compose -f "$COMPOSE_FILE" down --remove-orphans >/dev/null 2>&1 || true'
             ),
             'cleanup_compose() {',
-            '  LOCAL_UID="$LOCAL_UID" LOCAL_GID="$LOCAL_GID" EVAL_TIME="$EVAL_TIME" RMW_CHOICE="$RMW_CHOICE" RMW_IMPLEMENTATION="$RMW_IMPLEMENTATION" QOS_CASE_INDEX="${QOS_CASE_INDEX:-}" QOS_HISTORY="$QOS_HISTORY" QOS_DEPTH="$QOS_DEPTH" QOS_RELIABILITY="$QOS_RELIABILITY" ZENOH_CONFIG_OVERRIDE="${ZENOH_CONFIG_OVERRIDE:-}" ZENOH_ROUTER_CHECK_ATTEMPTS="${ZENOH_ROUTER_CHECK_ATTEMPTS:-}" RUST_LOG="${RUST_LOG:-}" LOG_DIR="$LOG_DIR" docker compose -f "$COMPOSE_FILE" down --remove-orphans >/dev/null 2>&1 || true',
+            '  LOCAL_UID="$LOCAL_UID" LOCAL_GID="$LOCAL_GID" EVAL_TIME="$EVAL_TIME" RMW_CHOICE="$RMW_CHOICE" RMW_IMPLEMENTATION="$RMW_IMPLEMENTATION" QOS_CASE_INDEX="${QOS_CASE_INDEX:-}" QOS_HISTORY="$QOS_HISTORY" QOS_DEPTH="$QOS_DEPTH" QOS_RELIABILITY="$QOS_RELIABILITY" ZENOH_CONFIG_OVERRIDE="${ZENOH_CONFIG_OVERRIDE:-}" ZENOH_ROUTER_CHECK_ATTEMPTS="${ZENOH_ROUTER_CHECK_ATTEMPTS:-}" ROS_DISCOVERY_SERVER="${ROS_DISCOVERY_SERVER:-}" RUST_LOG="${RUST_LOG:-}" LOG_DIR="$LOG_DIR" docker compose -f "$COMPOSE_FILE" down --remove-orphans >/dev/null 2>&1 || true',
             '}',
             'trap cleanup_compose EXIT',
             "",
@@ -717,6 +772,7 @@ def generate_local_run_script(json_content, output_dir, project_root, settings):
                 'QOS_RELIABILITY="$QOS_RELIABILITY" '
                 'ZENOH_CONFIG_OVERRIDE="${ZENOH_CONFIG_OVERRIDE:-}" '
                 'ZENOH_ROUTER_CHECK_ATTEMPTS="${ZENOH_ROUTER_CHECK_ATTEMPTS:-}" '
+                'ROS_DISCOVERY_SERVER="${ROS_DISCOVERY_SERVER:-}" '
                 'RUST_LOG="${RUST_LOG:-}" '
                 'LOG_DIR="$LOG_DIR" '
                 'docker compose -f "$COMPOSE_FILE" up -d service_zenohd'
@@ -735,6 +791,7 @@ def generate_local_run_script(json_content, output_dir, project_root, settings):
                 'QOS_RELIABILITY="$QOS_RELIABILITY" '
                 'ZENOH_CONFIG_OVERRIDE="${ZENOH_CONFIG_OVERRIDE:-}" '
                 'ZENOH_ROUTER_CHECK_ATTEMPTS="${ZENOH_ROUTER_CHECK_ATTEMPTS:-}" '
+                'ROS_DISCOVERY_SERVER="${ROS_DISCOVERY_SERVER:-}" '
                 'RUST_LOG="${RUST_LOG:-}" '
                 'LOG_DIR="$LOG_DIR" '
                 f'docker compose -f "$COMPOSE_FILE" up --abort-on-container-failure {
@@ -752,11 +809,62 @@ def generate_local_run_script(json_content, output_dir, project_root, settings):
                 'QOS_RELIABILITY="$QOS_RELIABILITY" '
                 'ZENOH_CONFIG_OVERRIDE="${ZENOH_CONFIG_OVERRIDE:-}" '
                 'ZENOH_ROUTER_CHECK_ATTEMPTS="${ZENOH_ROUTER_CHECK_ATTEMPTS:-}" '
+                'ROS_DISCOVERY_SERVER="${ROS_DISCOVERY_SERVER:-}" '
                 'RUST_LOG="${RUST_LOG:-}" '
                 'LOG_DIR="$LOG_DIR" '
                 'docker compose -f "$COMPOSE_FILE" stop service_zenohd >/dev/null 2>&1 || true'
             ),
             '  echo "Finished. service_zenohd stopped."',
+            'elif [[ "$RMW_CHOICE" == "fastdds" && "${FASTDDS_DISCOVERY_SERVER_ENABLED:-0}" == "1" ]]; then',
+            '  echo "[1/3] Starting service_fastdds_discoveryd..."',
+            (
+                '  LOCAL_UID="$LOCAL_UID" LOCAL_GID="$LOCAL_GID" '
+                'EVAL_TIME="$EVAL_TIME" '
+                'RMW_CHOICE="$RMW_CHOICE" '
+                'RMW_IMPLEMENTATION="$RMW_IMPLEMENTATION" '
+                'QOS_CASE_INDEX="${QOS_CASE_INDEX:-}" '
+                'QOS_HISTORY="$QOS_HISTORY" '
+                'QOS_DEPTH="$QOS_DEPTH" '
+                'QOS_RELIABILITY="$QOS_RELIABILITY" '
+                'ROS_DISCOVERY_SERVER="${ROS_DISCOVERY_SERVER:-}" '
+                'RUST_LOG="${RUST_LOG:-}" '
+                'LOG_DIR="$LOG_DIR" '
+                'docker compose -f "$COMPOSE_FILE" up -d service_fastdds_discoveryd'
+            ),
+            '  echo "[2/3] Waiting 3 seconds for Fast DDS discovery server startup..."',
+            '  sleep 3',
+            f'  echo "[3/3] Starting host services: {host_services}"',
+            (
+                '  LOCAL_UID="$LOCAL_UID" LOCAL_GID="$LOCAL_GID" '
+                'EVAL_TIME="$EVAL_TIME" '
+                'RMW_CHOICE="$RMW_CHOICE" '
+                'RMW_IMPLEMENTATION="$RMW_IMPLEMENTATION" '
+                'QOS_CASE_INDEX="${QOS_CASE_INDEX:-}" '
+                'QOS_HISTORY="$QOS_HISTORY" '
+                'QOS_DEPTH="$QOS_DEPTH" '
+                'QOS_RELIABILITY="$QOS_RELIABILITY" '
+                'ROS_DISCOVERY_SERVER="${ROS_DISCOVERY_SERVER:-}" '
+                'RUST_LOG="${RUST_LOG:-}" '
+                'LOG_DIR="$LOG_DIR" '
+                f'docker compose -f "$COMPOSE_FILE" up --abort-on-container-failure {
+                    host_services} || status=$?'
+            ),
+            '  echo "Stopping service_fastdds_discoveryd..."',
+            (
+                '  LOCAL_UID="$LOCAL_UID" LOCAL_GID="$LOCAL_GID" '
+                'EVAL_TIME="$EVAL_TIME" '
+                'RMW_CHOICE="$RMW_CHOICE" '
+                'RMW_IMPLEMENTATION="$RMW_IMPLEMENTATION" '
+                'QOS_CASE_INDEX="${QOS_CASE_INDEX:-}" '
+                'QOS_HISTORY="$QOS_HISTORY" '
+                'QOS_DEPTH="$QOS_DEPTH" '
+                'QOS_RELIABILITY="$QOS_RELIABILITY" '
+                'ROS_DISCOVERY_SERVER="${ROS_DISCOVERY_SERVER:-}" '
+                'RUST_LOG="${RUST_LOG:-}" '
+                'LOG_DIR="$LOG_DIR" '
+                'docker compose -f "$COMPOSE_FILE" stop service_fastdds_discoveryd >/dev/null 2>&1 || true'
+            ),
+            '  echo "Finished. service_fastdds_discoveryd stopped."',
             'else',
             f'  echo "Starting all services: {host_services}"',
             (
@@ -770,6 +878,7 @@ def generate_local_run_script(json_content, output_dir, project_root, settings):
                 'QOS_RELIABILITY="$QOS_RELIABILITY" '
                 'ZENOH_CONFIG_OVERRIDE="${ZENOH_CONFIG_OVERRIDE:-}" '
                 'ZENOH_ROUTER_CHECK_ATTEMPTS="${ZENOH_ROUTER_CHECK_ATTEMPTS:-}" '
+                'ROS_DISCOVERY_SERVER="${ROS_DISCOVERY_SERVER:-}" '
                 'RUST_LOG="${RUST_LOG:-}" '
                 'LOG_DIR="$LOG_DIR" '
                 f'docker compose -f "$COMPOSE_FILE" up --abort-on-container-failure {

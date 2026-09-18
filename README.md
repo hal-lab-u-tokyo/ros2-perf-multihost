@@ -323,6 +323,7 @@ python3 performance_test/performance_test.py \
   [--remote-repo-base|-b <dir>] \
   [--ssh-user|-u <user>] \
   [--zenoh-router|-z <target>] \
+  [--fastdds-discovery-server|-d <target>] \
   [--strict-analysis|-s]
 ```
 
@@ -338,6 +339,7 @@ for detailed option behavior and output handling.
 - `--remote-repo-base` (`-b`): Remote repository root for `docker`/`native`
 - `--ssh-user` (`-u`): SSH user for `docker`/`native`
 - `--zenoh-router` (`-z`): Zenoh router target; used only for Zenoh runs
+- `--fastdds-discovery-server` (`-d`): Fast DDS Discovery Server target; opt-in, used only for Fast DDS runs
 - `--strict-analysis` (`-s`): Reject malformed or non-finite analysis values
 
 QoS sweep execution does not require an extra command-line option. It is driven
@@ -378,6 +380,14 @@ python3 performance_test/performance_test.py \
   --exec-policy native \
   --eval-time 10 --trials 3
 
+# Native execution on remote Hosts with Fast DDS Discovery Server on host1 (opt-in)
+python3 performance_test/performance_test.py \
+  simple \
+  --rmw fastdds \
+  --fastdds-discovery-server host1 \
+  --exec-policy native \
+  --eval-time 10 --trials 3
+
 # Local execution with strict analysis (fail fast on malformed/non-finite summary values)
 python3 performance_test/performance_test.py \
   simple \
@@ -390,29 +400,13 @@ python3 performance_test/performance_test.py \
 
 If you want to distribute the generated host-specific execution files to each Host manually in advance, use `manager_scripts/distribute_exec_scripts.sh` as documented in [manager_scripts/README.md](./manager_scripts/README.md), then run `performance_test.py` normally.
 
-#### Note: Zenoh Router Setting [Zenoh only]
+### Note: Zenoh Router and Fast DDS Discovery Server [optional, RMW-specific]
 
-When using Zenoh as the RMW, `performance_test.py` automatically manages `rmw_zenohd` according to `--exec-policy` and `--zenoh-router`.
+When using Zenoh, `performance_test.py` automatically manages `rmw_zenohd` according to `--exec-policy` and `--zenoh-router` (it defaults to the first topology host if `--zenoh-router` is omitted, since Zenoh always requires a router).
 
-For `docker` and `native` modes, `--zenoh-router` selects the target:
-- (default): first host in the JSON topology (e.g., `host1`)
-- `<host-name>` / `<ipv4>`: explicit hostname or IPv4 address
-- `Manager`: the machine running `performance_test.py`
+Fast DDS also supports an equivalent central Discovery Server, but unlike Zenoh it works by default without one. `performance_test.py` therefore only starts it when `--fastdds-discovery-server` is explicitly given; it is never started implicitly (not even on `host1`).
 
-The specified target (hostname or `Manager`) is automatically resolved to an IP address, which is then used as the `connect/endpoints` value in `ZENOH_CONFIG_OVERRIDE`.
-
-`performance_test.py` also sets `ZENOH_CONFIG_OVERRIDE` so that every bench node connects to the router as a client:
-
-- `mode="client"`
-- `connect/endpoints=["tcp/<router-target>:7447"]`
-
-The table below summarizes how zenohd is placed and managed for each exec-policy:
-
-| exec-policy | zenohd placement | How it is managed |
-|---|---|---|
-| `local` | Manager (Docker container) | Managed internally by `local_exec.sh` via the `service_zenohd` service in `local_compose.yaml`; `performance_test.py` does not start or stop it separately |
-| `docker` | Router target host (Docker container) | `performance_test.py` runs `docker compose -f zenohd_compose.yaml up/down service_zenohd` on the target. No native ROS 2 installation required on the target host |
-| `native` | Router target host (native process) | `performance_test.py` SSHes to the target and starts/stops `rmw_zenohd` directly; requires ROS 2 and `rmw_zenoh_cpp` to be installed natively on the target host |
+See [performance_test/README.md#zenoh-router-and-fast-dds-discovery-server](./performance_test/README.md#zenoh-router-and-fast-dds-discovery-server) for target resolution rules, placement per `--exec-policy`, and CycloneDDS notes.
 
 ### Step4: Results and Analysis
 
@@ -427,13 +421,14 @@ For a single QoS case, the result layout is the original flat layout:
 - In `docker`/`native` modes, coordination logs are written under `<ws-dir>/<topology>/results/latest-<rmw>/coordination_logs/`.
 - Trial logs are collected under `<ws-dir>/<topology>/results/latest-<rmw>/raw_logs/trial<N>/`.
 - Aggregated outputs such as `total_latency.csv`, `throughput.csv`, `host_trials_usage.csv`, and `host_usage_summary.csv` are written under `<ws-dir>/<topology>/results/latest-<rmw>/analysis/`.
-- In `docker`/`native` modes, runtime service log snapshots are collected under `<ws-dir>/<topology>/results/latest-<rmw>/raw_logs/trial<N>/runtime_logs/` (for example, `<host>_rest_server.log` and `rmw_zenohd.log` for Zenoh runs).
+- In `docker`/`native` modes, runtime service log snapshots are collected under `<ws-dir>/<topology>/results/latest-<rmw>/raw_logs/trial<N>/runtime_logs/` (for example, `<host>_rest_server.log`, `rmw_zenohd.log` for Zenoh runs, and `fastdds_discoveryd.log` when `--fastdds-discovery-server` is set).
   - Note: `<host>_rest_server.log` is copied from the long-lived REST service log (`<remote-repo-base>/<ws-dir>/runtime_logs/rest_server.log`), so it may include entries from earlier benchmark runs unless the REST server was restarted.
 
 Long-lived service logs and result snapshots are separate:
 
 - Host-side `<remote-repo-base>/<ws-dir>/runtime_logs/rest_server.log` is used to diagnose the running REST server.
 - Native Zenoh router logs are written to `<manager-repo-root>/<ws-dir>/runtime_logs/rmw_zenohd.log` when `--zenoh-router Manager`, or to `<remote-repo-base>/<ws-dir>/runtime_logs/rmw_zenohd.log` when the router runs on a remote Host. Docker Zenoh output is captured from the `service_zenohd` container with `docker logs` and saved as `rmw_zenohd.log` in the per-trial snapshot directory.
+- Native Fast DDS discovery server logs follow the same convention as `fastdds_discoveryd.log` (Manager vs. remote Host, Docker vs. native), and only exist when `--fastdds-discovery-server` is set.
 - `raw_logs/trial<N>/runtime_logs/` stores the service-log snapshot captured for that trial. Local execution does not collect remote Host snapshots.
 - Each RMW has an independent result directory and `latest-<rmw>` symlink, which is updated only after that RMW run succeeds.
 
