@@ -345,10 +345,10 @@ def collect_runtime_logs(
             )
 
     if zenoh_router_kind == "host" and zenoh_router_target_host:
-        dst = os.path.join(runtime_logs_dir, "zenohd_router.log")
+        dst = os.path.join(runtime_logs_dir, "rmw_zenohd.log")
         if exec_policy == "native":
             remote_path = (
-                f"{ssh_user}@{zenoh_router_target_host}:{remote_runtime_dir}/zenohd_router.log"
+                f"{ssh_user}@{zenoh_router_target_host}:{remote_runtime_dir}/rmw_zenohd.log"
             )
             result = subprocess.run(
                 ["scp", remote_path, dst],
@@ -359,7 +359,7 @@ def collect_runtime_logs(
                 print(f"  runtime log -> {dst}")
             else:
                 print(
-                    f"  WARNING: Could not collect zenohd_router.log from {zenoh_router_target_host}: "
+                    f"  WARNING: Could not collect rmw_zenohd.log from {zenoh_router_target_host}: "
                     + (result.stderr or result.stdout or "").strip(),
                     file=sys.stderr,
                 )
@@ -384,21 +384,21 @@ def collect_runtime_logs(
 
             if not collected:
                 print(
-                    f"  WARNING: Could not collect zenohd_router.log (docker logs) from {zenoh_router_target_host}: {last_error}",
+                    f"  WARNING: Could not collect rmw_zenohd.log (docker logs) from {zenoh_router_target_host}: {last_error}",
                     file=sys.stderr,
                 )
     elif zenoh_router_kind == "manager" and local_repo_root:
-        dst = os.path.join(runtime_logs_dir, "zenohd_router.log")
+        dst = os.path.join(runtime_logs_dir, "rmw_zenohd.log")
         if exec_policy == "native":
             src = os.path.join(
-                local_repo_root, ws_dir, "runtime_logs", "zenohd_router.log"
+                local_repo_root, ws_dir, "runtime_logs", "rmw_zenohd.log"
             )
             if os.path.exists(src):
                 shutil.copy2(src, dst)
                 print(f"  runtime log -> {dst}")
             else:
                 print(
-                    f"  WARNING: zenohd_router.log not found at {src}",
+                    f"  WARNING: rmw_zenohd.log not found at {src}",
                     file=sys.stderr,
                 )
         else:  # docker
@@ -420,6 +420,6 @@ def collect_runtime_logs(
 
             if not collected:
                 print(
-                    f"  WARNING: Could not collect zenohd_router.log (docker logs) on manager: {last_error}",
+                    f"  WARNING: Could not collect rmw_zenohd.log (docker logs) on manager: {last_error}",
                     file=sys.stderr,
                 )

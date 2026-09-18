@@ -200,9 +200,9 @@ Runtime log files created by this script are stored on each Host under:
 This is a long-lived Host-side log and is independent of the topology being
 benchmarked. `performance_test.py` copies it into each trial's result directory
 in `docker` and `native` modes. For Zenoh, native `rmw_zenohd` stdout/stderr is
-redirected to `<ws-dir>/runtime_logs/zenohd_router.log` on the Manager when the
+redirected to `<manager-repo-root>/<ws-dir>/runtime_logs/rmw_zenohd.log` on the Manager when the
 router target is `Manager`, or to
-`<remote-repo-base>/<ws-dir>/runtime_logs/zenohd_router.log` on a remote router
+`<remote-repo-base>/<ws-dir>/runtime_logs/rmw_zenohd.log` on a remote router
 Host. Docker captures the `service_zenohd` container's stdout/stderr with
 `docker logs`.
 

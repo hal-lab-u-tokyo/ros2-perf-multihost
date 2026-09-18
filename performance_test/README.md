@@ -105,7 +105,7 @@ If a run fails before completion, the existing `latest-<rmw>` target is preserve
     │   │   └── runtime_logs/        # snapshots collected in docker/native mode
     │   │       ├── host1_rest_server.log
     │   │       ├── host2_rest_server.log
-    │   │       └── zenohd_router.log
+    │   │       └── rmw_zenohd.log
     │   ├── trial2/
     │   └── ...
     ├── analysis/
@@ -125,13 +125,13 @@ Long-lived service logs are separate from this result tree:
 ```text
 <remote-repo-base>/<ws-dir>/runtime_logs/       # remote Hosts
 ├── rest_server.log                  # on each remote Host
-└── zenohd_router.log                # native router, if the router is remote
+└── rmw_zenohd.log                   # native router, if the router is remote
 <manager-repo-root>/<ws-dir>/runtime_logs/      # native router target: Manager
-└── zenohd_router.log
+└── rmw_zenohd.log
 ```
 
 `raw_logs/trial<N>/runtime_logs/` contains snapshot copies of the long-lived
-service logs. In native Zenoh runs, `zenohd_router.log` is a copy of the
+service logs. In native Zenoh runs, `rmw_zenohd.log` is a copy of the
 `rmw_zenohd` process stdout/stderr file from the router location. In Docker
 Zenoh runs, it contains the `service_zenohd` container's stdout/stderr captured
 with `docker logs`; it is not necessarily present in the Host's shared

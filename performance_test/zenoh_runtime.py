@@ -151,7 +151,7 @@ def start_router(
         else:
             runtime_dir = _zenoh_router_runtime_dir(repo_root, ws_dir)
             os.makedirs(runtime_dir, exist_ok=True)
-            log_file = os.path.join(runtime_dir, "zenohd_router.log")
+            log_file = os.path.join(runtime_dir, "rmw_zenohd.log")
             legacy_pid_file = os.path.join(runtime_dir, "zenoh_router.pid")
             env = os.environ.copy()
             # Bench clients use ZENOH_CONFIG_OVERRIDE, but the router itself
@@ -198,7 +198,7 @@ def start_router(
             )
         else:
             runtime_dir = _zenoh_router_runtime_dir(remote_repo_base, ws_dir)
-            log_file = os.path.join(runtime_dir, "zenohd_router.log")
+            log_file = os.path.join(runtime_dir, "rmw_zenohd.log")
             legacy_pid_file = os.path.join(runtime_dir, "zenoh_router.pid")
             start_cmd = (
                 f"mkdir -p {shlex.quote(runtime_dir)}; "
