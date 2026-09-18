@@ -205,6 +205,7 @@ Generated launch and execution scripts receive the active case at runtime via
 python3 manager_scripts/generate_exec_scripts.py \
   <topology.json> \
   [--ws-dir|-w <dir>] \
+  [--image-repo <repo>] \
   [--image-tag <tag>] \
   [--force|-f]
 ```
@@ -213,6 +214,7 @@ Arguments:
 
 - `<topology.json>`: Path to the topology definition JSON file
 - `--ws-dir` (`-w`): Base directory for generated artifacts (default: `performance_ws`)
+- `--image-repo`: Docker image repository to embed in generated artifacts (default: the published project image)
 - `--image-tag`: Docker image tag to use. Usually unnecessary; use it when
   validating a development image such as `dev`. The default is the exact `v*`
   tag at `HEAD`, or `latest` when no such tag exists.
@@ -462,6 +464,7 @@ For details on output directory structure and CSV column definitions, see [perfo
 For detailed usage in subdomains, see the following documents:
 
 - [SETUP.md](./SETUP.md): One-time Manager/Host setup, SSH, Docker/ROS2, and chrony configuration.
+- [DEVELOPER.md](./DEVELOPER.md): Source changes, generated artifacts, development images, validation, and deployment updates.
 - [topology_example/README.md](./topology_example/README.md): Topology JSON format, including single QoS and QoS sweep array guidance.
 - [manager_scripts/README.md](./manager_scripts/README.md): Script usage, generated file details, `metadata.txt` QoS fields, and runtime QoS options.
 - [manager_scripts/system_perf/README.md](./manager_scripts/system_perf/README.md): Chrony synchronization and REST clock-skew checks.

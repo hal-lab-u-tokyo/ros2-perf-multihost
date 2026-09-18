@@ -349,32 +349,9 @@ HOSTS=(host1 host2)
 
 ### Updating a development branch
 
-1. Push the intended branch, update the Manager, and capture its exact revision:
-
-  ```bash
-  cd ~/ros2-perf-multihost
-  git switch <development-branch>
-  git pull --ff-only
-  REVISION="$(git rev-parse HEAD)"
-  echo "$REVISION"
-  ```
-
-2. In the same shell, fetch that exact revision on every Host using the loop
-  shown in step 2 of [Updating `main`](#updating-main).
-
-3. If Docker execution is used, publish the multi-architecture `dev` image as
-  described in
-  [docker/README.md](./docker/README.md#development-image-distribution). After
-  the publish completes, pull the mutable tag on every Docker benchmark
-  machine, but not on a Manager that does not run Docker benchmarks:
-
-  ```bash
-  docker pull ghcr.io/hal-lab-u-tokyo/ros2-perf-multihost:dev
-  ```
-
-4. Complete the [runtime refresh steps](#refresh-runtime-components) with
-  `<image-tag>` set to `dev`. Pull `dev` again after every new development
-  image is published.
+For source changes, private forks, and development branches, see
+[DEVELOPER.md](./DEVELOPER.md). This document assumes that the environment
+setup described in this file is already complete.
 
 ### Refresh runtime components
 
@@ -392,7 +369,7 @@ refresh the components used by the benchmark.
   ```
 
 2. On the Manager, regenerate and redistribute each topology. Replace
-  `<image-tag>` with `latest`, the release version, or `dev` selected above:
+  `<image-tag>` with `latest` or the selected release version:
 
   ```bash
   cd ~/ros2-perf-multihost
@@ -411,11 +388,9 @@ refresh the components used by the benchmark.
   ./manager_scripts/manage_rest_servers.sh status --hosts host1,host2,host3
   ```
 
-Native-only environments may skip the Docker image pull, but should still pass
-the intended image tag when regenerating because the same generated artifacts
-can later be used for Docker execution. Always regenerate and redistribute
-after generator, topology, or image-tag changes, and always restart the REST
-servers after updating their checkout.
+Native-only environments may skip the Docker image pull. Always regenerate and
+redistribute after generator, topology, or image-tag changes, and always restart
+the REST servers after updating their checkout.
 
 ### Verify the deployed revision
 

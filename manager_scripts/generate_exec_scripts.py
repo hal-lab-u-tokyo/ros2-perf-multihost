@@ -61,7 +61,7 @@ if __name__ == "__main__":
         description="Generate Docker execution scripts and compose files from a JSON topology",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         usage=(
-            "%(prog)s <topology.json> [--ws-dir|-w <dir>] [--image-tag <tag>] [--force|-f] "
+            "%(prog)s <topology.json> [--ws-dir|-w <dir>] [--image-repo <repo>] [--image-tag <tag>] [--force|-f] "
             "[--help|-h]"
         ),
         epilog="""
@@ -80,6 +80,14 @@ Examples:
         help=f"Base directory for generated artifacts (default: {DEFAULT_PERF_WS_DIR})",
     )
     parser.add_argument(
+        "--image-repo",
+        default=IMAGE_REPOSITORY,
+        help=(
+            "Docker image repository to embed in generated artifacts "
+            f"(default: {IMAGE_REPOSITORY})"
+        ),
+    )
+    parser.add_argument(
         "--image-tag",
         help="Docker image tag to use (default: exact v* tag at HEAD, otherwise latest)",
     )
@@ -95,7 +103,7 @@ Examples:
     settings = GenerationSettings(
         project_root_in_container=PROJECT_ROOT_IN_CONTAINER,
         ros_ws_in_container=ROS_WS_IN_CONTAINER,
-        image_name=f"{IMAGE_REPOSITORY}:{image_tag}",
+        image_name=f"{args.image_repo}:{image_tag}",
         perf_ws_dir=args.ws_dir,
         default_eval_time=DEFAULT_EVAL_TIME,
     )
