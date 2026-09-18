@@ -24,6 +24,9 @@ REPO_ROOT = os.environ.get("ROS2_PERF_REPO_ROOT",
                            "/home/ubuntu/ros2-perf-multihost")
 DEFAULT_WS_DIR = os.environ.get("ROS2_PERF_WS_DIR", "performance_ws")
 RUN_SCRIPT_TIMEOUT_SEC = int(os.environ.get("RUN_SCRIPT_TIMEOUT_SEC", "900"))
+RUN_SCRIPT_TIMEOUT_MARGIN_SEC = int(
+    os.environ.get("RUN_SCRIPT_TIMEOUT_MARGIN_SEC", "120")
+)
 CHRONY_SYNC_ON_STARTUP = os.environ.get(
     "ROS2_PERF_CHRONY_SYNC_ON_STARTUP", "1"
 ).strip().lower() in ("1", "true", "yes", "on")
@@ -427,12 +430,13 @@ def _resolve_host_script(exec_dir, hosts, suffix, joiner="_"):
     )
 
 
-def _run_script(cmd, env=None):
+def _run_script(cmd, env=None, timeout_sec=None):
+    timeout = timeout_sec if timeout_sec is not None else RUN_SCRIPT_TIMEOUT_SEC
     result = subprocess.run(
         cmd,
         text=True,
         capture_output=True,
-        timeout=RUN_SCRIPT_TIMEOUT_SEC,
+        timeout=timeout,
         env=env,
     )
     if result.returncode != 0:
@@ -448,6 +452,12 @@ def _run_script(cmd, env=None):
             500,
         )
     return jsonify({"status": "finished", "stdout": result.stdout}), 200
+
+
+def _script_timeout_for_eval(eval_time):
+    if eval_time is None:
+        return RUN_SCRIPT_TIMEOUT_SEC
+    return max(RUN_SCRIPT_TIMEOUT_SEC, eval_time + RUN_SCRIPT_TIMEOUT_MARGIN_SEC)
 
 
 def _prepare_results_timestamp(ctx, rmw):
@@ -582,13 +592,13 @@ def start_docker():
             run_timestamp,
             script_path,
         )
-        return _run_script(cmd, env=env)
+        return _run_script(cmd, env=env, timeout_sec=_script_timeout_for_eval(eval_time))
     except ValueError as exc:
         return jsonify({"error": str(exc)}), 400
     except FileNotFoundError as exc:
         return jsonify({"error": str(exc)}), 404
-    except subprocess.TimeoutExpired:
-        return jsonify({"error": f"script timeout after {RUN_SCRIPT_TIMEOUT_SEC}s"}), 504
+    except subprocess.TimeoutExpired as exc:
+        return jsonify({"error": f"script timeout after {exc.timeout}s"}), 504
     except Exception as exc:
         app.logger.exception("[start_docker] exception")
         return jsonify({"error": str(exc)}), 500
@@ -643,13 +653,13 @@ def start_native():
             run_timestamp,
             script_path,
         )
-        return _run_script(cmd, env=env)
+        return _run_script(cmd, env=env, timeout_sec=_script_timeout_for_eval(eval_time))
     except ValueError as exc:
         return jsonify({"error": str(exc)}), 400
     except FileNotFoundError as exc:
         return jsonify({"error": str(exc)}), 404
-    except subprocess.TimeoutExpired:
-        return jsonify({"error": f"script timeout after {RUN_SCRIPT_TIMEOUT_SEC}s"}), 504
+    except subprocess.TimeoutExpired as exc:
+        return jsonify({"error": f"script timeout after {exc.timeout}s"}), 504
     except Exception as exc:
         app.logger.exception("[start_native] exception")
         return jsonify({"error": str(exc)}), 500

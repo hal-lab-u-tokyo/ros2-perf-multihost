@@ -209,12 +209,14 @@ Examples:
             f"Using prepare mode: {endpoint} endpoint with timeout {timeout}")
     elif args.exec_policy == "docker":
         endpoint = "/start_docker"
-        timeout = (5, 300)  # (connect, read) in seconds
+        _read_timeout = max(300, eval_time_value +
+                            120) if eval_time_value is not None else 300
+        timeout = (5, _read_timeout)  # (connect, read) in seconds
         print(f"Using Docker mode: {endpoint} endpoint with timeout {timeout}")
     else:
         endpoint = "/start_native"
         _read_timeout = max(100, eval_time_value +
-                            30) if eval_time_value is not None else 100
+                            60) if eval_time_value is not None else 100
         timeout = (5, _read_timeout)  # (connect, read) in seconds
         print(
             f"Using native mode: {endpoint} endpoint with timeout {timeout}")

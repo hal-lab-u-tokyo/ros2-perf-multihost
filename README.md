@@ -318,6 +318,7 @@ python3 performance_test/performance_test.py \
   [--rmw <rmw>[,...]] \
   [--exec-policy|-p <mode>] \
   [--eval-time|-e <sec>] \
+  [--warmup-time <sec>] \
   [--trials|-t <n>] \
   [--ws-dir|-w <dir>] \
   [--remote-repo-base|-b <dir>] \
@@ -333,7 +334,8 @@ for detailed option behavior and output handling.
 - `<topology>`: Generated topology directory (required)
 - `--rmw`: Comma-separated RMW implementations, run in order (default: `fastdds`)
 - `--exec-policy` (`-p`): `docker`, `native`, or `local` (default: `docker`)
-- `--eval-time` (`-e`): Evaluation duration override
+- `--eval-time` (`-e`): Measurement duration in seconds (default: `60`)
+- `--warmup-time`: Warmup duration in seconds excluded from aggregation (default: `1`)
 - `--trials` (`-t`): Number of trials per RMW and QoS case (default: `3`)
 - `--ws-dir` (`-w`): Workspace containing generated artifacts (default: `performance_ws`)
 - `--remote-repo-base` (`-b`): Remote repository root for `docker`/`native`
@@ -344,6 +346,10 @@ for detailed option behavior and output handling.
 
 QoS sweep execution does not require an extra command-line option. It is driven
 by the topology JSON used during `generate_exec_scripts.py`.
+
+Benchmark nodes run longer than `warmup-time + eval-time` by a small internal
+padding to absorb host start skew. Aggregated latency and throughput are
+computed from exactly the `eval-time` window after warmup.
 
 If `metadata.txt` contains multiple QoS cases, `performance_test.py`
 automatically expands the sweep: for each QoS case, it runs the requested number

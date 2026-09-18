@@ -52,7 +52,7 @@ All endpoints accept a JSON body. Common request fields:
 | `rmw` | string | RMW implementation: `fastdds`, `cyclonedds`, or `zenoh` (required) |
 | `ws_dir` | string | Workspace directory (default: `performance_ws`) |
 | `trial_idx` | integer | Trial index, used by `/start_native` and `/start_docker` (default: `1`) |
-| `eval_time` | integer | Override evaluation duration in seconds (optional) |
+| `eval_time` | integer | Override execution duration in seconds for the host script (optional) |
 | `qos_case_idx` | integer | QoS sweep case index from the topology JSON `qos` array (optional) |
 | `qos` | object | One QoS case from the topology JSON `qos` array (optional) |
 | `zenoh_config_override` | string | Optional `ZENOH_CONFIG_OVERRIDE` value forwarded to the execution script environment |
@@ -114,7 +114,8 @@ For other startup sync failures, the server keeps running by default and reports
 |---|---|---|
 | `ROS2_PERF_REPO_ROOT` | `/home/ubuntu/ros2-perf-multihost` | Absolute path to the repository root on each Host |
 | `ROS2_PERF_WS_DIR` | `performance_ws` | Default workspace directory |
-| `RUN_SCRIPT_TIMEOUT_SEC` | `900` | Timeout in seconds for script execution |
+| `RUN_SCRIPT_TIMEOUT_SEC` | `900` | Minimum timeout in seconds for script execution |
+| `RUN_SCRIPT_TIMEOUT_MARGIN_SEC` | `120` | Margin added to the requested execution duration before taking the maximum with `RUN_SCRIPT_TIMEOUT_SEC` |
 | `ROS2_PERF_CHRONY_SYNC_ON_STARTUP` | `1` | Set `0` to disable the startup clock sync |
 | `ROS2_PERF_CHRONY_CHECK_ON_PREPARE` | `1` | Set `0` to disable the prepare-time offset guard |
 | `ROS2_PERF_CHRONY_FAIL_FAST_ON_STARTUP` | `0` | Set `1` to exit the server if startup chrony sync fails |

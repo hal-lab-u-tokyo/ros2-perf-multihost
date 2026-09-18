@@ -332,6 +332,7 @@ def aggregate_total_latency(
     num_trials,
     hosts,
     eval_time=None,
+    warmup_time=1,
     ws_dir="performance_ws",
     topology_name=None,
     strict_analysis=False,
@@ -348,7 +349,8 @@ def aggregate_total_latency(
     try:
         subprocess.run(
             [sys.executable, analyzer_script, "--logs",
-                log_dir, "--results", trial_dir],
+                log_dir, "--results", trial_dir, "--warmup-time", str(warmup_time),
+                "--measurement-time", str(eval_time)],
             check=True,
         )
     except subprocess.CalledProcessError as exc:
